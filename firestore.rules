@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Colección de usuarios (nivel superior)
+    // Los usuarios pueden crear y gestionar sus propios perfiles
+    match /usuarios/{userId} {
+      // Permitir lectura si está autenticado
+      allow read: if isAuthenticated();
+
+      // Permitir crear/actualizar solo su propio documento
+      allow create, update: if isAuthenticated() && isOwner(userId);
+
+      // Solo el usuario puede eliminar su propio perfil
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Colección de pacientes
+    match /pacientes/{pacienteId} {
+      // Permitir lectura a usuarios autenticados
+      allow read: if isAuthenticated();
+
+      // Permitir escritura a usuarios autenticados (por ahora)
+      // TODO: Restringir según rol cuando se implemente gestión de pacientes
+      allow write: if isAuthenticated();
+
+      // Subcolecciones del paciente
+      match /{document=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+  }
+}
