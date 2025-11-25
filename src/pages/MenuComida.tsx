@@ -274,7 +274,7 @@ export default function MenuComida() {
     }
 
     try {
-      const recetaData = {
+      const recetaData: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         nombre: formReceta.nombre.trim(),
         categoria: formReceta.categoria,
@@ -282,10 +282,14 @@ export default function MenuComida() {
         instrucciones: formReceta.instrucciones,
         etiquetas: formReceta.etiquetas,
         favorita: formReceta.favorita,
-        foto: formReceta.foto || undefined,
         activo: true,
         actualizadoEn: Timestamp.now(),
       };
+
+      // Solo incluir foto si tiene valor
+      if (formReceta.foto) {
+        recetaData.foto = formReceta.foto;
+      }
 
       if (recetaEditando) {
         await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'recetas', recetaEditando.id), recetaData);
