@@ -336,23 +336,31 @@ export default function Actividades() {
 
   async function duplicarPlantilla(plantilla: PlantillaActividad) {
     try {
-      await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'plantillasActividades'), {
+      const nuevaPlantilla: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         nombre: `${plantilla.nombre} (copia)`,
         tipo: plantilla.tipo,
-        descripcion: plantilla.descripcion,
-        duracion: plantilla.duracion,
-        ubicacion: plantilla.ubicacion,
-        materialesNecesarios: plantilla.materialesNecesarios,
-        nivelEnergia: plantilla.nivelEnergia,
-        responsableDefault: plantilla.responsableDefault,
-        etiquetas: plantilla.etiquetas,
         favorita: false,
-        foto: plantilla.foto,
         activo: true,
         creadoEn: Timestamp.now(),
         actualizadoEn: Timestamp.now()
-      });
+      };
+
+      // Solo agregar campos opcionales si tienen valor
+      if (plantilla.descripcion) nuevaPlantilla.descripcion = plantilla.descripcion;
+      if (plantilla.duracion) nuevaPlantilla.duracion = plantilla.duracion;
+      if (plantilla.ubicacion) nuevaPlantilla.ubicacion = plantilla.ubicacion;
+      if (plantilla.materialesNecesarios && plantilla.materialesNecesarios.length > 0) {
+        nuevaPlantilla.materialesNecesarios = plantilla.materialesNecesarios;
+      }
+      if (plantilla.nivelEnergia) nuevaPlantilla.nivelEnergia = plantilla.nivelEnergia;
+      if (plantilla.responsableDefault) nuevaPlantilla.responsableDefault = plantilla.responsableDefault;
+      if (plantilla.etiquetas && plantilla.etiquetas.length > 0) {
+        nuevaPlantilla.etiquetas = plantilla.etiquetas;
+      }
+      if (plantilla.foto) nuevaPlantilla.foto = plantilla.foto;
+
+      await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'plantillasActividades'), nuevaPlantilla);
     } catch (error) {
       console.error('Error al duplicar plantilla:', error);
       alert('Error al duplicar la plantilla');
