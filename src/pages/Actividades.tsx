@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
-import { Actividad, TipoActividad, EstadoActividad, NivelEnergia, ParticipacionActividad, Usuario } from '../types';
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, startOfDay, endOfDay } from 'date-fns';
+import { Actividad, TipoActividad, EstadoActividad, NivelEnergia, ParticipacionActividad, Usuario, PlantillaActividad } from '../types';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const PACIENTE_ID = 'paciente-principal';
@@ -34,16 +35,17 @@ const coloresEstado: Record<EstadoActividad, string> = {
   cancelada: 'bg-red-200 text-red-700'
 };
 
-const plantillasActividad: { nombre: string; tipo: TipoActividad; duracion: number; descripcion: string }[] = [
-  { nombre: 'Caminata matutina', tipo: 'fisica', duracion: 30, descripcion: 'Caminata ligera por el jardín o casa' },
-  { nombre: 'Ejercicios de fisioterapia', tipo: 'terapeutica', duracion: 45, descripcion: 'Rutina de ejercicios indicados por el fisioterapeuta' },
-  { nombre: 'Ejercicios intestinales', tipo: 'terapeutica', duracion: 15, descripcion: 'Movimientos para estimular el tránsito intestinal' },
-  { nombre: 'Juegos de memoria', tipo: 'cognitiva', duracion: 30, descripcion: 'Crucigramas, sudoku, juegos de cartas' },
-  { nombre: 'Lectura en voz alta', tipo: 'cognitiva', duracion: 20, descripcion: 'Leer periódico, libros o revistas' },
-  { nombre: 'Manualidades', tipo: 'recreativa', duracion: 45, descripcion: 'Tejido, pintura, armado de puzzles' },
-  { nombre: 'Ver fotos familiares', tipo: 'social', duracion: 30, descripcion: 'Revisar álbumes y recordar momentos' },
-  { nombre: 'Videollamada familiar', tipo: 'social', duracion: 30, descripcion: 'Llamada con familiares' },
-  { nombre: 'Paseo al parque', tipo: 'salida', duracion: 60, descripcion: 'Salida al parque cercano' }
+// Plantillas iniciales para migración automática
+const plantillasIniciales = [
+  { nombre: 'Caminata matutina', tipo: 'fisica' as TipoActividad, duracion: 30, descripcion: 'Caminata ligera por el jardín o casa', nivelEnergia: 'medio' as NivelEnergia, materialesNecesarios: ['Zapatos cómodos'], ubicacion: 'Jardín o interior', etiquetas: ['ejercicio', 'mañana'] },
+  { nombre: 'Ejercicios de fisioterapia', tipo: 'terapeutica' as TipoActividad, duracion: 45, descripcion: 'Rutina de ejercicios indicados por el fisioterapeuta', nivelEnergia: 'medio' as NivelEnergia, materialesNecesarios: ['Colchoneta', 'Banda elástica'], ubicacion: 'Sala', etiquetas: ['fisioterapia', 'ejercicio'] },
+  { nombre: 'Ejercicios intestinales', tipo: 'terapeutica' as TipoActividad, duracion: 15, descripcion: 'Movimientos para estimular el tránsito intestinal', nivelEnergia: 'bajo' as NivelEnergia, materialesNecesarios: [], ubicacion: 'Habitación', etiquetas: ['salud digestiva'] },
+  { nombre: 'Juegos de memoria', tipo: 'cognitiva' as TipoActividad, duracion: 30, descripcion: 'Crucigramas, sudoku, juegos de cartas', nivelEnergia: 'bajo' as NivelEnergia, materialesNecesarios: ['Crucigramas', 'Sudoku', 'Cartas'], ubicacion: 'Mesa del comedor', etiquetas: ['cognitivo', 'entretenimiento'] },
+  { nombre: 'Lectura en voz alta', tipo: 'cognitiva' as TipoActividad, duracion: 20, descripcion: 'Leer periódico, libros o revistas', nivelEnergia: 'bajo' as NivelEnergia, materialesNecesarios: ['Libro o periódico', 'Lentes de lectura'], ubicacion: 'Sala', etiquetas: ['cognitivo', 'lectura'] },
+  { nombre: 'Manualidades', tipo: 'recreativa' as TipoActividad, duracion: 45, descripcion: 'Tejido, pintura, armado de puzzles', nivelEnergia: 'bajo' as NivelEnergia, materialesNecesarios: ['Material de manualidades'], ubicacion: 'Mesa de trabajo', etiquetas: ['creatividad', 'entretenimiento'] },
+  { nombre: 'Ver fotos familiares', tipo: 'social' as TipoActividad, duracion: 30, descripcion: 'Revisar álbumes y recordar momentos', nivelEnergia: 'bajo' as NivelEnergia, materialesNecesarios: ['Álbum de fotos'], ubicacion: 'Sala', etiquetas: ['familia', 'memoria'] },
+  { nombre: 'Videollamada familiar', tipo: 'social' as TipoActividad, duracion: 30, descripcion: 'Llamada con familiares', nivelEnergia: 'bajo' as NivelEnergia, materialesNecesarios: ['Tablet o teléfono'], ubicacion: 'Sala', etiquetas: ['familia', 'comunicación'] },
+  { nombre: 'Paseo al parque', tipo: 'salida' as TipoActividad, duracion: 60, descripcion: 'Salida al parque cercano', nivelEnergia: 'alto' as NivelEnergia, materialesNecesarios: ['Silla de ruedas', 'Gorra', 'Agua'], ubicacion: 'Parque', etiquetas: ['salida', 'aire libre'] }
 ];
 
 export default function Actividades() {
@@ -80,6 +82,32 @@ export default function Actividades() {
   });
 
   const [nuevoMaterial, setNuevoMaterial] = useState('');
+
+  // Estados para plantillas configurables
+  const [plantillas, setPlantillas] = useState<PlantillaActividad[]>([]);
+  const [modalPlantillas, setModalPlantillas] = useState(false);
+  const [modalPlantillaCRUD, setModalPlantillaCRUD] = useState(false);
+  const [plantillaEditando, setPlantillaEditando] = useState<PlantillaActividad | null>(null);
+  const [busquedaPlantilla, setBusquedaPlantilla] = useState('');
+  const [filtroTipoPlantilla, setFiltroTipoPlantilla] = useState<TipoActividad | 'todas'>('todas');
+  const [mostrarSoloFavoritas, setMostrarSoloFavoritas] = useState(false);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [nuevoMaterialPlantilla, setNuevoMaterialPlantilla] = useState('');
+  const [nuevaEtiquetaPlantilla, setNuevaEtiquetaPlantilla] = useState('');
+
+  const [formPlantilla, setFormPlantilla] = useState({
+    nombre: '',
+    tipo: 'recreativa' as TipoActividad,
+    descripcion: '',
+    duracion: 30,
+    ubicacion: '',
+    materialesNecesarios: [] as string[],
+    nivelEnergia: 'medio' as NivelEnergia,
+    responsableDefault: '',
+    etiquetas: [] as string[],
+    favorita: false,
+    foto: ''
+  });
 
   // Obtener inicio y fin de semana
   const inicioSemana = startOfWeek(semanaActual, { weekStartsOn: 1 });
@@ -129,6 +157,59 @@ export default function Actividades() {
     return () => unsubscribe();
   }, []);
 
+  // Cargar plantillas de actividades
+  useEffect(() => {
+    const q = query(
+      collection(db, 'pacientes', PACIENTE_ID, 'plantillasActividades'),
+      orderBy('nombre', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const plantillasData = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          creadoEn: doc.data().creadoEn?.toDate(),
+          actualizadoEn: doc.data().actualizadoEn?.toDate()
+        }))
+        .filter(p => p.activo !== false) as PlantillaActividad[];
+
+      // Si no hay plantillas, migrar las iniciales
+      if (plantillasData.length === 0 && snapshot.docs.length === 0) {
+        await migrarPlantillasIniciales();
+      } else {
+        setPlantillas(plantillasData);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Migrar plantillas iniciales a Firestore
+  async function migrarPlantillasIniciales() {
+    try {
+      for (const plantilla of plantillasIniciales) {
+        await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'plantillasActividades'), {
+          pacienteId: PACIENTE_ID,
+          nombre: plantilla.nombre,
+          tipo: plantilla.tipo,
+          descripcion: plantilla.descripcion,
+          duracion: plantilla.duracion,
+          ubicacion: plantilla.ubicacion,
+          materialesNecesarios: plantilla.materialesNecesarios,
+          nivelEnergia: plantilla.nivelEnergia,
+          etiquetas: plantilla.etiquetas,
+          favorita: false,
+          activo: true,
+          creadoEn: Timestamp.now(),
+          actualizadoEn: Timestamp.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error migrando plantillas:', error);
+    }
+  }
+
   // Actividades del día
   function actividadesDelDia(fecha: Date): Actividad[] {
     return actividades.filter(a => a.fechaInicio && isSameDay(a.fechaInicio, fecha));
@@ -140,15 +221,184 @@ export default function Actividades() {
   }
 
   // Usar plantilla
-  function usarPlantilla(plantilla: typeof plantillasActividad[0]) {
+  function usarPlantilla(plantilla: PlantillaActividad) {
     setFormActividad({
       ...formActividad,
       nombre: plantilla.nombre,
       tipo: plantilla.tipo,
       duracion: plantilla.duracion,
-      descripcion: plantilla.descripcion
+      descripcion: plantilla.descripcion,
+      ubicacion: plantilla.ubicacion || '',
+      materialesNecesarios: plantilla.materialesNecesarios || [],
+      nivelEnergia: plantilla.nivelEnergia,
+      responsable: plantilla.responsableDefault || ''
     });
+    setModalPlantillas(false);
   }
+
+  // ========== FUNCIONES CRUD DE PLANTILLAS ==========
+
+  function abrirModalPlantilla(plantilla?: PlantillaActividad) {
+    if (plantilla) {
+      setPlantillaEditando(plantilla);
+      setFormPlantilla({
+        nombre: plantilla.nombre,
+        tipo: plantilla.tipo,
+        descripcion: plantilla.descripcion,
+        duracion: plantilla.duracion,
+        ubicacion: plantilla.ubicacion || '',
+        materialesNecesarios: plantilla.materialesNecesarios || [],
+        nivelEnergia: plantilla.nivelEnergia,
+        responsableDefault: plantilla.responsableDefault || '',
+        etiquetas: plantilla.etiquetas || [],
+        favorita: plantilla.favorita,
+        foto: plantilla.foto || ''
+      });
+    } else {
+      setPlantillaEditando(null);
+      setFormPlantilla({
+        nombre: '',
+        tipo: 'recreativa',
+        descripcion: '',
+        duracion: 30,
+        ubicacion: '',
+        materialesNecesarios: [],
+        nivelEnergia: 'medio',
+        responsableDefault: '',
+        etiquetas: [],
+        favorita: false,
+        foto: ''
+      });
+    }
+    setModalPlantillaCRUD(true);
+  }
+
+  function cerrarModalPlantilla() {
+    setModalPlantillaCRUD(false);
+    setPlantillaEditando(null);
+    setNuevoMaterialPlantilla('');
+    setNuevaEtiquetaPlantilla('');
+  }
+
+  async function guardarPlantilla() {
+    if (!formPlantilla.nombre.trim()) {
+      alert('El nombre de la plantilla es obligatorio');
+      return;
+    }
+
+    try {
+      const plantillaData = {
+        pacienteId: PACIENTE_ID,
+        nombre: formPlantilla.nombre.trim(),
+        tipo: formPlantilla.tipo,
+        descripcion: formPlantilla.descripcion,
+        duracion: formPlantilla.duracion,
+        ubicacion: formPlantilla.ubicacion || undefined,
+        materialesNecesarios: formPlantilla.materialesNecesarios,
+        nivelEnergia: formPlantilla.nivelEnergia,
+        responsableDefault: formPlantilla.responsableDefault || undefined,
+        etiquetas: formPlantilla.etiquetas,
+        favorita: formPlantilla.favorita,
+        foto: formPlantilla.foto || undefined,
+        activo: true,
+        actualizadoEn: Timestamp.now()
+      };
+
+      if (plantillaEditando) {
+        await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'plantillasActividades', plantillaEditando.id), plantillaData);
+      } else {
+        await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'plantillasActividades'), {
+          ...plantillaData,
+          creadoEn: Timestamp.now()
+        });
+      }
+
+      cerrarModalPlantilla();
+    } catch (error) {
+      console.error('Error al guardar plantilla:', error);
+      alert('Error al guardar la plantilla');
+    }
+  }
+
+  async function eliminarPlantilla(plantilla: PlantillaActividad) {
+    if (!confirm(`¿Eliminar la plantilla "${plantilla.nombre}"?`)) return;
+
+    try {
+      await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'plantillasActividades', plantilla.id), {
+        activo: false,
+        actualizadoEn: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error al eliminar plantilla:', error);
+      alert('Error al eliminar la plantilla');
+    }
+  }
+
+  async function duplicarPlantilla(plantilla: PlantillaActividad) {
+    try {
+      await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'plantillasActividades'), {
+        pacienteId: PACIENTE_ID,
+        nombre: `${plantilla.nombre} (copia)`,
+        tipo: plantilla.tipo,
+        descripcion: plantilla.descripcion,
+        duracion: plantilla.duracion,
+        ubicacion: plantilla.ubicacion,
+        materialesNecesarios: plantilla.materialesNecesarios,
+        nivelEnergia: plantilla.nivelEnergia,
+        responsableDefault: plantilla.responsableDefault,
+        etiquetas: plantilla.etiquetas,
+        favorita: false,
+        foto: plantilla.foto,
+        activo: true,
+        creadoEn: Timestamp.now(),
+        actualizadoEn: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error al duplicar plantilla:', error);
+      alert('Error al duplicar la plantilla');
+    }
+  }
+
+  async function toggleFavoritaPlantilla(plantilla: PlantillaActividad) {
+    try {
+      await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'plantillasActividades', plantilla.id), {
+        favorita: !plantilla.favorita,
+        actualizadoEn: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error al cambiar favorita:', error);
+    }
+  }
+
+  async function handleFotoPlantillaUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingFoto(true);
+      const storageRef = ref(storage, `plantillasActividades/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setFormPlantilla({ ...formPlantilla, foto: url });
+    } catch (error) {
+      console.error('Error al subir foto:', error);
+      alert('Error al subir la foto');
+    } finally {
+      setUploadingFoto(false);
+    }
+  }
+
+  // Filtrado de plantillas
+  const plantillasFiltradas = plantillas
+    .filter(p => filtroTipoPlantilla === 'todas' || p.tipo === filtroTipoPlantilla)
+    .filter(p => !mostrarSoloFavoritas || p.favorita)
+    .filter(p => !busquedaPlantilla ||
+      p.nombre.toLowerCase().includes(busquedaPlantilla.toLowerCase()) ||
+      p.descripcion.toLowerCase().includes(busquedaPlantilla.toLowerCase()) ||
+      p.materialesNecesarios?.some(m => m.toLowerCase().includes(busquedaPlantilla.toLowerCase()))
+    );
+
+  const todasEtiquetas = [...new Set(plantillas.flatMap(p => p.etiquetas || []))];
 
   // Crear/Editar actividad
   async function guardarActividad() {
@@ -595,23 +845,15 @@ export default function Actividades() {
                 {modoEdicion ? '✏️ Editar Actividad' : '🎯 Nueva Actividad'}
               </h2>
 
-              {/* Plantillas rápidas */}
+              {/* Botón para ver plantillas */}
               {!modoEdicion && (
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Plantillas rápidas
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {plantillasActividad.slice(0, 5).map((p, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => usarPlantilla(p)}
-                        className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-                      >
-                        {tiposActividad.find(t => t.value === p.tipo)?.icon} {p.nombre}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    onClick={() => setModalPlantillas(true)}
+                    className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    📋 Usar Plantilla de Actividad
+                  </button>
                 </div>
               )}
 
@@ -887,6 +1129,492 @@ export default function Actividades() {
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   ✓ Marcar Completada
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Selección de Plantillas */}
+        {modalPlantillas && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg max-w-4xl w-full p-6 my-8 max-h-[90vh] flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">📋 Plantillas de Actividades</h2>
+                <button
+                  onClick={() => setModalPlantillas(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Filtros */}
+              <div className="flex flex-wrap gap-3 mb-4">
+                <input
+                  type="text"
+                  value={busquedaPlantilla}
+                  onChange={(e) => setBusquedaPlantilla(e.target.value)}
+                  placeholder="Buscar plantillas..."
+                  className="flex-1 min-w-[200px] border rounded-lg px-3 py-2"
+                />
+                <select
+                  value={filtroTipoPlantilla}
+                  onChange={(e) => setFiltroTipoPlantilla(e.target.value as TipoActividad | 'todas')}
+                  className="border rounded-lg px-3 py-2"
+                >
+                  <option value="todas">Todos los tipos</option>
+                  {tiposActividad.map(t => (
+                    <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setMostrarSoloFavoritas(!mostrarSoloFavoritas)}
+                  className={`px-4 py-2 rounded-lg ${
+                    mostrarSoloFavoritas ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  ⭐ Favoritas
+                </button>
+                <button
+                  onClick={() => abrirModalPlantilla()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  + Nueva Plantilla
+                </button>
+              </div>
+
+              {/* Grid de plantillas */}
+              <div className="flex-1 overflow-y-auto">
+                {plantillasFiltradas.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <p className="text-4xl mb-2">📋</p>
+                    <p>No se encontraron plantillas</p>
+                    {plantillas.length === 0 && (
+                      <p className="text-sm mt-2">Crea tu primera plantilla para comenzar</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {plantillasFiltradas.map(plantilla => (
+                      <div
+                        key={plantilla.id}
+                        className={`border rounded-lg overflow-hidden hover:shadow-lg transition-shadow ${coloresTipo[plantilla.tipo]}`}
+                      >
+                        {/* Foto de la plantilla */}
+                        {plantilla.foto && (
+                          <div className="h-32 overflow-hidden">
+                            <img
+                              src={plantilla.foto}
+                              alt={plantilla.nombre}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        <div className="p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{tiposActividad.find(t => t.value === plantilla.tipo)?.icon}</span>
+                              <h3 className="font-semibold">{plantilla.nombre}</h3>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavoritaPlantilla(plantilla);
+                              }}
+                              className="text-xl hover:scale-110 transition-transform"
+                            >
+                              {plantilla.favorita ? '⭐' : '☆'}
+                            </button>
+                          </div>
+
+                          <p className="text-sm opacity-80 mb-2 line-clamp-2">{plantilla.descripcion}</p>
+
+                          <div className="flex flex-wrap gap-2 text-xs mb-3">
+                            <span className="bg-white/50 px-2 py-0.5 rounded">
+                              ⏱️ {plantilla.duracion} min
+                            </span>
+                            <span className="bg-white/50 px-2 py-0.5 rounded">
+                              {plantilla.nivelEnergia === 'bajo' ? '🔋' : plantilla.nivelEnergia === 'medio' ? '🔋🔋' : '🔋🔋🔋'}
+                            </span>
+                            {plantilla.ubicacion && (
+                              <span className="bg-white/50 px-2 py-0.5 rounded">
+                                📍 {plantilla.ubicacion}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Materiales */}
+                          {plantilla.materialesNecesarios && plantilla.materialesNecesarios.length > 0 && (
+                            <div className="text-xs mb-2">
+                              <span className="opacity-70">Materiales: </span>
+                              {plantilla.materialesNecesarios.slice(0, 3).join(', ')}
+                              {plantilla.materialesNecesarios.length > 3 && ` +${plantilla.materialesNecesarios.length - 3}`}
+                            </div>
+                          )}
+
+                          {/* Etiquetas */}
+                          {plantilla.etiquetas && plantilla.etiquetas.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {plantilla.etiquetas.map((etiqueta, idx) => (
+                                <span key={idx} className="text-xs bg-white/30 px-2 py-0.5 rounded">
+                                  #{etiqueta}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Acciones */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => usarPlantilla(plantilla)}
+                              className="flex-1 py-2 bg-white/80 rounded-lg text-sm font-medium hover:bg-white transition-colors"
+                            >
+                              ✓ Usar
+                            </button>
+                            <button
+                              onClick={() => abrirModalPlantilla(plantilla)}
+                              className="p-2 bg-white/50 rounded-lg hover:bg-white/80"
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => duplicarPlantilla(plantilla)}
+                              className="p-2 bg-white/50 rounded-lg hover:bg-white/80"
+                              title="Duplicar"
+                            >
+                              📄
+                            </button>
+                            <button
+                              onClick={() => eliminarPlantilla(plantilla)}
+                              className="p-2 bg-white/50 rounded-lg hover:bg-red-100 text-red-600"
+                              title="Eliminar"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                <p className="text-sm text-gray-500">
+                  {plantillasFiltradas.length} de {plantillas.length} plantillas
+                </p>
+                <button
+                  onClick={() => setModalPlantillas(false)}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal CRUD de Plantilla */}
+        {modalPlantillaCRUD && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg max-w-2xl w-full p-6 my-8">
+              <h2 className="text-xl font-bold mb-4">
+                {plantillaEditando ? '✏️ Editar Plantilla' : '📋 Nueva Plantilla'}
+              </h2>
+
+              <div className="space-y-4">
+                {/* Info básica */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                    <input
+                      type="text"
+                      value={formPlantilla.nombre}
+                      onChange={(e) => setFormPlantilla({ ...formPlantilla, nombre: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2"
+                      placeholder="Nombre de la plantilla"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                    <select
+                      value={formPlantilla.tipo}
+                      onChange={(e) => setFormPlantilla({ ...formPlantilla, tipo: e.target.value as TipoActividad })}
+                      className="w-full border rounded-lg px-3 py-2"
+                    >
+                      {tiposActividad.map(t => (
+                        <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Duración (min) *</label>
+                    <input
+                      type="number"
+                      value={formPlantilla.duracion}
+                      onChange={(e) => setFormPlantilla({ ...formPlantilla, duracion: parseInt(e.target.value) || 30 })}
+                      className="w-full border rounded-lg px-3 py-2"
+                      min="5"
+                      step="5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de energía</label>
+                    <select
+                      value={formPlantilla.nivelEnergia}
+                      onChange={(e) => setFormPlantilla({ ...formPlantilla, nivelEnergia: e.target.value as NivelEnergia })}
+                      className="w-full border rounded-lg px-3 py-2"
+                    >
+                      <option value="bajo">🔋 Bajo</option>
+                      <option value="medio">🔋🔋 Medio</option>
+                      <option value="alto">🔋🔋🔋 Alto</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
+                    <input
+                      type="text"
+                      value={formPlantilla.ubicacion}
+                      onChange={(e) => setFormPlantilla({ ...formPlantilla, ubicacion: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2"
+                      placeholder="Dónde se realiza"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea
+                    value={formPlantilla.descripcion}
+                    onChange={(e) => setFormPlantilla({ ...formPlantilla, descripcion: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2"
+                    rows={2}
+                    placeholder="Descripción de la actividad..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Responsable por defecto</label>
+                  <select
+                    value={formPlantilla.responsableDefault}
+                    onChange={(e) => setFormPlantilla({ ...formPlantilla, responsableDefault: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2"
+                  >
+                    <option value="">Sin asignar</option>
+                    {usuarios.map(u => (
+                      <option key={u.id} value={u.id}>{u.nombre} ({u.rol})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Materiales */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Materiales necesarios</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={nuevoMaterialPlantilla}
+                      onChange={(e) => setNuevoMaterialPlantilla(e.target.value)}
+                      className="flex-1 border rounded-lg px-3 py-2"
+                      placeholder="Agregar material..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && nuevoMaterialPlantilla.trim()) {
+                          e.preventDefault();
+                          setFormPlantilla({
+                            ...formPlantilla,
+                            materialesNecesarios: [...formPlantilla.materialesNecesarios, nuevoMaterialPlantilla.trim()]
+                          });
+                          setNuevoMaterialPlantilla('');
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (nuevoMaterialPlantilla.trim()) {
+                          setFormPlantilla({
+                            ...formPlantilla,
+                            materialesNecesarios: [...formPlantilla.materialesNecesarios, nuevoMaterialPlantilla.trim()]
+                          });
+                          setNuevoMaterialPlantilla('');
+                        }
+                      }}
+                      className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {formPlantilla.materialesNecesarios.map((mat, idx) => (
+                      <span key={idx} className="px-2 py-1 bg-gray-100 rounded text-sm flex items-center gap-1">
+                        {mat}
+                        <button
+                          onClick={() => setFormPlantilla({
+                            ...formPlantilla,
+                            materialesNecesarios: formPlantilla.materialesNecesarios.filter((_, i) => i !== idx)
+                          })}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Etiquetas */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Etiquetas</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={nuevaEtiquetaPlantilla}
+                      onChange={(e) => setNuevaEtiquetaPlantilla(e.target.value)}
+                      className="flex-1 border rounded-lg px-3 py-2"
+                      placeholder="Agregar etiqueta..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && nuevaEtiquetaPlantilla.trim()) {
+                          e.preventDefault();
+                          setFormPlantilla({
+                            ...formPlantilla,
+                            etiquetas: [...formPlantilla.etiquetas, nuevaEtiquetaPlantilla.trim()]
+                          });
+                          setNuevaEtiquetaPlantilla('');
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (nuevaEtiquetaPlantilla.trim()) {
+                          setFormPlantilla({
+                            ...formPlantilla,
+                            etiquetas: [...formPlantilla.etiquetas, nuevaEtiquetaPlantilla.trim()]
+                          });
+                          setNuevaEtiquetaPlantilla('');
+                        }
+                      }}
+                      className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {/* Sugerencias de etiquetas existentes */}
+                  {todasEtiquetas.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      <span className="text-xs text-gray-500">Sugerencias:</span>
+                      {todasEtiquetas.filter(e => !formPlantilla.etiquetas.includes(e)).slice(0, 5).map(etiqueta => (
+                        <button
+                          key={etiqueta}
+                          type="button"
+                          onClick={() => setFormPlantilla({
+                            ...formPlantilla,
+                            etiquetas: [...formPlantilla.etiquetas, etiqueta]
+                          })}
+                          className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                        >
+                          +{etiqueta}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {formPlantilla.etiquetas.map((etiqueta, idx) => (
+                      <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm flex items-center gap-1">
+                        #{etiqueta}
+                        <button
+                          onClick={() => setFormPlantilla({
+                            ...formPlantilla,
+                            etiquetas: formPlantilla.etiquetas.filter((_, i) => i !== idx)
+                          })}
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Foto */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Foto de referencia</label>
+                  <div className="flex items-center gap-4">
+                    {formPlantilla.foto ? (
+                      <div className="relative">
+                        <img
+                          src={formPlantilla.foto}
+                          alt="Foto plantilla"
+                          className="w-24 h-24 object-cover rounded-lg"
+                        />
+                        <button
+                          onClick={() => setFormPlantilla({ ...formPlantilla, foto: '' })}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-sm hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                        📷
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFotoPlantillaUpload}
+                        className="hidden"
+                        id="foto-plantilla"
+                        disabled={uploadingFoto}
+                      />
+                      <label
+                        htmlFor="foto-plantilla"
+                        className={`inline-block px-4 py-2 rounded-lg cursor-pointer ${
+                          uploadingFoto ? 'bg-gray-300' : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                      >
+                        {uploadingFoto ? 'Subiendo...' : 'Subir foto'}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Favorita */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="favorita"
+                    checked={formPlantilla.favorita}
+                    onChange={(e) => setFormPlantilla({ ...formPlantilla, favorita: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="favorita" className="text-sm text-gray-700">
+                    ⭐ Marcar como favorita
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={cerrarModalPlantilla}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={guardarPlantilla}
+                  disabled={!formPlantilla.nombre.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {plantillaEditando ? 'Guardar Cambios' : 'Crear Plantilla'}
                 </button>
               </div>
             </div>

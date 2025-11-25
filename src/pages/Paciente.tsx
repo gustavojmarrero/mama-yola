@@ -31,8 +31,7 @@ export default function PacientePage() {
     rangoPresionDiastolica: { min: 60, max: 90 },
     rangoFrecuenciaCardiaca: { min: 60, max: 100 },
     rangoTemperatura: { min: 36.0, max: 37.5 },
-    rangoSaturacionO2: { min: 95, max: 100 },
-    rangoGlucosa: { min: 70, max: 130 }
+    rangoSaturacionO2: { min: 95, max: 100 }
   });
 
   // Estados para manejar arrays
@@ -86,8 +85,7 @@ export default function PacientePage() {
           rangoPresionDiastolica: data.rangoSignosVitales?.presionDiastolica || { min: 60, max: 90 },
           rangoFrecuenciaCardiaca: data.rangoSignosVitales?.frecuenciaCardiaca || { min: 60, max: 100 },
           rangoTemperatura: data.rangoSignosVitales?.temperatura || { min: 36.0, max: 37.5 },
-          rangoSaturacionO2: data.rangoSignosVitales?.saturacionO2 || { min: 95, max: 100 },
-          rangoGlucosa: data.rangoSignosVitales?.glucosa || { min: 70, max: 130 }
+          rangoSaturacionO2: data.rangoSignosVitales?.saturacionO2 || { min: 95, max: 100 }
         });
         setEditing(false);
       } else {
@@ -111,8 +109,7 @@ export default function PacientePage() {
         presionDiastolica: formData.rangoPresionDiastolica,
         frecuenciaCardiaca: formData.rangoFrecuenciaCardiaca,
         temperatura: formData.rangoTemperatura,
-        saturacionO2: formData.rangoSaturacionO2,
-        glucosa: formData.rangoGlucosa
+        saturacionO2: formData.rangoSaturacionO2
       };
 
       const pacienteData = {
@@ -425,12 +422,6 @@ export default function PacientePage() {
                     <p className="text-sm font-medium text-gray-700">Saturación O2</p>
                     <p className="text-lg text-blue-600">
                       {paciente.rangoSignosVitales?.saturacionO2?.min} - {paciente.rangoSignosVitales?.saturacionO2?.max} %
-                    </p>
-                  </div>
-                  <div className="border rounded p-3">
-                    <p className="text-sm font-medium text-gray-700">Glucosa</p>
-                    <p className="text-lg text-blue-600">
-                      {paciente.rangoSignosVitales?.glucosa?.min} - {paciente.rangoSignosVitales?.glucosa?.max} mg/dL
                     </p>
                   </div>
                 </div>
@@ -869,35 +860,6 @@ export default function PacientePage() {
                         onChange={(e) => setFormData({
                           ...formData,
                           rangoSaturacionO2: { ...formData.rangoSaturacionO2, max: parseInt(e.target.value) || 0 }
-                        })}
-                        className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Glucosa */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Glucosa (mg/dL)
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="Mín"
-                        value={formData.rangoGlucosa.min}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          rangoGlucosa: { ...formData.rangoGlucosa, min: parseInt(e.target.value) || 0 }
-                        })}
-                        className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Máx"
-                        value={formData.rangoGlucosa.max}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          rangoGlucosa: { ...formData.rangoGlucosa, max: parseInt(e.target.value) || 0 }
                         })}
                         className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />

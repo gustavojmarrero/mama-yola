@@ -20,7 +20,6 @@ export default function SignosVitales() {
     frecuenciaCardiaca: '',
     presionArterialSistolica: '',
     presionArterialDiastolica: '',
-    glucosa: '',
     notas: ''
   });
 
@@ -82,9 +81,6 @@ export default function SignosVitales() {
       case 'presionDiastolica':
         fueraDeRango = valor < rangos.presionDiastolica.min || valor > rangos.presionDiastolica.max;
         break;
-      case 'glucosa':
-        fueraDeRango = valor < rangos.glucosa.min || valor > rangos.glucosa.max;
-        break;
     }
 
     return fueraDeRango;
@@ -130,7 +126,6 @@ export default function SignosVitales() {
         frecuenciaCardiaca: formData.frecuenciaCardiaca ? parseInt(formData.frecuenciaCardiaca) : undefined,
         presionArterialSistolica: formData.presionArterialSistolica ? parseInt(formData.presionArterialSistolica) : undefined,
         presionArterialDiastolica: formData.presionArterialDiastolica ? parseInt(formData.presionArterialDiastolica) : undefined,
-        glucosa: formData.glucosa ? parseFloat(formData.glucosa) : undefined,
         notas: formData.notas || undefined,
         fueraDeRango,
         alertaGenerada: fueraDeRango,
@@ -147,7 +142,6 @@ export default function SignosVitales() {
         if (alertas.spo2) mensajeAlerta.push('saturación O2');
         if (alertas.frecuenciaCardiaca) mensajeAlerta.push('frecuencia cardíaca');
         if (alertas.presionSistolica || alertas.presionDiastolica) mensajeAlerta.push('presión arterial');
-        if (alertas.glucosa) mensajeAlerta.push('glucosa');
 
         await addDoc(collection(db, 'notificaciones'), {
           pacienteId: PACIENTE_ID,
@@ -170,7 +164,6 @@ export default function SignosVitales() {
         frecuenciaCardiaca: '',
         presionArterialSistolica: '',
         presionArterialDiastolica: '',
-        glucosa: '',
         notas: ''
       });
       setAlertas({});
@@ -306,28 +299,6 @@ export default function SignosVitales() {
                     )}
                   </div>
 
-                  {/* Glucosa */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Glucosa (mg/dL)
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.glucosa}
-                      onChange={(e) => handleInputChange('glucosa', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                        alertas.glucosa ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                      }`}
-                      placeholder={paciente.rangoSignosVitales ?
-                        `Normal: ${paciente.rangoSignosVitales.glucosa.min}-${paciente.rangoSignosVitales.glucosa.max}` :
-                        ''
-                      }
-                    />
-                    {alertas.glucosa && (
-                      <p className="text-xs text-red-600 mt-1">⚠️ Fuera de rango normal</p>
-                    )}
-                  </div>
-
                   {/* Presión Sistólica */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -437,12 +408,6 @@ export default function SignosVitales() {
                         {paciente.rangoSignosVitales.presionDiastolica.min} - {paciente.rangoSignosVitales.presionDiastolica.max} mmHg
                       </p>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-700">Glucosa</p>
-                      <p className="text-blue-800">
-                        {paciente.rangoSignosVitales.glucosa.min} - {paciente.rangoSignosVitales.glucosa.max} mg/dL
-                      </p>
-                    </div>
                   </div>
                 )}
               </div>
@@ -481,9 +446,6 @@ export default function SignosVitales() {
                           PA
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Glucosa
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                           Estado
                         </th>
                       </tr>
@@ -508,9 +470,6 @@ export default function SignosVitales() {
                             {signo.presionArterialSistolica && signo.presionArterialDiastolica
                               ? `${signo.presionArterialSistolica}/${signo.presionArterialDiastolica}`
                               : '-'}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {signo.glucosa ? `${signo.glucosa} mg/dL` : '-'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {signo.fueraDeRango ? (

@@ -55,7 +55,6 @@ export interface Paciente {
     frecuenciaCardiaca: { min: number; max: number };
     temperatura: { min: number; max: number };
     saturacionO2: { min: number; max: number };
-    glucosa: { min: number; max: number };
   };
   rangoNormalSignosVitales?: RangoSignosVitales;
   activo?: boolean;
@@ -462,6 +461,27 @@ export interface Actividad {
     diasSemana?: number[];
   };
 
+  creadoEn: Date;
+  actualizadoEn: Date;
+}
+
+// ===== TIPOS DE PLANTILLAS DE ACTIVIDADES =====
+
+export interface PlantillaActividad {
+  id: string;
+  pacienteId: string;
+  nombre: string;
+  tipo: TipoActividad;
+  descripcion: string;
+  duracion: number; // minutos
+  ubicacion?: string;
+  materialesNecesarios: string[];
+  nivelEnergia: NivelEnergia;
+  responsableDefault?: string;
+  etiquetas: string[];
+  favorita: boolean;
+  foto?: string;
+  activo: boolean;
   creadoEn: Date;
   actualizadoEn: Date;
 }
