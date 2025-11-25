@@ -82,8 +82,6 @@ export default function MenuComida() {
     categoria: 'plato_fuerte' as CategoriaComida,
     ingredientes: [] as string[],
     instrucciones: '',
-    tiempoPreparacion: 15,
-    calorias: 0,
     etiquetas: [] as string[],
     favorita: false,
     foto: '',
@@ -205,8 +203,7 @@ export default function MenuComida() {
       platillo: receta.nombre,
       categoria: receta.categoria,
       ingredientes: receta.ingredientes,
-      instrucciones: receta.instrucciones,
-      calorias: receta.calorias || 0
+      instrucciones: receta.instrucciones
     });
     setModalReceta(false);
   }
@@ -244,8 +241,6 @@ export default function MenuComida() {
         categoria: receta.categoria,
         ingredientes: receta.ingredientes || [],
         instrucciones: receta.instrucciones,
-        tiempoPreparacion: receta.tiempoPreparacion,
-        calorias: receta.calorias || 0,
         etiquetas: receta.etiquetas || [],
         favorita: receta.favorita,
         foto: receta.foto || '',
@@ -257,8 +252,6 @@ export default function MenuComida() {
         categoria: 'plato_fuerte',
         ingredientes: [],
         instrucciones: '',
-        tiempoPreparacion: 15,
-        calorias: 0,
         etiquetas: [],
         favorita: false,
         foto: '',
@@ -287,8 +280,6 @@ export default function MenuComida() {
         categoria: formReceta.categoria,
         ingredientes: formReceta.ingredientes,
         instrucciones: formReceta.instrucciones,
-        tiempoPreparacion: formReceta.tiempoPreparacion,
-        calorias: formReceta.calorias || undefined,
         etiquetas: formReceta.etiquetas,
         favorita: formReceta.favorita,
         foto: formReceta.foto || undefined,
@@ -334,8 +325,6 @@ export default function MenuComida() {
         categoria: receta.categoria,
         ingredientes: receta.ingredientes,
         instrucciones: receta.instrucciones,
-        tiempoPreparacion: receta.tiempoPreparacion,
-        calorias: receta.calorias,
         etiquetas: receta.etiquetas,
         favorita: false,
         foto: receta.foto,
@@ -729,11 +718,6 @@ export default function MenuComida() {
                         )}
                       </div>
 
-                      {/* Info */}
-                      <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
-                        <span>⏱️ {receta.tiempoPreparacion} min</span>
-                        {receta.calorias && <span>🔥 {receta.calorias} cal</span>}
-                      </div>
 
                       {/* Botones de acción */}
                       <div className="grid grid-cols-3 gap-2 mb-2">
@@ -1044,7 +1028,7 @@ export default function MenuComida() {
                   >
                     <div className="font-medium">{receta.nombre}</div>
                     <div className="text-sm text-gray-500">
-                      {receta.calorias} cal • {receta.tiempoPreparacion} min
+                      {categoriasComida.find(c => c.value === receta.categoria)?.label}
                     </div>
                   </button>
                 ))}
@@ -1098,27 +1082,6 @@ export default function MenuComida() {
                           <option key={c.value} value={c.value}>{c.label}</option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tiempo (min)</label>
-                      <input
-                        type="number"
-                        value={formReceta.tiempoPreparacion}
-                        onChange={(e) => setFormReceta({ ...formReceta, tiempoPreparacion: parseInt(e.target.value) || 0 })}
-                        className="w-full border rounded-lg px-3 py-2"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Calorías</label>
-                      <input
-                        type="number"
-                        value={formReceta.calorias || ''}
-                        onChange={(e) => setFormReceta({ ...formReceta, calorias: parseInt(e.target.value) || 0 })}
-                        className="w-full border rounded-lg px-3 py-2"
-                        placeholder="kcal"
-                        min="0"
-                      />
                     </div>
                     <div className="flex items-end">
                       <label className="flex items-center gap-2 cursor-pointer">

@@ -535,8 +535,6 @@ export interface Receta {
   categoria: CategoriaComida;
   ingredientes: string[];
   instrucciones: string;
-  tiempoPreparacion: number;
-  calorias?: number;
   etiquetas: string[];
   favorita: boolean;
   foto?: string;
