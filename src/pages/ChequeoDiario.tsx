@@ -162,7 +162,21 @@ export default function ChequeoDiarioPage() {
           evacuacionesConsistencia: chequeoData.funcionesCorporales?.evacuacionesConsistencia || '',
           evacuacionesColor: chequeoData.funcionesCorporales?.evacuacionesColor || '',
           dificultadEvacuar: chequeoData.funcionesCorporales?.dificultadEvacuar || false,
-          laxantes: chequeoData.funcionesCorporales?.laxantesUsados || []
+          laxantes: chequeoData.funcionesCorporales?.laxantesUsados || [],
+
+          actividadesRealizadas: chequeoData.actividadesRealizadas?.actividadesRealizadas || [],
+          participacionActitud: chequeoData.actividadesRealizadas?.participacionActitud || '',
+
+          medicacionEnTiempoForma: chequeoData.medicacion?.medicacionEnTiempoForma || false,
+          medicamentosAdicionales: chequeoData.medicacion?.medicamentosAdicionales || [],
+          medicamentosRechazados: chequeoData.medicacion?.medicamentosRechazados || [],
+          observacionesMedicacion: chequeoData.medicacion?.observaciones || '',
+
+          incidentes: chequeoData.incidentes || [],
+
+          resumenGeneral: chequeoData.resumen?.resumenGeneral || '',
+          observacionesImportantes: chequeoData.resumen?.observacionesImportantes || '',
+          recomendacionesSiguienteTurno: chequeoData.resumen?.recomendacionesSiguienteTurno || ''
         });
       }
     } catch (error) {
@@ -489,41 +503,57 @@ export default function ChequeoDiarioPage() {
         nivelActividad: formData.nivelActividad,
         nivelCooperacion: formData.nivelCooperacion,
         estadoSueno: formData.estadoSueno,
-        dolor: formData.dolorNivel !== 'sin_dolor' ? {
-          nivel: formData.dolorNivel,
-          ubicacion: formData.dolorUbicacion,
-          descripcion: formData.dolorDescripcion
-        } : undefined,
+        ...(formData.dolorNivel !== 'sin_dolor' && {
+          dolor: {
+            nivel: formData.dolorNivel,
+            ubicacion: formData.dolorUbicacion,
+            descripcion: formData.dolorDescripcion
+          }
+        }),
         notasGenerales: formData.notasGenerales
       },
 
       alimentacion: {
-        kefir: formData.kefirHora ? {
-          hora: formData.kefirHora,
-          cantidad: formData.kefirCantidad,
-          notas: formData.kefirNotas
-        } : undefined,
-        desayuno: formData.desayunoDescripcion ? {
-          descripcion: formData.desayunoDescripcion,
-          cantidad: formData.desayunoCantidad
-        } : undefined,
-        colacion1: formData.colacion1Descripcion ? {
-          descripcion: formData.colacion1Descripcion,
-          cantidad: formData.colacion1Cantidad
-        } : undefined,
-        almuerzo: formData.almuerzoDescripcion ? {
-          descripcion: formData.almuerzoDescripcion,
-          cantidad: formData.almuerzoCantidad
-        } : undefined,
-        colacion2: formData.colacion2Descripcion ? {
-          descripcion: formData.colacion2Descripcion,
-          cantidad: formData.colacion2Cantidad
-        } : undefined,
-        cena: formData.cenaDescripcion ? {
-          descripcion: formData.cenaDescripcion,
-          cantidad: formData.cenaCantidad
-        } : undefined,
-        consumoAguaLitros: formData.consumoAguaLitros ? parseFloat(formData.consumoAguaLitros) : undefined,
+        ...(formData.kefirHora && {
+          kefir: {
+            hora: formData.kefirHora,
+            cantidad: formData.kefirCantidad,
+            notas: formData.kefirNotas
+          }
+        }),
+        ...(formData.desayunoDescripcion && {
+          desayuno: {
+            descripcion: formData.desayunoDescripcion,
+            cantidad: formData.desayunoCantidad
+          }
+        }),
+        ...(formData.colacion1Descripcion && {
+          colacion1: {
+            descripcion: formData.colacion1Descripcion,
+            cantidad: formData.colacion1Cantidad
+          }
+        }),
+        ...(formData.almuerzoDescripcion && {
+          almuerzo: {
+            descripcion: formData.almuerzoDescripcion,
+            cantidad: formData.almuerzoCantidad
+          }
+        }),
+        ...(formData.colacion2Descripcion && {
+          colacion2: {
+            descripcion: formData.colacion2Descripcion,
+            cantidad: formData.colacion2Cantidad
+          }
+        }),
+        ...(formData.cenaDescripcion && {
+          cena: {
+            descripcion: formData.cenaDescripcion,
+            cantidad: formData.cenaCantidad
+          }
+        }),
+        ...(formData.consumoAguaLitros && {
+          consumoAguaLitros: parseFloat(formData.consumoAguaLitros)
+        }),
         otrosLiquidos: formData.otrosLiquidos,
         observacionesApetito: formData.observacionesApetito,
         alimentosRechazados: formData.alimentosRechazados
@@ -546,12 +576,18 @@ export default function ChequeoDiarioPage() {
 
       medicacion: {
         medicacionEnTiempoForma: formData.medicacionEnTiempoForma,
-        medicamentosAdicionales: formData.medicamentosAdicionales.length > 0 ? formData.medicamentosAdicionales : undefined,
-        medicamentosRechazados: formData.medicamentosRechazados.length > 0 ? formData.medicamentosRechazados : undefined,
+        ...(formData.medicamentosAdicionales.length > 0 && {
+          medicamentosAdicionales: formData.medicamentosAdicionales
+        }),
+        ...(formData.medicamentosRechazados.length > 0 && {
+          medicamentosRechazados: formData.medicamentosRechazados
+        }),
         observaciones: formData.observacionesMedicacion
       },
 
-      incidentes: formData.incidentes.length > 0 ? formData.incidentes : undefined,
+      ...(formData.incidentes.length > 0 && {
+        incidentes: formData.incidentes
+      }),
 
       resumen: {
         resumenGeneral: formData.resumenGeneral,
@@ -1584,37 +1620,40 @@ export default function ChequeoDiarioPage() {
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                   <h3 className="font-medium text-gray-900 mb-3">Kefir</h3>
                   <div className="space-y-3">
-                    {/* Selector de hora mejorado */}
+                    {/* Selector de hora con dropdowns */}
                     <div>
                       <label className="block text-sm text-gray-600 mb-2">Hora</label>
-                      <div className="flex flex-wrap gap-2">
-                        {['06:00', '07:00', '08:00', '09:00', '10:00'].map((hora) => (
-                          <button
-                            key={hora}
-                            type="button"
-                            onClick={() => !yaCompletado && setFormData({ ...formData, kefirHora: hora })}
-                            disabled={yaCompletado}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              formData.kefirHora === hora
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                          >
-                            {hora}
-                          </button>
-                        ))}
-                        <input
-                          type="time"
-                          value={!['06:00', '07:00', '08:00', '09:00', '10:00'].includes(formData.kefirHora) ? formData.kefirHora : ''}
-                          onChange={(e) => setFormData({ ...formData, kefirHora: e.target.value })}
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={formData.kefirHora.split(':')[0] || ''}
+                          onChange={(e) => {
+                            const minutos = formData.kefirHora.split(':')[1] || '00';
+                            setFormData({ ...formData, kefirHora: e.target.value ? `${e.target.value}:${minutos}` : '' });
+                          }}
                           disabled={yaCompletado}
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                          title="Otra hora"
-                        />
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 bg-white"
+                        >
+                          <option value="">--</option>
+                          {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map((h) => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span className="text-gray-500 font-medium">:</span>
+                        <select
+                          value={formData.kefirHora.split(':')[1] || ''}
+                          onChange={(e) => {
+                            const hora = formData.kefirHora.split(':')[0] || '07';
+                            setFormData({ ...formData, kefirHora: `${hora}:${e.target.value}` });
+                          }}
+                          disabled={yaCompletado || !formData.kefirHora.split(':')[0]}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 bg-white"
+                        >
+                          <option value="">--</option>
+                          {['00', '15', '30', '45'].map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
                       </div>
-                      {formData.kefirHora && (
-                        <p className="text-sm text-blue-600 mt-1">Seleccionado: {formData.kefirHora}</p>
-                      )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <input
