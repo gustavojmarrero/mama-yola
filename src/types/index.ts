@@ -33,12 +33,32 @@ export interface Paciente {
   id: string;
   nombre: string;
   fechaNacimiento: Date;
+  genero: 'masculino' | 'femenino' | 'otro';
   foto?: string;
+  numeroIdentificacion?: string;
+  numeroSeguro?: string;
+  direccion?: string;
+  telefonoEmergencia?: string;
+  telefonoEmergencia2?: string;
   condicionesMedicas: string[];
   alergias: string[];
+  grupoSanguineo?: string;
+  peso?: number;
+  altura?: number;
+  nivelDependencia?: 'bajo' | 'medio' | 'alto';
+  notas?: string;
   seguros?: string[];
   contactosEmergencia?: string[]; // IDs de contactos
-  rangoNormalSignosVitales: RangoSignosVitales;
+  rangoSignosVitales?: {
+    presionSistolica: { min: number; max: number };
+    presionDiastolica: { min: number; max: number };
+    frecuenciaCardiaca: { min: number; max: number };
+    temperatura: { min: number; max: number };
+    saturacionO2: { min: number; max: number };
+    glucosa: { min: number; max: number };
+  };
+  rangoNormalSignosVitales?: RangoSignosVitales;
+  activo?: boolean;
   creadoEn: Date;
   actualizadoEn: Date;
 }

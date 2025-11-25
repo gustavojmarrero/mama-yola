@@ -15,8 +15,10 @@ export default function PacientePage() {
     fechaNacimiento: '',
     genero: 'otro' as 'masculino' | 'femenino' | 'otro',
     numeroIdentificacion: '',
+    numeroSeguro: '',
     direccion: '',
     telefonoEmergencia: '',
+    telefonoEmergencia2: '',
     alergias: [] as string[],
     condicionesMedicas: [] as string[],
     grupoSanguineo: '',
@@ -52,17 +54,27 @@ export default function PacientePage() {
         setPaciente(data);
 
         // Convertir Timestamp de Firebase a string para el input
-        const fechaNacimiento = data.fechaNacimiento instanceof Date
-          ? data.fechaNacimiento.toISOString().split('T')[0]
-          : new Date(data.fechaNacimiento).toISOString().split('T')[0];
+        let fechaNacimiento = '';
+        if (data.fechaNacimiento) {
+          // Si es un Timestamp de Firestore (tiene método toDate)
+          if (typeof (data.fechaNacimiento as any).toDate === 'function') {
+            fechaNacimiento = (data.fechaNacimiento as any).toDate().toISOString().split('T')[0];
+          } else if (data.fechaNacimiento instanceof Date) {
+            fechaNacimiento = data.fechaNacimiento.toISOString().split('T')[0];
+          } else if (typeof data.fechaNacimiento === 'string') {
+            fechaNacimiento = data.fechaNacimiento.split('T')[0];
+          }
+        }
 
         setFormData({
           nombre: data.nombre,
           fechaNacimiento,
           genero: data.genero,
           numeroIdentificacion: data.numeroIdentificacion || '',
+          numeroSeguro: data.numeroSeguro || '',
           direccion: data.direccion || '',
           telefonoEmergencia: data.telefonoEmergencia || '',
+          telefonoEmergencia2: data.telefonoEmergencia2 || '',
           alergias: data.alergias || [],
           condicionesMedicas: data.condicionesMedicas || [],
           grupoSanguineo: data.grupoSanguineo || '',
@@ -108,8 +120,10 @@ export default function PacientePage() {
         fechaNacimiento: new Date(formData.fechaNacimiento),
         genero: formData.genero,
         numeroIdentificacion: formData.numeroIdentificacion,
+        numeroSeguro: formData.numeroSeguro,
         direccion: formData.direccion,
         telefonoEmergencia: formData.telefonoEmergencia,
+        telefonoEmergencia2: formData.telefonoEmergencia2,
         alergias: formData.alergias,
         condicionesMedicas: formData.condicionesMedicas,
         grupoSanguineo: formData.grupoSanguineo,
@@ -166,6 +180,19 @@ export default function PacientePage() {
     });
   }
 
+  // Función para convertir fecha de Firestore a Date
+  function convertirFecha(fecha: any): Date | null {
+    if (!fecha) return null;
+    if (typeof fecha.toDate === 'function') {
+      return fecha.toDate();
+    }
+    if (fecha instanceof Date) {
+      return fecha;
+    }
+    const parsed = new Date(fecha);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
   function calcularEdad(): number | null {
     if (!formData.fechaNacimiento) return null;
     const hoy = new Date();
@@ -176,6 +203,13 @@ export default function PacientePage() {
       edad--;
     }
     return edad;
+  }
+
+  function formatearFechaNacimiento(): string {
+    if (!paciente?.fechaNacimiento) return '-';
+    const fecha = convertirFecha(paciente.fechaNacimiento);
+    if (!fecha) return '-';
+    return fecha.toLocaleDateString();
   }
 
   if (loading) {
@@ -230,7 +264,7 @@ export default function PacientePage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Fecha de nacimiento</dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {new Date(paciente.fechaNacimiento).toLocaleDateString()}
+                      {formatearFechaNacimiento()}
                       {calcularEdad() && ` (${calcularEdad()} años)`}
                     </dd>
                   </div>
@@ -241,6 +275,10 @@ export default function PacientePage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Identificación</dt>
                     <dd className="mt-1 text-sm text-gray-900">{paciente.numeroIdentificacion || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Nº de Seguro</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{paciente.numeroSeguro || '-'}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Grupo sanguíneo</dt>
@@ -286,6 +324,10 @@ export default function PacientePage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Teléfono de emergencia</dt>
                     <dd className="mt-1 text-sm text-gray-900">{paciente.telefonoEmergencia || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Teléfono de emergencia (secundario)</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{paciente.telefonoEmergencia2 || '-'}</dd>
                   </div>
                 </dl>
               </div>
@@ -453,6 +495,19 @@ export default function PacientePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nº de Seguro
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.numeroSeguro}
+                      onChange={(e) => setFormData({ ...formData, numeroSeguro: e.target.value })}
+                      placeholder="Número de póliza o seguro médico"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Grupo sanguíneo
                     </label>
                     <input
@@ -533,6 +588,19 @@ export default function PacientePage() {
                       type="tel"
                       value={formData.telefonoEmergencia}
                       onChange={(e) => setFormData({ ...formData, telefonoEmergencia: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Teléfono de emergencia (secundario)
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.telefonoEmergencia2}
+                      onChange={(e) => setFormData({ ...formData, telefonoEmergencia2: e.target.value })}
+                      placeholder="Teléfono alternativo para emergencias"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
