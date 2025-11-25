@@ -392,16 +392,39 @@ export default function Medicamentos() {
               {/* Horarios */}
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Horarios *</h3>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {horarios.map((horario, index) => (
                     <div key={index} className="flex gap-2 items-center">
-                      <input
-                        type="time"
-                        value={horario}
-                        onChange={(e) => actualizarHorario(index, e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={horario.split(':')[0] || ''}
+                          onChange={(e) => {
+                            const minutos = horario.split(':')[1] || '00';
+                            actualizarHorario(index, e.target.value ? `${e.target.value}:${minutos}` : '');
+                          }}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="">--</option>
+                          {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map((h) => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span className="text-gray-500 font-medium">:</span>
+                        <select
+                          value={horario.split(':')[1] || ''}
+                          onChange={(e) => {
+                            const hora = horario.split(':')[0] || '08';
+                            actualizarHorario(index, `${hora}:${e.target.value}`);
+                          }}
+                          disabled={!horario.split(':')[0]}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 bg-white"
+                        >
+                          <option value="">--</option>
+                          {['00', '15', '30', '45'].map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
                       {horarios.length > 1 && (
                         <button
                           type="button"
