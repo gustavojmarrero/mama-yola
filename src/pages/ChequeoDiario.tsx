@@ -1583,31 +1583,57 @@ export default function ChequeoDiarioPage() {
                 {/* Kefir */}
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                   <h3 className="font-medium text-gray-900 mb-3">Kefir</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <input
-                      type="time"
-                      value={formData.kefirHora}
-                      onChange={(e) => setFormData({ ...formData, kefirHora: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Hora"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formData.kefirCantidad}
-                      onChange={(e) => setFormData({ ...formData, kefirCantidad: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Cantidad (ej: 1 vaso)"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formData.kefirNotas}
-                      onChange={(e) => setFormData({ ...formData, kefirNotas: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Notas"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
+                  <div className="space-y-3">
+                    {/* Selector de hora mejorado */}
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Hora</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['06:00', '07:00', '08:00', '09:00', '10:00'].map((hora) => (
+                          <button
+                            key={hora}
+                            type="button"
+                            onClick={() => !yaCompletado && setFormData({ ...formData, kefirHora: hora })}
+                            disabled={yaCompletado}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              formData.kefirHora === hora
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {hora}
+                          </button>
+                        ))}
+                        <input
+                          type="time"
+                          value={!['06:00', '07:00', '08:00', '09:00', '10:00'].includes(formData.kefirHora) ? formData.kefirHora : ''}
+                          onChange={(e) => setFormData({ ...formData, kefirHora: e.target.value })}
+                          disabled={yaCompletado}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                          title="Otra hora"
+                        />
+                      </div>
+                      {formData.kefirHora && (
+                        <p className="text-sm text-blue-600 mt-1">Seleccionado: {formData.kefirHora}</p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={formData.kefirCantidad}
+                        onChange={(e) => setFormData({ ...formData, kefirCantidad: e.target.value })}
+                        disabled={yaCompletado}
+                        placeholder="Cantidad (ej: 1 vaso)"
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      />
+                      <input
+                        type="text"
+                        value={formData.kefirNotas}
+                        onChange={(e) => setFormData({ ...formData, kefirNotas: e.target.value })}
+                        disabled={yaCompletado}
+                        placeholder="Notas"
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      />
+                    </div>
                   </div>
                 </div>
 
