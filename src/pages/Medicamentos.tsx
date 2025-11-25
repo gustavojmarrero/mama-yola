@@ -94,7 +94,7 @@ export default function Medicamentos() {
       // Filtrar horarios vacíos
       const horariosLimpios = horarios.filter((h) => h !== '');
 
-      const medicamentoData = {
+      const medicamentoData: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         nombre,
         dosis,
@@ -105,11 +105,17 @@ export default function Medicamentos() {
           ...(frecuenciaTipo === 'dias_especificos' && { diasSemana }),
         },
         horarios: horariosLimpios,
-        instrucciones: instrucciones || undefined,
-        foto: fotoURLFinal || undefined,
         activo: true,
         actualizadoEn: new Date(),
       };
+
+      // Solo agregar campos opcionales si tienen valor
+      if (instrucciones) {
+        medicamentoData.instrucciones = instrucciones;
+      }
+      if (fotoURLFinal) {
+        medicamentoData.foto = fotoURLFinal;
+      }
 
       if (medicamentoEditando) {
         // Actualizar
