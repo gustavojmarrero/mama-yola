@@ -75,10 +75,10 @@ export default function SignosVitales() {
       case 'frecuenciaCardiaca':
         fueraDeRango = valor < rangos.frecuenciaCardiaca.min || valor > rangos.frecuenciaCardiaca.max;
         break;
-      case 'presionSistolica':
+      case 'presionArterialSistolica':
         fueraDeRango = valor < rangos.presionSistolica.min || valor > rangos.presionSistolica.max;
         break;
-      case 'presionDiastolica':
+      case 'presionArterialDiastolica':
         fueraDeRango = valor < rangos.presionDiastolica.min || valor > rangos.presionDiastolica.max;
         break;
     }
@@ -141,7 +141,7 @@ export default function SignosVitales() {
         if (alertas.temperatura) mensajeAlerta.push('temperatura');
         if (alertas.spo2) mensajeAlerta.push('saturación O2');
         if (alertas.frecuenciaCardiaca) mensajeAlerta.push('frecuencia cardíaca');
-        if (alertas.presionSistolica || alertas.presionDiastolica) mensajeAlerta.push('presión arterial');
+        if (alertas.presionArterialSistolica || alertas.presionArterialDiastolica) mensajeAlerta.push('presión arterial');
 
         await addDoc(collection(db, 'notificaciones'), {
           pacienteId: PACIENTE_ID,
@@ -307,16 +307,16 @@ export default function SignosVitales() {
                     <input
                       type="number"
                       value={formData.presionArterialSistolica}
-                      onChange={(e) => handleInputChange('presionSistolica', e.target.value)}
+                      onChange={(e) => handleInputChange('presionArterialSistolica', e.target.value)}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                        alertas.presionSistolica ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                        alertas.presionArterialSistolica ? 'border-red-500 bg-red-50' : 'border-gray-300'
                       }`}
                       placeholder={paciente.rangoSignosVitales ?
                         `Normal: ${paciente.rangoSignosVitales.presionSistolica.min}-${paciente.rangoSignosVitales.presionSistolica.max}` :
                         ''
                       }
                     />
-                    {alertas.presionSistolica && (
+                    {alertas.presionArterialSistolica && (
                       <p className="text-xs text-red-600 mt-1">⚠️ Fuera de rango normal</p>
                     )}
                   </div>
@@ -329,16 +329,16 @@ export default function SignosVitales() {
                     <input
                       type="number"
                       value={formData.presionArterialDiastolica}
-                      onChange={(e) => handleInputChange('presionDiastolica', e.target.value)}
+                      onChange={(e) => handleInputChange('presionArterialDiastolica', e.target.value)}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                        alertas.presionDiastolica ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                        alertas.presionArterialDiastolica ? 'border-red-500 bg-red-50' : 'border-gray-300'
                       }`}
                       placeholder={paciente.rangoSignosVitales ?
                         `Normal: ${paciente.rangoSignosVitales.presionDiastolica.min}-${paciente.rangoSignosVitales.presionDiastolica.max}` :
                         ''
                       }
                     />
-                    {alertas.presionDiastolica && (
+                    {alertas.presionArterialDiastolica && (
                       <p className="text-xs text-red-600 mt-1">⚠️ Fuera de rango normal</p>
                     )}
                   </div>
