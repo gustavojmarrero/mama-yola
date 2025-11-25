@@ -526,6 +526,25 @@ export interface RestriccionDietetica {
   suplementos?: Array<{ nombre: string; horario: string; cantidad: string }>;
 }
 
+// ===== TIPOS DE RECETAS =====
+
+export interface Receta {
+  id: string;
+  pacienteId: string;
+  nombre: string;
+  categoria: CategoriaComida;
+  ingredientes: string[];
+  instrucciones: string;
+  tiempoPreparacion: number;
+  calorias?: number;
+  etiquetas: string[];
+  favorita: boolean;
+  foto?: string;
+  activo: boolean;
+  creadoEn: Date;
+  actualizadoEn: Date;
+}
+
 // ===== TIPOS DE AUDITORÍA =====
 
 export interface LogAuditoria {

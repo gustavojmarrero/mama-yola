@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
-import { ComidaProgramada, TipoComida, CategoriaComida, NivelConsumo } from '../types';
+import { ComidaProgramada, TipoComida, CategoriaComida, NivelConsumo, Receta } from '../types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -31,29 +32,6 @@ const nivelesConsumo: { value: NivelConsumo; label: string; porcentaje: number; 
   { value: 'mitad', label: 'Mitad', porcentaje: 50, color: 'bg-yellow-500' },
   { value: 'poco', label: 'Poco', porcentaje: 25, color: 'bg-orange-500' },
   { value: 'nada', label: 'Nada', porcentaje: 0, color: 'bg-red-500' }
-];
-
-interface Receta {
-  id: string;
-  nombre: string;
-  categoria: CategoriaComida;
-  ingredientes: string[];
-  instrucciones: string;
-  tiempoPreparacion: number;
-  calorias?: number;
-  etiquetas: string[];
-  favorita: boolean;
-}
-
-const recetasBase: Omit<Receta, 'id'>[] = [
-  { nombre: 'Avena con frutas', categoria: 'plato_fuerte', ingredientes: ['avena', 'leche', 'plátano', 'miel'], instrucciones: 'Cocinar avena, agregar frutas', tiempoPreparacion: 15, calorias: 300, etiquetas: ['desayuno', 'fibra'], favorita: true },
-  { nombre: 'Huevos revueltos', categoria: 'plato_fuerte', ingredientes: ['huevos', 'mantequilla', 'sal'], instrucciones: 'Batir y cocinar a fuego bajo', tiempoPreparacion: 10, calorias: 200, etiquetas: ['desayuno', 'proteína'], favorita: true },
-  { nombre: 'Caldo de pollo', categoria: 'entrada', ingredientes: ['pollo', 'zanahoria', 'papa', 'apio'], instrucciones: 'Hervir pollo con verduras', tiempoPreparacion: 60, calorias: 150, etiquetas: ['almuerzo', 'bajo_sodio'], favorita: true },
-  { nombre: 'Pescado al vapor', categoria: 'plato_fuerte', ingredientes: ['filete de pescado', 'limón', 'hierbas'], instrucciones: 'Cocinar al vapor 15 min', tiempoPreparacion: 20, calorias: 250, etiquetas: ['cena', 'proteína', 'bajo_grasa'], favorita: false },
-  { nombre: 'Puré de papa', categoria: 'plato_fuerte', ingredientes: ['papa', 'leche', 'mantequilla'], instrucciones: 'Hervir papas y hacer puré', tiempoPreparacion: 30, calorias: 200, etiquetas: ['almuerzo', 'blanda'], favorita: true },
-  { nombre: 'Gelatina de frutas', categoria: 'postre', ingredientes: ['gelatina sin azúcar', 'frutas'], instrucciones: 'Preparar gelatina, agregar frutas', tiempoPreparacion: 10, calorias: 50, etiquetas: ['postre', 'bajo_azucar'], favorita: false },
-  { nombre: 'Licuado de plátano', categoria: 'bebida', ingredientes: ['plátano', 'leche', 'avena'], instrucciones: 'Licuar todos los ingredientes', tiempoPreparacion: 5, calorias: 180, etiquetas: ['desayuno', 'energía'], favorita: true },
-  { nombre: 'Yogur con granola', categoria: 'snack', ingredientes: ['yogur natural', 'granola', 'miel'], instrucciones: 'Mezclar ingredientes', tiempoPreparacion: 5, calorias: 200, etiquetas: ['colación', 'fibra'], favorita: true }
 ];
 
 export default function MenuComida() {
@@ -88,6 +66,28 @@ export default function MenuComida() {
 
   const [nuevoIngrediente, setNuevoIngrediente] = useState('');
   const [filtroEtiqueta, setFiltroEtiqueta] = useState('');
+
+  // Estados para CRUD de recetas
+  const [modalRecetaCRUD, setModalRecetaCRUD] = useState(false);
+  const [recetaEditando, setRecetaEditando] = useState<Receta | null>(null);
+  const [busquedaReceta, setBusquedaReceta] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState<CategoriaComida | 'todas'>('todas');
+  const [mostrarSoloFavoritas, setMostrarSoloFavoritas] = useState(false);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [nuevoIngredienteReceta, setNuevoIngredienteReceta] = useState('');
+  const [nuevaEtiquetaReceta, setNuevaEtiquetaReceta] = useState('');
+
+  const [formReceta, setFormReceta] = useState({
+    nombre: '',
+    categoria: 'plato_fuerte' as CategoriaComida,
+    ingredientes: [] as string[],
+    instrucciones: '',
+    tiempoPreparacion: 15,
+    calorias: 0,
+    etiquetas: [] as string[],
+    favorita: false,
+    foto: '',
+  });
 
   const inicioSemana = startOfWeek(semanaActual, { weekStartsOn: 1 });
   const finSemana = endOfWeek(semanaActual, { weekStartsOn: 1 });
@@ -124,19 +124,14 @@ export default function MenuComida() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
-        // Crear recetas base si no existen
-        recetasBase.forEach(async (receta) => {
-          await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'recetas'), {
-            ...receta,
-            creadoEn: Timestamp.now()
-          });
-        });
-      }
-      const recetasData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Receta[];
+      const recetasData = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          creadoEn: doc.data().creadoEn?.toDate(),
+          actualizadoEn: doc.data().actualizadoEn?.toDate()
+        }))
+        .filter(r => r.activo !== false) as Receta[];
       setRecetas(recetasData);
     });
 
@@ -239,6 +234,162 @@ export default function MenuComida() {
     });
   }
 
+  // ========== FUNCIONES CRUD DE RECETAS ==========
+
+  function abrirModalReceta(receta?: Receta) {
+    if (receta) {
+      setRecetaEditando(receta);
+      setFormReceta({
+        nombre: receta.nombre,
+        categoria: receta.categoria,
+        ingredientes: receta.ingredientes || [],
+        instrucciones: receta.instrucciones,
+        tiempoPreparacion: receta.tiempoPreparacion,
+        calorias: receta.calorias || 0,
+        etiquetas: receta.etiquetas || [],
+        favorita: receta.favorita,
+        foto: receta.foto || '',
+      });
+    } else {
+      setRecetaEditando(null);
+      setFormReceta({
+        nombre: '',
+        categoria: 'plato_fuerte',
+        ingredientes: [],
+        instrucciones: '',
+        tiempoPreparacion: 15,
+        calorias: 0,
+        etiquetas: [],
+        favorita: false,
+        foto: '',
+      });
+    }
+    setModalRecetaCRUD(true);
+  }
+
+  function cerrarModalReceta() {
+    setModalRecetaCRUD(false);
+    setRecetaEditando(null);
+    setNuevoIngredienteReceta('');
+    setNuevaEtiquetaReceta('');
+  }
+
+  async function guardarReceta() {
+    if (!formReceta.nombre.trim()) {
+      alert('El nombre de la receta es obligatorio');
+      return;
+    }
+
+    try {
+      const recetaData = {
+        pacienteId: PACIENTE_ID,
+        nombre: formReceta.nombre.trim(),
+        categoria: formReceta.categoria,
+        ingredientes: formReceta.ingredientes,
+        instrucciones: formReceta.instrucciones,
+        tiempoPreparacion: formReceta.tiempoPreparacion,
+        calorias: formReceta.calorias || undefined,
+        etiquetas: formReceta.etiquetas,
+        favorita: formReceta.favorita,
+        foto: formReceta.foto || undefined,
+        activo: true,
+        actualizadoEn: Timestamp.now(),
+      };
+
+      if (recetaEditando) {
+        await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'recetas', recetaEditando.id), recetaData);
+      } else {
+        await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'recetas'), {
+          ...recetaData,
+          creadoEn: Timestamp.now(),
+        });
+      }
+
+      cerrarModalReceta();
+    } catch (error) {
+      console.error('Error al guardar receta:', error);
+      alert('Error al guardar la receta');
+    }
+  }
+
+  async function eliminarReceta(receta: Receta) {
+    if (!confirm(`¿Eliminar la receta "${receta.nombre}"?`)) return;
+
+    try {
+      await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'recetas', receta.id), {
+        activo: false,
+        actualizadoEn: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error('Error al eliminar receta:', error);
+      alert('Error al eliminar la receta');
+    }
+  }
+
+  async function duplicarReceta(receta: Receta) {
+    try {
+      await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'recetas'), {
+        pacienteId: PACIENTE_ID,
+        nombre: `${receta.nombre} (copia)`,
+        categoria: receta.categoria,
+        ingredientes: receta.ingredientes,
+        instrucciones: receta.instrucciones,
+        tiempoPreparacion: receta.tiempoPreparacion,
+        calorias: receta.calorias,
+        etiquetas: receta.etiquetas,
+        favorita: false,
+        foto: receta.foto,
+        activo: true,
+        creadoEn: Timestamp.now(),
+        actualizadoEn: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error('Error al duplicar receta:', error);
+      alert('Error al duplicar la receta');
+    }
+  }
+
+  async function toggleFavoritaReceta(receta: Receta) {
+    try {
+      await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'recetas', receta.id), {
+        favorita: !receta.favorita,
+        actualizadoEn: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error('Error al cambiar favorita:', error);
+    }
+  }
+
+  async function handleFotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingFoto(true);
+      const storageRef = ref(storage, `recetas/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setFormReceta({ ...formReceta, foto: url });
+    } catch (error) {
+      console.error('Error al subir foto:', error);
+      alert('Error al subir la foto');
+    } finally {
+      setUploadingFoto(false);
+    }
+  }
+
+  // Filtrado de recetas
+  const recetasFiltradas = recetas
+    .filter(r => filtroCategoria === 'todas' || r.categoria === filtroCategoria)
+    .filter(r => !filtroEtiqueta || r.etiquetas?.includes(filtroEtiqueta))
+    .filter(r => !mostrarSoloFavoritas || r.favorita)
+    .filter(r => !busquedaReceta ||
+      r.nombre.toLowerCase().includes(busquedaReceta.toLowerCase()) ||
+      r.ingredientes?.some(i => i.toLowerCase().includes(busquedaReceta.toLowerCase()))
+    );
+
+  const todasEtiquetas = [...new Set(recetas.flatMap(r => r.etiquetas || []))];
+
   // Calcular estadísticas de consumo
   function estadisticasSemana() {
     const comidasSemana = comidas.filter(c =>
@@ -268,13 +419,6 @@ export default function MenuComida() {
       totalCalorias: Math.round(totalCalorias)
     };
   }
-
-  // Filtrar recetas
-  const recetasFiltradas = filtroEtiqueta
-    ? recetas.filter(r => r.etiquetas?.includes(filtroEtiqueta))
-    : recetas;
-
-  const todasEtiquetas = [...new Set(recetas.flatMap(r => r.etiquetas || []))];
 
   if (loading) {
     return (
@@ -471,58 +615,163 @@ export default function MenuComida() {
         ) : (
           /* Vista de Recetas */
           <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">📖 Banco de Recetas</h3>
-              <div className="flex gap-2">
-                <select
-                  value={filtroEtiqueta}
-                  onChange={(e) => setFiltroEtiqueta(e.target.value)}
-                  className="border rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">Todas las etiquetas</option>
-                  {todasEtiquetas.map(etq => (
-                    <option key={etq} value={etq}>{etq}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Header con botón nueva receta */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <h3 className="text-lg font-semibold">Banco de Recetas</h3>
+              <button
+                onClick={() => abrirModalReceta()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                + Nueva Receta
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recetasFiltradas.map(receta => (
-                <div
-                  key={receta.id}
-                  className="border rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium">{receta.nombre}</h4>
-                    {receta.favorita && <span className="text-yellow-500">⭐</span>}
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {categoriasComida.find(c => c.value === receta.categoria)?.label}
-                  </p>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {receta.etiquetas?.map(etq => (
-                      <span key={etq} className="text-xs px-2 py-0.5 bg-gray-100 rounded">
-                        {etq}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span>⏱️ {receta.tiempoPreparacion} min</span>
-                    {receta.calorias && <span>🔥 {receta.calorias} cal</span>}
-                  </div>
-                  <button
-                    onClick={() => {
-                      usarReceta(receta);
-                      setModalComida(true);
-                    }}
-                    className="mt-3 w-full py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
-                  >
-                    Usar en menú
-                  </button>
-                </div>
-              ))}
+            {/* Filtros */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <input
+                type="text"
+                value={busquedaReceta}
+                onChange={(e) => setBusquedaReceta(e.target.value)}
+                placeholder="Buscar receta o ingrediente..."
+                className="border rounded-lg px-3 py-2 text-sm"
+              />
+              <select
+                value={filtroCategoria}
+                onChange={(e) => setFiltroCategoria(e.target.value as CategoriaComida | 'todas')}
+                className="border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="todas">Todas las categorías</option>
+                {categoriasComida.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </select>
+              <select
+                value={filtroEtiqueta}
+                onChange={(e) => setFiltroEtiqueta(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todas las etiquetas</option>
+                {todasEtiquetas.map(etq => (
+                  <option key={etq} value={etq}>{etq}</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={mostrarSoloFavoritas}
+                  onChange={(e) => setMostrarSoloFavoritas(e.target.checked)}
+                  className="h-4 w-4 rounded"
+                />
+                <span className="text-sm">Solo favoritas</span>
+              </label>
             </div>
+
+            {/* Contador de resultados */}
+            <p className="text-sm text-gray-500 mb-4">
+              Mostrando {recetasFiltradas.length} de {recetas.length} recetas
+            </p>
+
+            {/* Grid de recetas */}
+            {recetasFiltradas.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p className="text-lg mb-2">No hay recetas</p>
+                <p className="text-sm">Crea tu primera receta con el botón "+ Nueva Receta"</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recetasFiltradas.map(receta => (
+                  <div
+                    key={receta.id}
+                    className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    {/* Foto o placeholder */}
+                    {receta.foto ? (
+                      <img
+                        src={receta.foto}
+                        alt={receta.nombre}
+                        className="w-full h-32 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-32 bg-gray-100 flex items-center justify-center text-4xl">
+                        🍽️
+                      </div>
+                    )}
+
+                    <div className="p-4">
+                      {/* Nombre y favorita */}
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium">{receta.nombre}</h4>
+                        <button
+                          onClick={() => toggleFavoritaReceta(receta)}
+                          className="text-xl hover:scale-110 transition-transform"
+                          title={receta.favorita ? 'Quitar de favoritas' : 'Agregar a favoritas'}
+                        >
+                          {receta.favorita ? '⭐' : '☆'}
+                        </button>
+                      </div>
+
+                      {/* Categoría */}
+                      <p className="text-sm text-gray-600 mb-2">
+                        {categoriasComida.find(c => c.value === receta.categoria)?.label}
+                      </p>
+
+                      {/* Etiquetas */}
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {receta.etiquetas?.slice(0, 3).map(etq => (
+                          <span key={etq} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                            {etq}
+                          </span>
+                        ))}
+                        {receta.etiquetas?.length > 3 && (
+                          <span className="text-xs px-2 py-0.5 bg-gray-100 rounded">
+                            +{receta.etiquetas.length - 3}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex justify-between items-center text-sm text-gray-500 mb-3">
+                        <span>⏱️ {receta.tiempoPreparacion} min</span>
+                        {receta.calorias && <span>🔥 {receta.calorias} cal</span>}
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        <button
+                          onClick={() => abrirModalReceta(receta)}
+                          className="py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => duplicarReceta(receta)}
+                          className="py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                        >
+                          Duplicar
+                        </button>
+                        <button
+                          onClick={() => eliminarReceta(receta)}
+                          className="py-1.5 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+
+                      {/* Botón usar en menú */}
+                      <button
+                        onClick={() => {
+                          usarReceta(receta);
+                          setModalComida(true);
+                        }}
+                        className="w-full py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        Usar en menú
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -777,7 +1026,7 @@ export default function MenuComida() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg max-w-2xl w-full p-6 my-8 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">📖 Seleccionar Receta</h2>
+                <h2 className="text-xl font-bold">Seleccionar Receta</h2>
                 <button
                   onClick={() => setModalReceta(false)}
                   className="text-gray-500 hover:text-gray-700"
@@ -799,6 +1048,256 @@ export default function MenuComida() {
                     </div>
                   </button>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Crear/Editar Receta */}
+        {modalRecetaCRUD && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
+              {/* Header sticky */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 z-10">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">
+                    {recetaEditando ? 'Editar Receta' : 'Nueva Receta'}
+                  </h2>
+                  <button
+                    onClick={cerrarModalReceta}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Información básica */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-4">Información Básica</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                      <input
+                        type="text"
+                        value={formReceta.nombre}
+                        onChange={(e) => setFormReceta({ ...formReceta, nombre: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="Nombre de la receta"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                      <select
+                        value={formReceta.categoria}
+                        onChange={(e) => setFormReceta({ ...formReceta, categoria: e.target.value as CategoriaComida })}
+                        className="w-full border rounded-lg px-3 py-2"
+                      >
+                        {categoriasComida.map(c => (
+                          <option key={c.value} value={c.value}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tiempo (min)</label>
+                      <input
+                        type="number"
+                        value={formReceta.tiempoPreparacion}
+                        onChange={(e) => setFormReceta({ ...formReceta, tiempoPreparacion: parseInt(e.target.value) || 0 })}
+                        className="w-full border rounded-lg px-3 py-2"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Calorías</label>
+                      <input
+                        type="number"
+                        value={formReceta.calorias || ''}
+                        onChange={(e) => setFormReceta({ ...formReceta, calorias: parseInt(e.target.value) || 0 })}
+                        className="w-full border rounded-lg px-3 py-2"
+                        placeholder="kcal"
+                        min="0"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formReceta.favorita}
+                          onChange={(e) => setFormReceta({ ...formReceta, favorita: e.target.checked })}
+                          className="h-4 w-4 rounded"
+                        />
+                        <span className="text-sm">Marcar como favorita</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ingredientes */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-4">Ingredientes</h3>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={nuevoIngredienteReceta}
+                      onChange={(e) => setNuevoIngredienteReceta(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && nuevoIngredienteReceta.trim()) {
+                          e.preventDefault();
+                          setFormReceta({ ...formReceta, ingredientes: [...formReceta.ingredientes, nuevoIngredienteReceta.trim()] });
+                          setNuevoIngredienteReceta('');
+                        }
+                      }}
+                      className="flex-1 border rounded-lg px-3 py-2"
+                      placeholder="Agregar ingrediente..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (nuevoIngredienteReceta.trim()) {
+                          setFormReceta({ ...formReceta, ingredientes: [...formReceta.ingredientes, nuevoIngredienteReceta.trim()] });
+                          setNuevoIngredienteReceta('');
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {formReceta.ingredientes.map((ing, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-white border rounded-full text-sm flex items-center gap-2">
+                        {ing}
+                        <button
+                          onClick={() => setFormReceta({
+                            ...formReceta,
+                            ingredientes: formReceta.ingredientes.filter((_, i) => i !== idx)
+                          })}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Instrucciones */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-4">Instrucciones</h3>
+                  <textarea
+                    value={formReceta.instrucciones}
+                    onChange={(e) => setFormReceta({ ...formReceta, instrucciones: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2"
+                    rows={4}
+                    placeholder="Pasos para preparar la receta..."
+                  />
+                </div>
+
+                {/* Etiquetas */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-4">Etiquetas</h3>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={nuevaEtiquetaReceta}
+                      onChange={(e) => setNuevaEtiquetaReceta(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && nuevaEtiquetaReceta.trim()) {
+                          e.preventDefault();
+                          setFormReceta({ ...formReceta, etiquetas: [...formReceta.etiquetas, nuevaEtiquetaReceta.trim()] });
+                          setNuevaEtiquetaReceta('');
+                        }
+                      }}
+                      className="flex-1 border rounded-lg px-3 py-2"
+                      placeholder="Agregar etiqueta (ej: desayuno, proteína)..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (nuevaEtiquetaReceta.trim()) {
+                          setFormReceta({ ...formReceta, etiquetas: [...formReceta.etiquetas, nuevaEtiquetaReceta.trim()] });
+                          setNuevaEtiquetaReceta('');
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {formReceta.etiquetas.map((etq, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-2">
+                        {etq}
+                        <button
+                          onClick={() => setFormReceta({
+                            ...formReceta,
+                            etiquetas: formReceta.etiquetas.filter((_, i) => i !== idx)
+                          })}
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Foto */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-900 mb-4">Foto</h3>
+                  {formReceta.foto ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={formReceta.foto}
+                        alt="Preview"
+                        className="w-48 h-32 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => setFormReceta({ ...formReceta, foto: '' })}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFotoUpload}
+                        disabled={uploadingFoto}
+                        className="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-lg file:border-0
+                          file:text-sm file:font-medium
+                          file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100"
+                      />
+                      {uploadingFoto && (
+                        <p className="text-sm text-gray-500 mt-2">Subiendo foto...</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={cerrarModalReceta}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarReceta}
+                    disabled={!formReceta.nombre.trim()}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {recetaEditando ? 'Actualizar' : 'Crear'} Receta
+                  </button>
+                </div>
               </div>
             </div>
           </div>

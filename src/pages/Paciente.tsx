@@ -212,6 +212,18 @@ export default function PacientePage() {
     return fecha.toLocaleDateString();
   }
 
+  function formatearTelefono(telefono: string | undefined): string {
+    if (!telefono) return '-';
+    // Eliminar cualquier caracter no numérico
+    const numeros = telefono.replace(/\D/g, '');
+    // Formato: 998-109-0864
+    if (numeros.length === 10) {
+      return `${numeros.slice(0, 3)}-${numeros.slice(3, 6)}-${numeros.slice(6)}`;
+    }
+    // Si no tiene 10 dígitos, devolver el original
+    return telefono;
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -323,11 +335,11 @@ export default function PacientePage() {
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Teléfono de emergencia</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{paciente.telefonoEmergencia || '-'}</dd>
+                    <dd className="mt-1 text-sm text-gray-900">{formatearTelefono(paciente.telefonoEmergencia)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Teléfono de emergencia (secundario)</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{paciente.telefonoEmergencia2 || '-'}</dd>
+                    <dd className="mt-1 text-sm text-gray-900">{formatearTelefono(paciente.telefonoEmergencia2)}</dd>
                   </div>
                 </dl>
               </div>
