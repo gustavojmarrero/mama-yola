@@ -41,25 +41,6 @@ export default function ChequeoDiarioPage() {
     dolorDescripcion: '',
     notasGenerales: '',
 
-    // Alimentación
-    kefirHora: '',
-    kefirCantidad: '',
-    kefirNotas: '',
-    desayunoDescripcion: '',
-    desayunoCantidad: '',
-    colacion1Descripcion: '',
-    colacion1Cantidad: '',
-    almuerzoDescripcion: '',
-    almuerzoCantidad: '',
-    colacion2Descripcion: '',
-    colacion2Cantidad: '',
-    cenaDescripcion: '',
-    cenaCantidad: '',
-    consumoAguaLitros: '',
-    otrosLiquidos: '',
-    observacionesApetito: '',
-    alimentosRechazados: '',
-
     // Funciones corporales
     miccionesNumero: 0,
     miccionesCaracteristicas: '',
@@ -149,24 +130,6 @@ export default function ChequeoDiarioPage() {
           dolorUbicacion: chequeoData.estadoGeneral?.dolor?.ubicacion || '',
           dolorDescripcion: chequeoData.estadoGeneral?.dolor?.descripcion || '',
           notasGenerales: chequeoData.estadoGeneral?.notasGenerales || '',
-
-          kefirHora: chequeoData.alimentacion?.kefir?.hora || '',
-          kefirCantidad: chequeoData.alimentacion?.kefir?.cantidad || '',
-          kefirNotas: chequeoData.alimentacion?.kefir?.notas || '',
-          desayunoDescripcion: chequeoData.alimentacion?.desayuno?.descripcion || '',
-          desayunoCantidad: chequeoData.alimentacion?.desayuno?.cantidad || '',
-          colacion1Descripcion: chequeoData.alimentacion?.colacion1?.descripcion || '',
-          colacion1Cantidad: chequeoData.alimentacion?.colacion1?.cantidad || '',
-          almuerzoDescripcion: chequeoData.alimentacion?.almuerzo?.descripcion || '',
-          almuerzoCantidad: chequeoData.alimentacion?.almuerzo?.cantidad || '',
-          colacion2Descripcion: chequeoData.alimentacion?.colacion2?.descripcion || '',
-          colacion2Cantidad: chequeoData.alimentacion?.colacion2?.cantidad || '',
-          cenaDescripcion: chequeoData.alimentacion?.cena?.descripcion || '',
-          cenaCantidad: chequeoData.alimentacion?.cena?.cantidad || '',
-          consumoAguaLitros: chequeoData.alimentacion?.consumoAguaLitros?.toString() || '',
-          otrosLiquidos: chequeoData.alimentacion?.otrosLiquidos || '',
-          observacionesApetito: chequeoData.alimentacion?.observacionesApetito || '',
-          alimentosRechazados: chequeoData.alimentacion?.alimentosRechazados || '',
 
           miccionesNumero: chequeoData.funcionesCorporales?.miccionesNumero || 0,
           miccionesCaracteristicas: chequeoData.funcionesCorporales?.miccionesCaracteristicas || '',
@@ -321,43 +284,14 @@ export default function ChequeoDiarioPage() {
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Sección 2: Alimentación
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = 20;
-    }
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('2. Alimentación', 20, yPos);
-    yPos += 8;
-
-    const comidas = [
-      ['Desayuno', chequeo.desayunoDescripcion || 'No registrado', chequeo.desayunoCantidad || 'N/A'],
-      ['Almuerzo', chequeo.almuerzoDescripcion || 'No registrado', chequeo.almuerzoCantidad || 'N/A'],
-      ['Cena', chequeo.cenaDescripcion || 'No registrado', chequeo.cenaCantidad || 'N/A'],
-      ['Agua consumida', `${chequeo.consumoAguaLitros || 0} litros`, ''],
-      ['Alimentos rechazados', chequeo.alimentosRechazados || 'Ninguno', '']
-    ];
-
-    doc.setFontSize(10);
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Comida', 'Descripción', 'Cantidad']],
-      body: comidas,
-      theme: 'grid',
-      headStyles: { fillColor: [92, 184, 92] },
-      margin: { left: 20, right: 20 }
-    });
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-
-    // Sección 3: Funciones Corporales
+    // Sección 2: Funciones Corporales
     if (yPos > 230) {
       doc.addPage();
       yPos = 20;
     }
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('3. Funciones Corporales', 20, yPos);
+    doc.text('2. Funciones Corporales', 20, yPos);
     yPos += 8;
 
     doc.setFontSize(10);
@@ -377,14 +311,14 @@ export default function ChequeoDiarioPage() {
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Sección 4: Actividades
+    // Sección 3: Actividades
     if (yPos > 230) {
       doc.addPage();
       yPos = 20;
     }
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('4. Actividades Realizadas', 20, yPos);
+    doc.text('3. Actividades Realizadas', 20, yPos);
     yPos += 8;
 
     doc.setFontSize(10);
@@ -401,14 +335,14 @@ export default function ChequeoDiarioPage() {
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Sección 5: Medicación
+    // Sección 4: Medicación
     if (yPos > 230) {
       doc.addPage();
       yPos = 20;
     }
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('5. Medicación', 20, yPos);
+    doc.text('4. Medicación', 20, yPos);
     yPos += 8;
 
     doc.setFontSize(10);
@@ -425,14 +359,14 @@ export default function ChequeoDiarioPage() {
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Sección 7: Resumen
+    // Sección 5: Resumen
     if (yPos > 220) {
       doc.addPage();
       yPos = 20;
     }
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('7. Resumen del Día', 20, yPos);
+    doc.text('5. Resumen del Día', 20, yPos);
     yPos += 8;
 
     doc.setFontSize(10);
@@ -526,52 +460,6 @@ export default function ChequeoDiarioPage() {
         notasGenerales: formData.notasGenerales
       },
 
-      alimentacion: {
-        ...(formData.kefirHora && {
-          kefir: {
-            hora: formData.kefirHora,
-            cantidad: formData.kefirCantidad,
-            notas: formData.kefirNotas
-          }
-        }),
-        ...(formData.desayunoDescripcion && {
-          desayuno: {
-            descripcion: formData.desayunoDescripcion,
-            cantidad: formData.desayunoCantidad
-          }
-        }),
-        ...(formData.colacion1Descripcion && {
-          colacion1: {
-            descripcion: formData.colacion1Descripcion,
-            cantidad: formData.colacion1Cantidad
-          }
-        }),
-        ...(formData.almuerzoDescripcion && {
-          almuerzo: {
-            descripcion: formData.almuerzoDescripcion,
-            cantidad: formData.almuerzoCantidad
-          }
-        }),
-        ...(formData.colacion2Descripcion && {
-          colacion2: {
-            descripcion: formData.colacion2Descripcion,
-            cantidad: formData.colacion2Cantidad
-          }
-        }),
-        ...(formData.cenaDescripcion && {
-          cena: {
-            descripcion: formData.cenaDescripcion,
-            cantidad: formData.cenaCantidad
-          }
-        }),
-        ...(formData.consumoAguaLitros && {
-          consumoAguaLitros: parseFloat(formData.consumoAguaLitros)
-        }),
-        otrosLiquidos: formData.otrosLiquidos,
-        observacionesApetito: formData.observacionesApetito,
-        alimentosRechazados: formData.alimentosRechazados
-      },
-
       funcionesCorporales: {
         miccionesNumero: formData.miccionesNumero,
         miccionesCaracteristicas: formData.miccionesCaracteristicas,
@@ -631,16 +519,6 @@ export default function ChequeoDiarioPage() {
       errores.push('Debes seleccionar el estado del sueño');
     }
 
-    // Validar al menos una comida registrada
-    const hayAlgunaComida = formData.desayunoDescripcion ||
-                           formData.colacion1Descripcion ||
-                           formData.almuerzoDescripcion ||
-                           formData.colacion2Descripcion ||
-                           formData.cenaDescripcion;
-    if (!hayAlgunaComida) {
-      errores.push('Debes registrar al menos una comida del día');
-    }
-
     // Validar resumen general
     if (!formData.resumenGeneral || formData.resumenGeneral.trim() === '') {
       errores.push('Debes incluir un resumen general del día');
@@ -664,16 +542,6 @@ export default function ChequeoDiarioPage() {
       });
     }
 
-    // Alerta: Consumo de agua bajo
-    const consumoAgua = parseFloat(formData.consumoAguaLitros || '0');
-    if (consumoAgua < 1.5) {
-      alertas.push({
-        tipo: 'agua_baja',
-        mensaje: `Consumo de agua bajo: ${consumoAgua}L (recomendado: >1.5L)`,
-        gravedad: 'leve'
-      });
-    }
-
     // Alerta: Múltiples incidentes
     if (formData.incidentes.length >= 2) {
       alertas.push({
@@ -690,23 +558,6 @@ export default function ChequeoDiarioPage() {
         tipo: 'incidente_grave',
         mensaje: 'Se registró un incidente de gravedad GRAVE',
         gravedad: 'grave'
-      });
-    }
-
-    // Alerta: Rechazó múltiples comidas
-    const comidasRechazadas = [
-      formData.desayunoCantidad === 'nada',
-      formData.colacion1Cantidad === 'nada',
-      formData.almuerzoCantidad === 'nada',
-      formData.colacion2Cantidad === 'nada',
-      formData.cenaCantidad === 'nada'
-    ].filter(Boolean).length;
-
-    if (comidasRechazadas >= 2) {
-      alertas.push({
-        tipo: 'comidas_rechazadas',
-        mensaje: `Rechazó ${comidasRechazadas} comidas del día`,
-        gravedad: 'moderada'
       });
     }
 
@@ -1015,12 +866,6 @@ export default function ChequeoDiarioPage() {
                       {chequeo.evacuacionesNumero || 0}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase">Agua (L)</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {chequeo.consumoAguaLitros || '0'}
-                    </p>
-                  </div>
                 </div>
 
                 {/* Resumen general */}
@@ -1140,81 +985,9 @@ export default function ChequeoDiarioPage() {
           )}
         </div>
 
-        {/* 2. Alimentación */}
+        {/* 2. Funciones Corporales */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">2. Alimentación</h3>
-
-          {formData.kefirHora && (
-            <div className="mb-3">
-              <p className="font-medium text-gray-700">Kefir</p>
-              <p className="text-sm text-gray-600">Hora: {formData.kefirHora} - {formData.kefirCantidad}</p>
-              {formData.kefirNotas && <p className="text-sm text-gray-600">{formData.kefirNotas}</p>}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {formData.desayunoDescripcion && (
-              <div className="p-3 bg-gray-50 rounded">
-                <p className="font-medium text-sm text-gray-700">Desayuno</p>
-                <p className="text-sm text-gray-600">{formData.desayunoDescripcion}</p>
-                <p className="text-xs text-gray-500 mt-1">Consumió: {formData.desayunoCantidad || 'No especificado'}</p>
-              </div>
-            )}
-            {formData.colacion1Descripcion && (
-              <div className="p-3 bg-gray-50 rounded">
-                <p className="font-medium text-sm text-gray-700">Colación 1</p>
-                <p className="text-sm text-gray-600">{formData.colacion1Descripcion}</p>
-                <p className="text-xs text-gray-500 mt-1">Consumió: {formData.colacion1Cantidad || 'No especificado'}</p>
-              </div>
-            )}
-            {formData.almuerzoDescripcion && (
-              <div className="p-3 bg-gray-50 rounded">
-                <p className="font-medium text-sm text-gray-700">Almuerzo</p>
-                <p className="text-sm text-gray-600">{formData.almuerzoDescripcion}</p>
-                <p className="text-xs text-gray-500 mt-1">Consumió: {formData.almuerzoCantidad || 'No especificado'}</p>
-              </div>
-            )}
-            {formData.colacion2Descripcion && (
-              <div className="p-3 bg-gray-50 rounded">
-                <p className="font-medium text-sm text-gray-700">Colación 2</p>
-                <p className="text-sm text-gray-600">{formData.colacion2Descripcion}</p>
-                <p className="text-xs text-gray-500 mt-1">Consumió: {formData.colacion2Cantidad || 'No especificado'}</p>
-              </div>
-            )}
-            {formData.cenaDescripcion && (
-              <div className="p-3 bg-gray-50 rounded">
-                <p className="font-medium text-sm text-gray-700">Cena</p>
-                <p className="text-sm text-gray-600">{formData.cenaDescripcion}</p>
-                <p className="text-xs text-gray-500 mt-1">Consumió: {formData.cenaCantidad || 'No especificado'}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            {formData.consumoAguaLitros && (
-              <p className="text-sm text-gray-700 mb-2">💧 Agua: {formData.consumoAguaLitros}L</p>
-            )}
-            {formData.otrosLiquidos && (
-              <p className="text-sm text-gray-700 mb-2">Otros líquidos: {formData.otrosLiquidos}</p>
-            )}
-            {formData.observacionesApetito && (
-              <div className="mt-2">
-                <p className="text-sm font-medium text-gray-700">Observaciones de apetito:</p>
-                <p className="text-sm text-gray-600 mt-1">{formData.observacionesApetito}</p>
-              </div>
-            )}
-            {formData.alimentosRechazados && (
-              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                <p className="text-sm font-medium text-yellow-900">Alimentos rechazados:</p>
-                <p className="text-sm text-yellow-800">{formData.alimentosRechazados}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 3. Funciones Corporales */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">3. Funciones Corporales</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">2. Funciones Corporales</h3>
 
           <div className="grid grid-cols-2 gap-4 mb-3">
             <div>
@@ -1254,9 +1027,9 @@ export default function ChequeoDiarioPage() {
           )}
         </div>
 
-        {/* 4. Actividades Realizadas */}
+        {/* 3. Actividades Realizadas */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">4. Actividades Realizadas</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">3. Actividades Realizadas</h3>
 
           {formData.actividadesRealizadas.length > 0 ? (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -1278,9 +1051,9 @@ export default function ChequeoDiarioPage() {
           )}
         </div>
 
-        {/* 5. Medicación */}
+        {/* 4. Medicación */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">5. Medicación</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">4. Medicación</h3>
 
           <div className="mb-3">
             {formData.medicacionEnTiempoForma ? (
@@ -1325,10 +1098,10 @@ export default function ChequeoDiarioPage() {
           )}
         </div>
 
-        {/* 6. Incidentes */}
+        {/* 5. Incidentes */}
         {formData.incidentes.length > 0 && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">6. Incidentes</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">5. Incidentes</h3>
 
             <div className="space-y-3">
               {formData.incidentes.map((inc, idx) => (
@@ -1362,9 +1135,9 @@ export default function ChequeoDiarioPage() {
           </div>
         )}
 
-        {/* 7. Resumen del Día */}
+        {/* 6. Resumen del Día */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">7. Resumen del Día</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">6. Resumen del Día</h3>
 
           {formData.resumenGeneral && (
             <div className="mb-4">
@@ -1636,279 +1409,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 2: Alimentación */}
+            {/* Sección 2: Funciones Corporales */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                2. Alimentación
-              </h2>
-
-              <div className="space-y-4">
-                {/* Kefir */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <h3 className="font-medium text-gray-900 mb-3">Kefir</h3>
-                  <div className="space-y-3">
-                    {/* Selector de hora con dropdowns */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Hora</label>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={formData.kefirHora.split(':')[0] || ''}
-                          onChange={(e) => {
-                            const minutos = formData.kefirHora.split(':')[1] || '00';
-                            setFormData({ ...formData, kefirHora: e.target.value ? `${e.target.value}:${minutos}` : '' });
-                          }}
-                          disabled={yaCompletado}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 bg-white"
-                        >
-                          <option value="">--</option>
-                          {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map((h) => (
-                            <option key={h} value={h}>{h}</option>
-                          ))}
-                        </select>
-                        <span className="text-gray-500 font-medium">:</span>
-                        <select
-                          value={formData.kefirHora.split(':')[1] || ''}
-                          onChange={(e) => {
-                            const hora = formData.kefirHora.split(':')[0] || '07';
-                            setFormData({ ...formData, kefirHora: `${hora}:${e.target.value}` });
-                          }}
-                          disabled={yaCompletado || !formData.kefirHora.split(':')[0]}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 bg-white"
-                        >
-                          <option value="">--</option>
-                          {['00', '15', '30', '45'].map((m) => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        value={formData.kefirCantidad}
-                        onChange={(e) => setFormData({ ...formData, kefirCantidad: e.target.value })}
-                        disabled={yaCompletado}
-                        placeholder="Cantidad (ej: 1 vaso)"
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                      />
-                      <input
-                        type="text"
-                        value={formData.kefirNotas}
-                        onChange={(e) => setFormData({ ...formData, kefirNotas: e.target.value })}
-                        disabled={yaCompletado}
-                        placeholder="Notas"
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Desayuno */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Desayuno</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={formData.desayunoDescripcion}
-                      onChange={(e) => setFormData({ ...formData, desayunoDescripcion: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Descripción"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                    <select
-                      value={formData.desayunoCantidad}
-                      onChange={(e) => setFormData({ ...formData, desayunoCantidad: e.target.value })}
-                      disabled={yaCompletado}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    >
-                      <option value="">Cantidad consumida</option>
-                      <option value="todo">Todo</option>
-                      <option value="mayor_parte">Mayor parte (75%)</option>
-                      <option value="mitad">Mitad (50%)</option>
-                      <option value="poco">Poco (25%)</option>
-                      <option value="nada">Nada</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Colación 1 */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Colación 1</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={formData.colacion1Descripcion}
-                      onChange={(e) => setFormData({ ...formData, colacion1Descripcion: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Descripción"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                    <select
-                      value={formData.colacion1Cantidad}
-                      onChange={(e) => setFormData({ ...formData, colacion1Cantidad: e.target.value })}
-                      disabled={yaCompletado}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    >
-                      <option value="">Cantidad consumida</option>
-                      <option value="todo">Todo</option>
-                      <option value="mayor_parte">Mayor parte</option>
-                      <option value="mitad">Mitad</option>
-                      <option value="poco">Poco</option>
-                      <option value="nada">Nada</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Almuerzo */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Almuerzo</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={formData.almuerzoDescripcion}
-                      onChange={(e) => setFormData({ ...formData, almuerzoDescripcion: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Descripción"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                    <select
-                      value={formData.almuerzoCantidad}
-                      onChange={(e) => setFormData({ ...formData, almuerzoCantidad: e.target.value })}
-                      disabled={yaCompletado}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    >
-                      <option value="">Cantidad consumida</option>
-                      <option value="todo">Todo</option>
-                      <option value="mayor_parte">Mayor parte</option>
-                      <option value="mitad">Mitad</option>
-                      <option value="poco">Poco</option>
-                      <option value="nada">Nada</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Colación 2 */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Colación 2</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={formData.colacion2Descripcion}
-                      onChange={(e) => setFormData({ ...formData, colacion2Descripcion: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Descripción"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                    <select
-                      value={formData.colacion2Cantidad}
-                      onChange={(e) => setFormData({ ...formData, colacion2Cantidad: e.target.value })}
-                      disabled={yaCompletado}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    >
-                      <option value="">Cantidad consumida</option>
-                      <option value="todo">Todo</option>
-                      <option value="mayor_parte">Mayor parte</option>
-                      <option value="mitad">Mitad</option>
-                      <option value="poco">Poco</option>
-                      <option value="nada">Nada</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Cena */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Cena</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={formData.cenaDescripcion}
-                      onChange={(e) => setFormData({ ...formData, cenaDescripcion: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Descripción"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                    <select
-                      value={formData.cenaCantidad}
-                      onChange={(e) => setFormData({ ...formData, cenaCantidad: e.target.value })}
-                      disabled={yaCompletado}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    >
-                      <option value="">Cantidad consumida</option>
-                      <option value="todo">Todo</option>
-                      <option value="mayor_parte">Mayor parte</option>
-                      <option value="mitad">Mitad</option>
-                      <option value="poco">Poco</option>
-                      <option value="nada">Nada</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Consumo de líquidos */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Consumo de agua (litros)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.consumoAguaLitros}
-                      onChange={(e) => setFormData({ ...formData, consumoAguaLitros: e.target.value })}
-                      disabled={yaCompletado}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Otros líquidos
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.otrosLiquidos}
-                      onChange={(e) => setFormData({ ...formData, otrosLiquidos: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Ej: 2 tazas de té"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                  </div>
-                </div>
-
-                {/* Observaciones de apetito */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Observaciones de apetito
-                  </label>
-                  <textarea
-                    value={formData.observacionesApetito}
-                    onChange={(e) => setFormData({ ...formData, observacionesApetito: e.target.value })}
-                    disabled={yaCompletado}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    placeholder="Comentarios sobre el apetito..."
-                  />
-                </div>
-
-                {/* Alimentos rechazados */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Alimentos rechazados
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.alimentosRechazados}
-                    onChange={(e) => setFormData({ ...formData, alimentosRechazados: e.target.value })}
-                    disabled={yaCompletado}
-                    placeholder="Alimentos que rechazó..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Sección 3: Funciones Corporales */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                3. Funciones Corporales
+                2. Funciones Corporales
               </h2>
 
               <div className="space-y-4">
@@ -2051,10 +1555,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 4: Actividades Realizadas */}
+            {/* Sección 3: Actividades Realizadas */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                4. Actividades Realizadas
+                3. Actividades Realizadas
               </h2>
 
               <div className="space-y-4">
@@ -2109,10 +1613,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 5: Medicación */}
+            {/* Sección 4: Medicación */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                5. Medicación
+                4. Medicación
               </h2>
 
               <div className="space-y-4">
@@ -2290,10 +1794,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 6: Incidentes */}
+            {/* Sección 5: Incidentes */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                6. Incidentes
+                5. Incidentes
               </h2>
 
               <div className="space-y-4">
@@ -2382,10 +1886,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 7: Resumen */}
+            {/* Sección 6: Resumen */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                7. Resumen del Día
+                6. Resumen del Día
               </h2>
 
               <div className="space-y-4">
