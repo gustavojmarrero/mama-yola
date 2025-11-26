@@ -453,21 +453,32 @@ export default function Medicamentos() {
 
               {/* Foto */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Foto del medicamento
                 </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFotoFile(e.target.files?.[0] || null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="flex items-center gap-4">
+                  <label className="cursor-pointer px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors border border-gray-300">
+                    Seleccionar imagen
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setFotoFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                  {fotoFile && (
+                    <span className="text-sm text-gray-600">{fotoFile.name}</span>
+                  )}
+                  {!fotoFile && fotoURL && (
+                    <span className="text-sm text-gray-600">Imagen actual guardada</span>
+                  )}
+                </div>
                 {(fotoURL || fotoFile) && (
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <img
                       src={fotoFile ? URL.createObjectURL(fotoFile) : fotoURL}
                       alt="Preview"
-                      className="w-32 h-32 object-cover rounded-lg"
+                      className="w-32 h-32 object-cover rounded-lg border border-gray-200"
                     />
                   </div>
                 )}
