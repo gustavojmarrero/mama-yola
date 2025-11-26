@@ -488,9 +488,74 @@ export interface PlantillaActividad {
 
 // ===== TIPOS DE MENÚ =====
 
+// Tipos legacy (mantener por compatibilidad)
 export type TipoComida = 'desayuno' | 'colacion1' | 'comida' | 'colacion2' | 'cena';
 export type CategoriaComida = 'entrada' | 'plato_fuerte' | 'postre' | 'bebida' | 'snack';
 export type NivelConsumo = 'todo' | 'mayor_parte' | 'mitad' | 'poco' | 'nada';
+
+// ===== NUEVOS TIPOS DE MENÚ (v2) =====
+
+// Identificadores de tiempos de comida
+export type TiempoComidaId = 'desayuno' | 'colacion_am' | 'almuerzo' | 'colacion_pm' | 'cena';
+
+// Identificadores de componentes
+export type ComponenteId = 'primer_plato' | 'segundo_plato' | 'complemento' | 'postre' | 'snack' | 'bebida';
+
+// Configuración de un componente dentro de un tiempo de comida
+export interface ComponenteConfig {
+  id: ComponenteId;
+  nombre: string;
+  obligatorio: boolean;  // true solo para bebida
+  orden: number;
+}
+
+// Configuración de un tiempo de comida con sus componentes
+export interface TiempoComidaConfig {
+  id: TiempoComidaId;
+  nombre: string;
+  horaDefault: string;
+  icono: string;
+  componentes: ComponenteConfig[];
+  orden: number;
+  activo: boolean;
+}
+
+// Habilitación flexible de receta: tiempo + componente
+export interface RecetaHabilitacion {
+  tiempoComidaId: TiempoComidaId;
+  componenteId: ComponenteId;
+}
+
+// Platillo asignado a un componente específico
+export interface PlatilloAsignado {
+  componenteId: ComponenteId;
+  recetaId?: string;
+  recetaNombre?: string;
+  nombreCustom?: string;  // Si no usa receta
+  notas?: string;
+  consumo?: {
+    nivel: NivelConsumo;
+    porcentaje: number;
+    motivoRechazo?: string;
+    horaServida?: Date;
+    satisfaccion?: number;  // 1-5
+  };
+}
+
+// Menú de un tiempo de comida para un día específico
+export interface MenuTiempoComida {
+  id: string;  // formato: "2025-01-15_almuerzo"
+  pacienteId: string;
+  fecha: Date;
+  tiempoComidaId: TiempoComidaId;
+  horaProgramada: string;
+  platillos: PlatilloAsignado[];
+  estado: 'pendiente' | 'en_preparacion' | 'servido' | 'completado';
+  preparadoPor?: string;
+  notas?: string;
+  creadoEn: Date;
+  actualizadoEn: Date;
+}
 
 export interface ValorNutricional {
   calorias: number;
@@ -552,7 +617,10 @@ export interface Receta {
   id: string;
   pacienteId: string;
   nombre: string;
-  categoria: CategoriaComida;
+  // Campo legacy - mantener para compatibilidad
+  categoria?: CategoriaComida;
+  // Nuevo campo: habilitaciones flexibles por tiempo+componente
+  habilitaciones?: RecetaHabilitacion[];
   ingredientes: string[];
   instrucciones: string;
   etiquetas: string[];
