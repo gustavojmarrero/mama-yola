@@ -477,8 +477,101 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          {/* Grid principal */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
+          {/* Accesos Rápidos */}
+          <div className="bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4">⚡ Acceso Rápido</h3>
+            <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
+              {[
+                { path: '/chequeo-diario', icon: '📋', label: 'Chequeo' },
+                { path: '/signos-vitales', icon: '💓', label: 'Signos' },
+                { path: '/pastillero-diario', icon: '💊', label: 'Pastillero' },
+                { path: '/menu-comida', icon: '🍽️', label: 'Menú' },
+                { path: '/turnos', icon: '👥', label: 'Turnos' },
+                { path: '/actividades', icon: '🎯', label: 'Actividades' },
+                { path: '/configuracion-horarios', icon: '⏰', label: 'Horarios' },
+                { path: '/analytics', icon: '📊', label: 'Analytics' },
+              ].map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className="flex flex-col items-center justify-center p-3 md:p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
+                >
+                  <span className="text-2xl md:text-3xl mb-1">{item.icon}</span>
+                  <span className="text-xs font-medium text-gray-700 text-center">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Procesos del Día */}
+          {procesos.length > 0 && (
+            <div className="bg-white rounded-lg shadow mb-6">
+              <div className="p-4 md:p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900">
+                      Procesos del Día
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {(() => {
+                        const stats = calcularEstadisticasProcesos(procesos);
+                        return `${stats.completados}/${stats.total} completados (${stats.porcentajeCompletado}%)`;
+                      })()}
+                    </p>
+                  </div>
+                  <Link
+                    to="/configuracion-horarios"
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Configurar horarios"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </Link>
+                </div>
+              </div>
+              <div className="p-4 md:p-6">
+                {(() => {
+                  const grupos = agruparProcesosPorEstado(procesos);
+                  return (
+                    <>
+                      <ProcesoGrupo
+                        titulo="Vencidos"
+                        procesos={grupos.vencidos}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Activos"
+                        procesos={grupos.activos}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Próximos"
+                        procesos={grupos.proximos}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Pendientes"
+                        procesos={grupos.pendientes}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Completados"
+                        procesos={grupos.completados}
+                        horaActual={horaActual}
+                        colapsable
+                        colapsadoDefault
+                      />
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Grid Citas y Contactos */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
             {/* Próximas Citas */}
             <div className="lg:col-span-2 bg-white rounded-lg shadow">
               <div className="p-4 md:p-6 border-b border-gray-200">
@@ -598,99 +691,6 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Procesos del Día */}
-          {procesos.length > 0 && (
-            <div className="bg-white rounded-lg shadow mb-6">
-              <div className="p-4 md:p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg md:text-xl font-bold text-gray-900">
-                      Procesos del Día
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {(() => {
-                        const stats = calcularEstadisticasProcesos(procesos);
-                        return `${stats.completados}/${stats.total} completados (${stats.porcentajeCompletado}%)`;
-                      })()}
-                    </p>
-                  </div>
-                  <Link
-                    to="/configuracion-horarios"
-                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Configurar horarios"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </Link>
-                </div>
-              </div>
-              <div className="p-4 md:p-6">
-                {(() => {
-                  const grupos = agruparProcesosPorEstado(procesos);
-                  return (
-                    <>
-                      <ProcesoGrupo
-                        titulo="Vencidos"
-                        procesos={grupos.vencidos}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Activos"
-                        procesos={grupos.activos}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Próximos"
-                        procesos={grupos.proximos}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Pendientes"
-                        procesos={grupos.pendientes}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Completados"
-                        procesos={grupos.completados}
-                        horaActual={horaActual}
-                        colapsable
-                        colapsadoDefault
-                      />
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-
-          {/* Accesos Rápidos */}
-          <div className="bg-white rounded-lg shadow p-4 md:p-6">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4">⚡ Acceso Rápido</h3>
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
-              {[
-                { path: '/chequeo-diario', icon: '📋', label: 'Chequeo' },
-                { path: '/signos-vitales', icon: '💓', label: 'Signos' },
-                { path: '/pastillero-diario', icon: '💊', label: 'Pastillero' },
-                { path: '/menu-comida', icon: '🍽️', label: 'Menú' },
-                { path: '/turnos', icon: '👥', label: 'Turnos' },
-                { path: '/actividades', icon: '🎯', label: 'Actividades' },
-                { path: '/configuracion-horarios', icon: '⏰', label: 'Horarios' },
-                { path: '/analytics', icon: '📊', label: 'Analytics' },
-              ].map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className="flex flex-col items-center justify-center p-3 md:p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
-                >
-                  <span className="text-2xl md:text-3xl mb-1">{item.icon}</span>
-                  <span className="text-xs font-medium text-gray-700 text-center">{item.label}</span>
-                </Link>
-              ))}
             </div>
           </div>
         </div>
