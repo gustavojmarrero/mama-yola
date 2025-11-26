@@ -16,13 +16,21 @@ import Layout from '../components/common/Layout';
 import {
   ItemInventario,
   MovimientoInventario,
-  TipoInventario,
   CategoriaInventario,
   TipoMovimiento,
 } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 const PACIENTE_ID = 'paciente-principal';
+
+// Tipo para las notificaciones toast
+type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+interface Toast {
+  id: number;
+  message: string;
+  type: ToastType;
+}
 
 const categorias: { value: CategoriaInventario; label: string; icon: string }[] = [
   { value: 'medicamento', label: 'Medicamento', icon: '💊' },
@@ -37,27 +45,35 @@ export default function Inventarios() {
   const [items, setItems] = useState<ItemInventario[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoInventario[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tabActivo, setTabActivo] = useState<TipoInventario>('operativo');
   const [showModal, setShowModal] = useState(false);
   const [showMovimientoModal, setShowMovimientoModal] = useState(false);
   const [showHistorialModal, setShowHistorialModal] = useState(false);
   const [editando, setEditando] = useState<ItemInventario | null>(null);
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaInventario | 'todos'>('todos');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'critico' | 'bajo' | 'por_vencer' | 'ok'>('todos');
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Función para mostrar toast
+  const showToast = (message: string, type: ToastType = 'success') => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    // Auto-remover después de 3 segundos
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  };
 
   const [formData, setFormData] = useState({
     nombre: '',
-    tipo: 'operativo' as TipoInventario,
     categoria: 'medicamento' as CategoriaInventario,
     presentacion: '',
     fechaVencimiento: '',
-    lote: '',
-    cantidad: 0,
+    cantidadMaestro: 0,
+    cantidadOperativo: 0,
     unidad: 'piezas',
-    nivelMinimo: 5,
+    nivelMinimoMaestro: 5,
+    nivelMinimoOperativo: 5,
     ubicacion: '',
-    costo: 0,
-    proveedor: '',
     notas: '',
   });
 
@@ -94,11 +110,28 @@ export default function Inventarios() {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        // Compatibilidad con modelo antiguo: convertir cantidad a cantidadMaestro/cantidadOperativo
+        const cantidadMaestro = data.cantidadMaestro ?? (data.tipo === 'maestro' ? data.cantidad : 0) ?? 0;
+        const cantidadOperativo = data.cantidadOperativo ?? (data.tipo === 'operativo' ? data.cantidad : 0) ?? 0;
+        const nivelMinimoMaestro = data.nivelMinimoMaestro ?? data.nivelMinimo ?? 5;
+        const nivelMinimoOperativo = data.nivelMinimoOperativo ?? data.nivelMinimo ?? 5;
+
         itemsData.push({
           id: doc.id,
-          ...data,
+          pacienteId: data.pacienteId,
+          nombre: data.nombre,
+          categoria: data.categoria,
+          cantidadMaestro,
+          cantidadOperativo,
+          presentacion: data.presentacion,
           fechaVencimiento: data.fechaVencimiento?.toDate(),
-          ultimaRevision: data.ultimaRevision?.toDate(),
+          vinculadoPastillero: data.vinculadoPastillero,
+          medicamentoId: data.medicamentoId,
+          unidad: data.unidad,
+          nivelMinimoMaestro,
+          nivelMinimoOperativo,
+          ubicacion: data.ubicacion,
+          notas: data.notas,
           creadoEn: data.creadoEn?.toDate() || new Date(),
           actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
         } as ItemInventario);
@@ -140,36 +173,32 @@ export default function Inventarios() {
       setEditando(item);
       setFormData({
         nombre: item.nombre,
-        tipo: item.tipo,
         categoria: item.categoria,
         presentacion: item.presentacion || '',
         fechaVencimiento: item.fechaVencimiento
           ? format(item.fechaVencimiento, 'yyyy-MM-dd')
           : '',
-        lote: item.lote || '',
-        cantidad: item.cantidad,
+        cantidadMaestro: item.cantidadMaestro,
+        cantidadOperativo: item.cantidadOperativo,
         unidad: item.unidad,
-        nivelMinimo: item.nivelMinimo,
+        nivelMinimoMaestro: item.nivelMinimoMaestro,
+        nivelMinimoOperativo: item.nivelMinimoOperativo,
         ubicacion: item.ubicacion || '',
-        costo: item.costo || 0,
-        proveedor: item.proveedor || '',
         notas: item.notas || '',
       });
     } else {
       setEditando(null);
       setFormData({
         nombre: '',
-        tipo: tabActivo,
         categoria: 'medicamento',
         presentacion: '',
         fechaVencimiento: '',
-        lote: '',
-        cantidad: 0,
+        cantidadMaestro: 0,
+        cantidadOperativo: 0,
         unidad: 'piezas',
-        nivelMinimo: 5,
+        nivelMinimoMaestro: 5,
+        nivelMinimoOperativo: 5,
         ubicacion: '',
-        costo: 0,
-        proveedor: '',
         notas: '',
       });
     }
@@ -195,50 +224,51 @@ export default function Inventarios() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.nombre || formData.cantidad < 0) {
-      alert('Por favor completa los campos obligatorios');
+    if (!formData.nombre) {
+      showToast('Por favor completa los campos obligatorios', 'warning');
       return;
     }
 
     try {
       const ahora = Timestamp.now();
 
-      const itemData = {
+      // Construir objeto solo con campos definidos (Firebase no acepta undefined)
+      const itemData: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         nombre: formData.nombre,
-        tipo: formData.tipo,
         categoria: formData.categoria,
-        presentacion: formData.presentacion || undefined,
-        fechaVencimiento: formData.fechaVencimiento
-          ? Timestamp.fromDate(new Date(formData.fechaVencimiento))
-          : undefined,
-        lote: formData.lote || undefined,
-        cantidad: formData.cantidad,
+        cantidadMaestro: formData.cantidadMaestro,
+        cantidadOperativo: formData.cantidadOperativo,
         unidad: formData.unidad,
-        nivelMinimo: formData.nivelMinimo,
-        ubicacion: formData.ubicacion || undefined,
-        costo: formData.costo || undefined,
-        proveedor: formData.proveedor || undefined,
-        notas: formData.notas || undefined,
+        nivelMinimoMaestro: formData.nivelMinimoMaestro,
+        nivelMinimoOperativo: formData.nivelMinimoOperativo,
         actualizadoEn: ahora,
       };
 
+      // Agregar campos opcionales solo si tienen valor
+      if (formData.presentacion) itemData.presentacion = formData.presentacion;
+      if (formData.fechaVencimiento) {
+        itemData.fechaVencimiento = Timestamp.fromDate(new Date(formData.fechaVencimiento));
+      }
+      if (formData.ubicacion) itemData.ubicacion = formData.ubicacion;
+      if (formData.notas) itemData.notas = formData.notas;
+
       if (editando) {
         await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'inventario', editando.id), itemData);
-        alert('Item actualizado correctamente');
+        showToast('Item actualizado correctamente', 'success');
       } else {
         await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'inventario'), {
           ...itemData,
           creadoEn: ahora,
         });
-        alert('Item creado correctamente');
+        showToast('Item creado correctamente', 'success');
       }
 
       cerrarModal();
       cargarItems();
     } catch (error) {
       console.error('Error al guardar item:', error);
-      alert('Error al guardar el item');
+      showToast('Error al guardar el item', 'error');
     }
   }
 
@@ -246,103 +276,93 @@ export default function Inventarios() {
     e.preventDefault();
 
     if (!movimientoForm.itemId || movimientoForm.cantidad <= 0) {
-      alert('Por favor ingresa una cantidad válida');
+      showToast('Por favor ingresa una cantidad válida', 'warning');
       return;
     }
 
     const item = items.find((i) => i.id === movimientoForm.itemId);
     if (!item) return;
 
-    // Validar que hay suficiente stock para salidas/transferencias
-    if (
-      (movimientoForm.tipo === 'salida' || movimientoForm.tipo === 'transferencia') &&
-      movimientoForm.cantidad > item.cantidad
-    ) {
-      alert('No hay suficiente stock disponible');
+    // Validar stock según tipo de movimiento
+    if (movimientoForm.tipo === 'salida' && movimientoForm.cantidad > item.cantidadOperativo) {
+      showToast('No hay suficiente stock en el inventario operativo', 'error');
+      return;
+    }
+    if (movimientoForm.tipo === 'transferencia' && movimientoForm.cantidad > item.cantidadMaestro) {
+      showToast('No hay suficiente stock en el inventario maestro', 'error');
       return;
     }
 
     try {
       const ahora = Timestamp.now();
 
-      // Calcular nueva cantidad
-      let nuevaCantidad = item.cantidad;
+      // Calcular nuevas cantidades según tipo de movimiento
+      let nuevaCantidadMaestro = item.cantidadMaestro;
+      let nuevaCantidadOperativo = item.cantidadOperativo;
+
       if (movimientoForm.tipo === 'entrada') {
-        nuevaCantidad += movimientoForm.cantidad;
-      } else if (movimientoForm.tipo === 'salida' || movimientoForm.tipo === 'transferencia') {
-        nuevaCantidad -= movimientoForm.cantidad;
+        // Entrada: suma al maestro
+        nuevaCantidadMaestro += movimientoForm.cantidad;
+      } else if (movimientoForm.tipo === 'salida') {
+        // Salida: resta del operativo
+        nuevaCantidadOperativo -= movimientoForm.cantidad;
+      } else if (movimientoForm.tipo === 'transferencia') {
+        // Transferencia: del maestro al operativo
+        nuevaCantidadMaestro -= movimientoForm.cantidad;
+        nuevaCantidadOperativo += movimientoForm.cantidad;
       } else if (movimientoForm.tipo === 'ajuste') {
-        nuevaCantidad = movimientoForm.cantidad;
+        // Ajuste: se ajusta la cantidad del operativo (principal)
+        nuevaCantidadOperativo = movimientoForm.cantidad;
       }
 
-      // Actualizar item
+      // Actualizar item con las nuevas cantidades
       await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'inventario', item.id), {
-        cantidad: nuevaCantidad,
+        cantidadMaestro: nuevaCantidadMaestro,
+        cantidadOperativo: nuevaCantidadOperativo,
         actualizadoEn: ahora,
       });
 
       // Crear registro de movimiento
-      await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'movimientosInventario'), {
+      const movimientoData: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         tipo: movimientoForm.tipo,
         itemId: item.id,
         itemNombre: item.nombre,
-        origen: item.tipo,
-        destino: movimientoForm.tipo === 'transferencia'
-          ? (item.tipo === 'maestro' ? 'operativo' : 'maestro')
-          : movimientoForm.tipo === 'salida' ? 'consumido' : 'externo',
+        origen: movimientoForm.tipo === 'entrada' ? 'externo' :
+                movimientoForm.tipo === 'transferencia' ? 'maestro' : 'operativo',
+        destino: movimientoForm.tipo === 'entrada' ? 'maestro' :
+                 movimientoForm.tipo === 'transferencia' ? 'operativo' : 'consumido',
         cantidad: movimientoForm.cantidad,
-        motivo: movimientoForm.motivo || undefined,
         usuarioId: currentUser?.uid || '',
         usuarioNombre: userProfile?.nombre || 'Usuario',
         fecha: ahora,
-        notas: movimientoForm.notas || undefined,
         creadoEn: ahora,
-      });
+      };
 
-      // Si es transferencia, crear item en el otro inventario
-      if (movimientoForm.tipo === 'transferencia') {
-        const nuevoTipo = item.tipo === 'maestro' ? 'operativo' : 'maestro';
+      if (movimientoForm.motivo) movimientoData.motivo = movimientoForm.motivo;
+      if (movimientoForm.notas) movimientoData.notas = movimientoForm.notas;
 
-        // Buscar si ya existe el item en el otro inventario
-        const itemExistente = items.find(
-          (i) => i.nombre === item.nombre && i.tipo === nuevoTipo
-        );
+      await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'movimientosInventario'), movimientoData);
 
-        if (itemExistente) {
-          await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'inventario', itemExistente.id), {
-            cantidad: itemExistente.cantidad + movimientoForm.cantidad,
-            actualizadoEn: ahora,
-          });
-        } else {
-          await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'inventario'), {
-            ...item,
-            id: undefined,
-            tipo: nuevoTipo,
-            cantidad: movimientoForm.cantidad,
-            creadoEn: ahora,
-            actualizadoEn: ahora,
-          });
-        }
-      }
-
-      alert('Movimiento registrado correctamente');
+      showToast('Movimiento registrado correctamente', 'success');
       setShowMovimientoModal(false);
       cargarDatos();
     } catch (error) {
       console.error('Error al registrar movimiento:', error);
-      alert('Error al registrar el movimiento');
+      showToast('Error al registrar el movimiento', 'error');
     }
   }
 
   function getEstadoItem(item: ItemInventario) {
     const hoy = new Date();
     const en30Dias = addDays(hoy, 30);
+    const cantidadTotal = item.cantidadMaestro + item.cantidadOperativo;
 
-    if (item.cantidad === 0) return 'critico';
+    if (cantidadTotal === 0) return 'critico';
     if (item.fechaVencimiento && isBefore(item.fechaVencimiento, hoy)) return 'vencido';
     if (item.fechaVencimiento && isBefore(item.fechaVencimiento, en30Dias)) return 'por_vencer';
-    if (item.cantidad <= item.nivelMinimo) return 'bajo';
+    // Verificar si alguno de los inventarios está bajo
+    if (item.cantidadMaestro <= item.nivelMinimoMaestro || item.cantidadOperativo <= item.nivelMinimoOperativo) return 'bajo';
     return 'ok';
   }
 
@@ -377,10 +397,9 @@ export default function Inventarios() {
 
   // Filtrar items
   const itemsFiltrados = items.filter((item) => {
-    const matchTipo = item.tipo === tabActivo;
     const matchCategoria = filtroCategoria === 'todos' || item.categoria === filtroCategoria;
     const matchEstado = filtroEstado === 'todos' || getEstadoItem(item) === filtroEstado;
-    return matchTipo && matchCategoria && matchEstado;
+    return matchCategoria && matchEstado;
   });
 
   // Alertas
@@ -443,7 +462,7 @@ export default function Inventarios() {
                         key={item.id}
                         className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm"
                       >
-                        {item.nombre}: {item.cantidad} {item.unidad}
+                        {item.nombre}: M:{item.cantidadMaestro} O:{item.cantidadOperativo} {item.unidad}
                       </span>
                     ))}
                     {itemsBajos.length > 5 && (
@@ -475,38 +494,6 @@ export default function Inventarios() {
               )}
             </div>
           )}
-
-          {/* Tabs */}
-          <div className="bg-white rounded-lg shadow mb-6">
-            <div className="flex border-b border-gray-200">
-              <button
-                onClick={() => setTabActivo('operativo')}
-                className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
-                  tabActivo === 'operativo'
-                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                📋 Inventario Operativo
-                <span className="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded-full">
-                  {items.filter((i) => i.tipo === 'operativo').length}
-                </span>
-              </button>
-              <button
-                onClick={() => setTabActivo('maestro')}
-                className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
-                  tabActivo === 'maestro'
-                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                🏪 Inventario Maestro
-                <span className="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded-full">
-                  {items.filter((i) => i.tipo === 'maestro').length}
-                </span>
-              </button>
-            </div>
-          </div>
 
           {/* Filtros */}
           <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -565,8 +552,7 @@ export default function Inventarios() {
           {/* Resumen */}
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <p className="text-sm text-gray-600">
-              Mostrando <strong>{itemsFiltrados.length}</strong> items en inventario{' '}
-              <strong>{tabActivo}</strong>
+              Mostrando <strong>{itemsFiltrados.length}</strong> items en inventario
             </p>
           </div>
 
@@ -578,8 +564,11 @@ export default function Inventarios() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Item
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cantidad
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    🏪 Maestro
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    📋 Operativo
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
@@ -604,18 +593,25 @@ export default function Inventarios() {
                           <div>
                             <div className="text-sm font-medium text-gray-900">{item.nombre}</div>
                             <div className="text-sm text-gray-500">
-                              {item.presentacion && `${item.presentacion} • `}
-                              {item.lote && `Lote: ${item.lote}`}
+                              {item.presentacion && `${item.presentacion}`}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="text-sm text-gray-900 font-semibold">
-                          {item.cantidad} {item.unidad}
+                          {item.cantidadMaestro} {item.unidad}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Mín: {item.nivelMinimo}
+                          Mín: {item.nivelMinimoMaestro}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="text-sm text-gray-900 font-semibold">
+                          {item.cantidadOperativo} {item.unidad}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Mín: {item.nivelMinimoOperativo}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -635,23 +631,23 @@ export default function Inventarios() {
                           <button
                             onClick={() => abrirMovimientoModal(item, 'entrada')}
                             className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs rounded transition-colors"
-                            title="Entrada"
+                            title="Entrada (Compra al Maestro)"
                           >
                             ➕
                           </button>
                           <button
-                            onClick={() => abrirMovimientoModal(item, 'salida')}
-                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded transition-colors"
-                            title="Salida"
-                          >
-                            ➖
-                          </button>
-                          <button
                             onClick={() => abrirMovimientoModal(item, 'transferencia')}
                             className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
-                            title={`Transferir a ${item.tipo === 'maestro' ? 'Operativo' : 'Maestro'}`}
+                            title="Transferir de Maestro a Operativo"
                           >
                             ↔️
+                          </button>
+                          <button
+                            onClick={() => abrirMovimientoModal(item, 'salida')}
+                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded transition-colors"
+                            title="Salida (Consumo del Operativo)"
+                          >
+                            ➖
                           </button>
                           <button
                             onClick={() => abrirModal(item)}
@@ -670,7 +666,7 @@ export default function Inventarios() {
 
             {itemsFiltrados.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No hay items en este inventario</p>
+                <p className="text-gray-500 text-lg">No hay items en el inventario</p>
                 <button
                   onClick={() => abrirModal()}
                   className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
@@ -707,18 +703,6 @@ export default function Inventarios() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo *</label>
-                  <select
-                    value={formData.tipo}
-                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value as TipoInventario })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="operativo">Operativo</option>
-                    <option value="maestro">Maestro</option>
-                  </select>
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Categoría *</label>
                   <select
                     value={formData.categoria}
@@ -745,28 +729,6 @@ export default function Inventarios() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Lote</label>
-                  <input
-                    type="text"
-                    value={formData.lote}
-                    onChange={(e) => setFormData({ ...formData, lote: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad *</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={formData.cantidad}
-                    onChange={(e) => setFormData({ ...formData, cantidad: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Unidad</label>
                   <select
                     value={formData.unidad}
@@ -781,15 +743,58 @@ export default function Inventarios() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nivel Mínimo</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.nivelMinimo}
-                    onChange={(e) => setFormData({ ...formData, nivelMinimo: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                {/* Sección Maestro */}
+                <div className="md:col-span-2 bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-800 mb-3">🏪 Inventario Maestro</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad Maestro</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.cantidadMaestro}
+                        onChange={(e) => setFormData({ ...formData, cantidadMaestro: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nivel Mínimo Maestro</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.nivelMinimoMaestro}
+                        onChange={(e) => setFormData({ ...formData, nivelMinimoMaestro: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sección Operativo */}
+                <div className="md:col-span-2 bg-green-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-green-800 mb-3">📋 Inventario Operativo</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad Operativo</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.cantidadOperativo}
+                        onChange={(e) => setFormData({ ...formData, cantidadOperativo: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nivel Mínimo Operativo</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.nivelMinimoOperativo}
+                        onChange={(e) => setFormData({ ...formData, nivelMinimoOperativo: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -809,28 +814,6 @@ export default function Inventarios() {
                     value={formData.ubicacion}
                     onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
                     placeholder="Ej: Cajón 1, Refrigerador"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Costo</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.costo}
-                    onChange={(e) => setFormData({ ...formData, costo: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
-                  <input
-                    type="text"
-                    value={formData.proveedor}
-                    onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -949,6 +932,38 @@ export default function Inventarios() {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slide-in ${
+              toast.type === 'success'
+                ? 'bg-green-500 text-white'
+                : toast.type === 'error'
+                ? 'bg-red-500 text-white'
+                : toast.type === 'warning'
+                ? 'bg-yellow-500 text-white'
+                : 'bg-blue-500 text-white'
+            }`}
+          >
+            <span className="text-lg">
+              {toast.type === 'success' && '✓'}
+              {toast.type === 'error' && '✕'}
+              {toast.type === 'warning' && '⚠'}
+              {toast.type === 'info' && 'ℹ'}
+            </span>
+            <span className="flex-1">{toast.message}</span>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+              className="text-white/80 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
 
       {/* Modal historial de movimientos */}
       {showHistorialModal && (

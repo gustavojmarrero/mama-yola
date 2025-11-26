@@ -331,35 +331,29 @@ export interface Evento {
 
 // ===== TIPOS DE INVENTARIO =====
 
-export type TipoInventario = 'operativo' | 'maestro';
 export type CategoriaInventario = 'medicamento' | 'material' | 'consumible';
-export type EstadoMaterial = 'disponible' | 'en_uso' | 'mantenimiento' | 'extraviado';
 
 export interface ItemInventario {
   id: string;
   pacienteId: string;
   nombre: string;
-  tipo: TipoInventario;
   categoria: CategoriaInventario;
+
+  // Cantidades por almacén
+  cantidadMaestro: number;
+  cantidadOperativo: number;
 
   // Para medicamentos
   presentacion?: string;
   fechaVencimiento?: Date;
-  lote?: string;
   vinculadoPastillero?: boolean;
   medicamentoId?: string; // si está vinculado
 
-  // Para materiales
-  estado?: EstadoMaterial;
-  ultimaRevision?: Date;
-
   // Comunes
-  cantidad: number;
   unidad: string; // "piezas", "ml", "cajas"
-  nivelMinimo: number;
+  nivelMinimoMaestro: number;
+  nivelMinimoOperativo: number;
   ubicacion?: string;
-  costo?: number;
-  proveedor?: string;
   notas?: string;
 
   creadoEn: Date;
