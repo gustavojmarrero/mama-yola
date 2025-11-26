@@ -951,11 +951,21 @@ export default function ChequeoDiarioPage() {
             <div className="mb-3">
               <span className="text-sm font-medium text-gray-700">Actitud:</span>
               <div className="flex flex-wrap gap-2 mt-1">
-                {formData.actitud.map(act => (
-                  <span key={act} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                    {act}
-                  </span>
-                ))}
+                {formData.actitud.map(actId => {
+                  const actitudConfig: Record<string, { label: string; bg: string }> = {
+                    positiva: { label: 'Positiva / Adaptativa', bg: 'bg-green-100 text-green-800' },
+                    negativa: { label: 'Negativa / Pesimista', bg: 'bg-yellow-100 text-yellow-800' },
+                    aislamiento: { label: 'Aislamiento / Apatía', bg: 'bg-orange-100 text-orange-800' },
+                    enfado: { label: 'Enfado / Resentimiento', bg: 'bg-red-100 text-red-800' },
+                    dependencia: { label: 'Dependencia', bg: 'bg-blue-100 text-blue-900' },
+                  };
+                  const config = actitudConfig[actId] || { label: actId, bg: 'bg-gray-100 text-gray-800' };
+                  return (
+                    <span key={actId} className={`px-3 py-1 rounded-full text-sm font-medium ${config.bg}`}>
+                      {config.label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1027,33 +1037,9 @@ export default function ChequeoDiarioPage() {
           )}
         </div>
 
-        {/* 3. Actividades Realizadas */}
+        {/* 3. Medicación */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">3. Actividades Realizadas</h3>
-
-          {formData.actividadesRealizadas.length > 0 ? (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {formData.actividadesRealizadas.map(act => (
-                <span key={act} className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                  {act}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500 mb-3">No se registraron actividades</p>
-          )}
-
-          {formData.participacionActitud && (
-            <div className="p-3 bg-gray-50 rounded">
-              <p className="text-sm font-medium text-gray-700 mb-1">Participación y Actitud:</p>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{formData.participacionActitud}</p>
-            </div>
-          )}
-        </div>
-
-        {/* 4. Medicación */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">4. Medicación</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">3. Medicación</h3>
 
           <div className="mb-3">
             {formData.medicacionEnTiempoForma ? (
@@ -1098,10 +1084,10 @@ export default function ChequeoDiarioPage() {
           )}
         </div>
 
-        {/* 5. Incidentes */}
+        {/* 4. Incidentes */}
         {formData.incidentes.length > 0 && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">5. Incidentes</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">4. Incidentes</h3>
 
             <div className="space-y-3">
               {formData.incidentes.map((inc, idx) => (
@@ -1135,9 +1121,9 @@ export default function ChequeoDiarioPage() {
           </div>
         )}
 
-        {/* 6. Resumen del Día */}
+        {/* 5. Resumen del Día */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">6. Resumen del Día</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">5. Resumen del Día</h3>
 
           {formData.resumenGeneral && (
             <div className="mb-4">
@@ -1272,25 +1258,94 @@ export default function ChequeoDiarioPage() {
                 {/* Actitud */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Actitud (puede seleccionar varias)
+                    Actitud del día
                   </label>
+                  <p className="text-xs text-gray-500 mb-3">Mantén presionado o pasa el cursor para ver la descripción</p>
                   <div className="flex flex-wrap gap-2">
-                    {['tranquila', 'activa', 'inquieta', 'ansiosa', 'alegre', 'triste'].map(opcion => (
-                      <button
-                        key={opcion}
-                        type="button"
-                        disabled={yaCompletado}
-                        onClick={() => toggleActitud(opcion)}
-                        className={`px-4 py-2 rounded-lg border transition-colors ${
-                          formData.actitud.includes(opcion)
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        } ${yaCompletado ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {opcion}
-                      </button>
+                    {[
+                      {
+                        id: 'positiva',
+                        label: 'Positiva / Adaptativa',
+                        descripcion: 'Caracterizada por la aceptación de los cambios físicos y sociales, la búsqueda de nuevas actividades, el mantenimiento de redes de apoyo social y una sensación de bienestar general.',
+                        color: 'green',
+                        bgSelected: 'bg-green-600',
+                        bgUnselected: 'bg-green-50 border-green-300 text-green-800 hover:bg-green-100',
+                      },
+                      {
+                        id: 'negativa',
+                        label: 'Negativa / Pesimista',
+                        descripcion: 'Implica ver el envejecimiento como un período de declive, con un enfoque en las pérdidas, la soledad y la desesperanza, lo que puede aumentar el riesgo de depresión y ansiedad.',
+                        color: 'yellow',
+                        bgSelected: 'bg-yellow-500',
+                        bgUnselected: 'bg-yellow-50 border-yellow-400 text-yellow-800 hover:bg-yellow-100',
+                      },
+                      {
+                        id: 'aislamiento',
+                        label: 'Aislamiento / Apatía',
+                        descripcion: 'Conlleva una retirada de las actividades sociales y familiares, falta de interés y desorientación, lo que puede afectar directamente su entorno y su salud mental.',
+                        color: 'orange',
+                        bgSelected: 'bg-orange-500',
+                        bgUnselected: 'bg-orange-50 border-orange-400 text-orange-800 hover:bg-orange-100',
+                      },
+                      {
+                        id: 'enfado',
+                        label: 'Enfado / Resentimiento',
+                        descripcion: 'Puede manifestarse como irritabilidad, quejas constantes o dificultad para tratar con los demás, a menudo derivada de sentimientos de incomprensión o frustración ante las limitaciones.',
+                        color: 'red',
+                        bgSelected: 'bg-red-600',
+                        bgUnselected: 'bg-red-50 border-red-300 text-red-800 hover:bg-red-100',
+                      },
+                      {
+                        id: 'dependencia',
+                        label: 'Dependencia',
+                        descripcion: 'Una inclinación a depender excesivamente de otros para la toma de decisiones o actividades diarias, a veces debido al miedo a perder autonomía.',
+                        color: 'blue',
+                        bgSelected: 'bg-blue-900',
+                        bgUnselected: 'bg-blue-50 border-blue-300 text-blue-900 hover:bg-blue-100',
+                      },
+                    ].map(opcion => (
+                      <div key={opcion.id} className="relative group">
+                        <button
+                          type="button"
+                          disabled={yaCompletado}
+                          onClick={() => toggleActitud(opcion.id)}
+                          className={`px-4 py-2 rounded-lg border-2 transition-all font-medium ${
+                            formData.actitud.includes(opcion.id)
+                              ? `${opcion.bgSelected} text-white border-transparent shadow-md`
+                              : opcion.bgUnselected
+                          } ${yaCompletado ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {opcion.label}
+                        </button>
+                        {/* Tooltip para desktop */}
+                        <div className="absolute z-10 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-200 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                          <p className="font-medium mb-1">{opcion.label}</p>
+                          <p>{opcion.descripcion}</p>
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+                        </div>
+                      </div>
                     ))}
                   </div>
+                  {/* Descripción de actitud seleccionada (visible en móvil) */}
+                  {formData.actitud.length > 0 && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 md:hidden">
+                      <p className="text-xs font-medium text-gray-700 mb-1">Actitud seleccionada:</p>
+                      {formData.actitud.map(actId => {
+                        const actitud = [
+                          { id: 'positiva', label: 'Positiva / Adaptativa', descripcion: 'Caracterizada por la aceptación de los cambios físicos y sociales, la búsqueda de nuevas actividades, el mantenimiento de redes de apoyo social y una sensación de bienestar general.' },
+                          { id: 'negativa', label: 'Negativa / Pesimista', descripcion: 'Implica ver el envejecimiento como un período de declive, con un enfoque en las pérdidas, la soledad y la desesperanza.' },
+                          { id: 'aislamiento', label: 'Aislamiento / Apatía', descripcion: 'Conlleva una retirada de las actividades sociales y familiares, falta de interés y desorientación.' },
+                          { id: 'enfado', label: 'Enfado / Resentimiento', descripcion: 'Puede manifestarse como irritabilidad, quejas constantes o dificultad para tratar con los demás.' },
+                          { id: 'dependencia', label: 'Dependencia', descripcion: 'Una inclinación a depender excesivamente de otros para la toma de decisiones o actividades diarias.' },
+                        ].find(a => a.id === actId);
+                        return actitud ? (
+                          <p key={actId} className="text-xs text-gray-600 mb-2">
+                            <span className="font-medium">{actitud.label}:</span> {actitud.descripcion}
+                          </p>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Nivel de Actividad */}
@@ -1555,68 +1610,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 3: Actividades Realizadas */}
+            {/* Sección 3: Medicación */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                3. Actividades Realizadas
-              </h2>
-
-              <div className="space-y-4">
-                {/* Actividades */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Actividades (puede seleccionar varias)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      'Fisioterapia',
-                      'Ejercicios intestinales',
-                      'Caminata matutina',
-                      'Caminata vespertina',
-                      'Actividades recreativas',
-                      'Actividades cognitivas',
-                      'Conversación',
-                      'Música',
-                      'Lectura'
-                    ].map(actividad => (
-                      <button
-                        key={actividad}
-                        type="button"
-                        disabled={yaCompletado}
-                        onClick={() => toggleActividad(actividad)}
-                        className={`px-4 py-2 rounded-lg border transition-colors ${
-                          formData.actividadesRealizadas.includes(actividad)
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        } ${yaCompletado ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {actividad}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Participación y actitud */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Participación y Actitud
-                  </label>
-                  <textarea
-                    value={formData.participacionActitud}
-                    onChange={(e) => setFormData({ ...formData, participacionActitud: e.target.value })}
-                    disabled={yaCompletado}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    placeholder="Describe la participación y actitud durante las actividades..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Sección 4: Medicación */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                4. Medicación
+                3. Medicación
               </h2>
 
               <div className="space-y-4">
@@ -1794,10 +1791,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 5: Incidentes */}
+            {/* Sección 4: Incidentes */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                5. Incidentes
+                4. Incidentes
               </h2>
 
               <div className="space-y-4">
@@ -1886,10 +1883,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 6: Resumen */}
+            {/* Sección 5: Resumen */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                6. Resumen del Día
+                5. Resumen del Día
               </h2>
 
               <div className="space-y-4">

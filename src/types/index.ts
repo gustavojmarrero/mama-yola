@@ -645,3 +645,43 @@ export interface LogAuditoria {
   metadatos?: Record<string, unknown>;
   timestamp: Date;
 }
+
+// ===== TIPOS DE CONFIGURACIÓN DE HORARIOS =====
+
+// Configuración de horarios para procesos que NO tienen horarios propios
+export interface ConfiguracionHorarios {
+  // Chequeo Diario - horarios por turno
+  chequeoDiario: {
+    matutino: string;   // "07:00"
+    vespertino: string; // "14:00"
+    nocturno: string;   // "21:00"
+  };
+
+  // Signos Vitales - array de horarios sugeridos
+  signosVitales: string[]; // ["08:00", "18:00"]
+
+  // Kéfir - array de horarios
+  kefir: string[]; // ["06:30", "18:00"]
+
+  actualizadoEn: Date;
+}
+
+// ===== TIPOS DE PROCESOS DEL DÍA (DASHBOARD) =====
+
+export type EstadoProceso = 'pendiente' | 'proximo' | 'activo' | 'vencido' | 'completado';
+
+export type TipoProceso = 'medicamento' | 'chequeo' | 'signosVitales' | 'comida' | 'kefir' | 'actividad';
+
+// Proceso unificado para mostrar en Dashboard
+export interface ProcesoDelDia {
+  id: string;
+  tipo: TipoProceso;
+  nombre: string;
+  detalle?: string;
+  horaProgramada: string;
+  horaDate: Date;
+  estado: EstadoProceso;
+  horaCompletado?: Date;
+  icono: string;
+  enlace: string;
+}

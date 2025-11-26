@@ -1,13 +1,32 @@
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, orderBy, Timestamp, updateDoc, doc, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp, updateDoc, doc, limit, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Link } from 'react-router-dom';
 import { format, isToday, isTomorrow, addDays, startOfDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Layout from '../components/common/Layout';
-import { DashboardSkeleton, CardSkeleton } from '../components/common/Skeleton';
-import { Evento, Contacto, SignoVital, RegistroMedicamento, ChequeoDiario } from '../types';
+import { DashboardSkeleton } from '../components/common/Skeleton';
+import {
+  Evento,
+  Contacto,
+  SignoVital,
+  RegistroMedicamento,
+  ChequeoDiario,
+  Medicamento,
+  Actividad,
+  MenuTiempoComida,
+  ConfiguracionHorarios,
+  TiempoComidaConfig,
+  ProcesoDelDia,
+} from '../types';
+import ProcesoCard, { ProcesoGrupo } from '../components/dashboard/ProcesoCard';
+import {
+  calcularProcesosDelDia,
+  agruparProcesosPorEstado,
+  calcularEstadisticasProcesos,
+  CONFIG_HORARIOS_DEFAULT,
+} from '../utils/procesosDelDia';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -31,9 +50,19 @@ export default function Dashboard() {
     alertasActivas: 0
   });
   const [loading, setLoading] = useState(true);
+  const [procesos, setProcesos] = useState<ProcesoDelDia[]>([]);
+  const [horaActual, setHoraActual] = useState(new Date());
 
   useEffect(() => {
     cargarDatos();
+  }, []);
+
+  // Actualizar hora cada minuto
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHoraActual(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   async function cargarDatos() {
@@ -41,12 +70,159 @@ export default function Dashboard() {
       await Promise.all([
         cargarProximasCitas(),
         cargarContactos(),
-        cargarMetricas()
+        cargarMetricas(),
+        cargarProcesosDelDia()
       ]);
     } catch (error) {
       console.error('Error al cargar datos:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function cargarProcesosDelDia() {
+    try {
+      const hoy = startOfDay(new Date());
+      const manana = addDays(hoy, 1);
+
+      // 1. Cargar configuración de horarios
+      const configDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'configuracion', 'horarios'));
+      const config: ConfiguracionHorarios = configDoc.exists()
+        ? {
+            chequeoDiario: configDoc.data().chequeoDiario || CONFIG_HORARIOS_DEFAULT.chequeoDiario,
+            signosVitales: configDoc.data().signosVitales || CONFIG_HORARIOS_DEFAULT.signosVitales,
+            kefir: configDoc.data().kefir || CONFIG_HORARIOS_DEFAULT.kefir,
+            actualizadoEn: configDoc.data().actualizadoEn?.toDate() || new Date(),
+          }
+        : CONFIG_HORARIOS_DEFAULT;
+
+      // 2. Cargar tiempos de comida config
+      const tiemposComidaDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'configuracion', 'tiemposComida'));
+      const tiemposComida: TiempoComidaConfig[] = tiemposComidaDoc.exists()
+        ? tiemposComidaDoc.data().tiempos || []
+        : [];
+
+      // 3. Cargar medicamentos activos
+      const qMeds = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'medicamentos'),
+        where('activo', '==', true)
+      );
+      const medsSnap = await getDocs(qMeds);
+      const medicamentos: Medicamento[] = medsSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Medicamento[];
+
+      // 4. Cargar actividades del día
+      const qActs = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'actividades'),
+        where('fechaInicio', '>=', Timestamp.fromDate(hoy)),
+        where('fechaInicio', '<', Timestamp.fromDate(manana))
+      );
+      const actsSnap = await getDocs(qActs);
+      const actividades: Actividad[] = actsSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          fechaInicio: data.fechaInicio?.toDate() || new Date(),
+          fechaFin: data.fechaFin?.toDate() || new Date(),
+          horaInicioReal: data.horaInicioReal?.toDate(),
+          horaFinReal: data.horaFinReal?.toDate(),
+          creadoEn: data.creadoEn?.toDate() || new Date(),
+          actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
+        } as Actividad;
+      });
+
+      // 5. Cargar registros del día: chequeos
+      const qChequeos = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios'),
+        where('fecha', '>=', Timestamp.fromDate(hoy)),
+        where('fecha', '<', Timestamp.fromDate(manana))
+      );
+      const chequeosSnap = await getDocs(qChequeos);
+      const chequeosDiarios: ChequeoDiario[] = chequeosSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          fecha: data.fecha?.toDate() || new Date(),
+          horaRegistro: data.horaRegistro?.toDate() || new Date(),
+          creadoEn: data.creadoEn?.toDate() || new Date(),
+          actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
+        } as ChequeoDiario;
+      });
+
+      // 6. Cargar signos vitales del día
+      const qSignos = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'signosVitales'),
+        where('fecha', '>=', Timestamp.fromDate(hoy)),
+        where('fecha', '<', Timestamp.fromDate(manana))
+      );
+      const signosSnap = await getDocs(qSignos);
+      const signosVitales: SignoVital[] = signosSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          fecha: data.fecha?.toDate() || new Date(),
+          creadoEn: data.creadoEn?.toDate() || new Date(),
+        } as SignoVital;
+      });
+
+      // 7. Cargar menús del día
+      const qMenus = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'menusDiarios'),
+        where('fecha', '>=', Timestamp.fromDate(hoy)),
+        where('fecha', '<', Timestamp.fromDate(manana))
+      );
+      const menusSnap = await getDocs(qMenus);
+      const menusDiarios: MenuTiempoComida[] = menusSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          fecha: data.fecha?.toDate() || new Date(),
+          creadoEn: data.creadoEn?.toDate() || new Date(),
+          actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
+        } as MenuTiempoComida;
+      });
+
+      // 8. Cargar registros de medicamentos del día
+      const qRegMeds = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'registroMedicamentos'),
+        where('fechaHoraProgramada', '>=', Timestamp.fromDate(hoy)),
+        where('fechaHoraProgramada', '<', Timestamp.fromDate(manana))
+      );
+      const regMedsSnap = await getDocs(qRegMeds);
+      const registrosMedicamentos: RegistroMedicamento[] = regMedsSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          fechaHoraProgramada: data.fechaHoraProgramada?.toDate() || new Date(),
+          fechaHoraReal: data.fechaHoraReal?.toDate(),
+          creadoEn: data.creadoEn?.toDate() || new Date(),
+        } as RegistroMedicamento;
+      });
+
+      // Calcular procesos
+      const procesosCalculados = calcularProcesosDelDia(new Date(), {
+        config,
+        tiemposComida,
+        medicamentos,
+        actividades,
+        registros: {
+          chequeosDiarios,
+          signosVitales,
+          menusDiarios,
+          registrosMedicamentos,
+        },
+      });
+
+      setProcesos(procesosCalculados);
+    } catch (error) {
+      console.error('Error al cargar procesos del día:', error);
     }
   }
 
@@ -425,6 +601,73 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Procesos del Día */}
+          {procesos.length > 0 && (
+            <div className="bg-white rounded-lg shadow mb-6">
+              <div className="p-4 md:p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900">
+                      Procesos del Día
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {(() => {
+                        const stats = calcularEstadisticasProcesos(procesos);
+                        return `${stats.completados}/${stats.total} completados (${stats.porcentajeCompletado}%)`;
+                      })()}
+                    </p>
+                  </div>
+                  <Link
+                    to="/configuracion-horarios"
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Configurar horarios"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </Link>
+                </div>
+              </div>
+              <div className="p-4 md:p-6">
+                {(() => {
+                  const grupos = agruparProcesosPorEstado(procesos);
+                  return (
+                    <>
+                      <ProcesoGrupo
+                        titulo="Vencidos"
+                        procesos={grupos.vencidos}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Activos"
+                        procesos={grupos.activos}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Próximos"
+                        procesos={grupos.proximos}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Pendientes"
+                        procesos={grupos.pendientes}
+                        horaActual={horaActual}
+                      />
+                      <ProcesoGrupo
+                        titulo="Completados"
+                        procesos={grupos.completados}
+                        horaActual={horaActual}
+                        colapsable
+                        colapsadoDefault
+                      />
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
           {/* Accesos Rápidos */}
           <div className="bg-white rounded-lg shadow p-4 md:p-6">
             <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4">⚡ Acceso Rápido</h3>
@@ -436,8 +679,8 @@ export default function Dashboard() {
                 { path: '/menu-comida', icon: '🍽️', label: 'Menú' },
                 { path: '/turnos', icon: '👥', label: 'Turnos' },
                 { path: '/actividades', icon: '🎯', label: 'Actividades' },
+                { path: '/configuracion-horarios', icon: '⏰', label: 'Horarios' },
                 { path: '/analytics', icon: '📊', label: 'Analytics' },
-                { path: '/inventarios', icon: '📦', label: 'Inventario' },
               ].map((item) => (
                 <Link
                   key={item.path}
