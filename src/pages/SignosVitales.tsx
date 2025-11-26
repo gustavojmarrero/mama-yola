@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { SignoVital, Paciente } from '../types';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -25,9 +26,25 @@ export default function SignosVitales() {
 
   const [alertas, setAlertas] = useState<{[key: string]: boolean}>({});
 
+  // Hook para detectar cambios sin guardar
+  const { isDirty, setIsDirty, markAsSaved } = useUnsavedChanges();
+  const isInitialLoad = useRef(true);
+
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Detectar cambios en el formulario
+  useEffect(() => {
+    if (!isInitialLoad.current) {
+      // Verificar si hay algún valor en el formulario
+      const tieneValores = formData.temperatura || formData.spo2 ||
+        formData.frecuenciaCardiaca || formData.presionArterialSistolica ||
+        formData.presionArterialDiastolica || formData.notas;
+      setIsDirty(!!tieneValores);
+    }
+    isInitialLoad.current = false;
+  }, [formData]);
 
   async function cargarDatos() {
     try {
@@ -155,6 +172,7 @@ export default function SignosVitales() {
         });
       }
 
+      markAsSaved();
       alert('Signos vitales registrados exitosamente');
 
       // Limpiar formulario
@@ -167,6 +185,7 @@ export default function SignosVitales() {
         notas: ''
       });
       setAlertas({});
+      isInitialLoad.current = true; // Resetear flag para evitar marcar como dirty
 
       // Recargar historial
       cargarDatos();
@@ -219,9 +238,18 @@ export default function SignosVitales() {
     <Layout>
       <div className="p-8">
         <div className="max-w-5xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">
-            Registro de Signos Vitales
-          </h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Registro de Signos Vitales
+            </h1>
+            {/* Indicador de cambios sin guardar */}
+            {isDirty && (
+              <span className="text-sm text-orange-600 flex items-center gap-1">
+                <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                Cambios sin guardar
+              </span>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Formulario de registro */}

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -25,6 +26,9 @@ export default function ChequeoDiarioPage() {
   // Estados para adherencia de medicamentos
   const [registrosMedicamentos, setRegistrosMedicamentos] = useState<RegistroMedicamento[]>([]);
   const [adherenciaAutomatica, setAdherenciaAutomatica] = useState(false);
+
+  // Hook para detectar cambios sin guardar
+  const { isDirty, setIsDirty, markAsSaved, confirmNavigation, setOriginalData } = useUnsavedChanges();
 
   const [formData, setFormData] = useState({
     // Estado general
@@ -94,6 +98,14 @@ export default function ChequeoDiarioPage() {
     cargarChequeoDelDia();
     verificarAdherenciaMedicamentos();
   }, []);
+
+  // Detectar cambios en el formulario para marcar como dirty
+  useEffect(() => {
+    // Solo marcar como dirty si no es el estado inicial y no está completado
+    if (!loading && chequeoActual && !chequeoActual.completado) {
+      setIsDirty(true);
+    }
+  }, [formData]);
 
   // Guardado automático cada 30 segundos
   useEffect(() => {
@@ -482,6 +494,7 @@ export default function ChequeoDiarioPage() {
       }
 
       setUltimoGuardado(new Date());
+      markAsSaved();
     } catch (error) {
       console.error('Error guardando borrador:', error);
     } finally {
@@ -1411,12 +1424,23 @@ export default function ChequeoDiarioPage() {
               )}
             </div>
 
+            {/* Indicador de cambios sin guardar */}
+            {isDirty && vistaActual === 'hoy' && !chequeoActual?.completado && (
+              <span className="text-sm text-orange-600 flex items-center gap-1">
+                <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                Cambios sin guardar
+              </span>
+            )}
+
             {/* Navegación entre vistas */}
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  setVistaActual('hoy');
-                  cargarChequeoDelDia();
+                  if (vistaActual === 'hoy') return;
+                  confirmNavigation(() => {
+                    setVistaActual('hoy');
+                    cargarChequeoDelDia();
+                  });
                 }}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   vistaActual === 'hoy'
@@ -1428,8 +1452,11 @@ export default function ChequeoDiarioPage() {
               </button>
               <button
                 onClick={() => {
-                  setVistaActual('historial');
-                  cargarHistorialChequeos();
+                  if (vistaActual === 'historial') return;
+                  confirmNavigation(() => {
+                    setVistaActual('historial');
+                    cargarHistorialChequeos();
+                  });
                 }}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   vistaActual === 'historial'

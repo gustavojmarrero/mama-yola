@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   addDoc,
@@ -11,6 +11,7 @@ import { db, storage } from '../config/firebase';
 import { Medicamento, FrecuenciaTipo } from '../types';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -33,9 +34,33 @@ export default function Medicamentos() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoURL, setFotoURL] = useState('');
 
+  // Hook para detectar cambios sin guardar
+  const { isDirty, setIsDirty, markAsSaved, confirmNavigation } = useUnsavedChanges();
+  const isInitialLoad = useRef(true);
+
   useEffect(() => {
     cargarMedicamentos();
   }, []);
+
+  // Detectar cambios en el formulario cuando está visible
+  useEffect(() => {
+    if (mostrarFormulario && !isInitialLoad.current) {
+      setIsDirty(true);
+    }
+  }, [nombre, dosis, presentacion, frecuenciaTipo, frecuenciaValor, diasSemana, horarios, instrucciones, fotoFile, mostrarFormulario]);
+
+  // Resetear el flag cuando se abre/cierra el formulario
+  useEffect(() => {
+    if (mostrarFormulario) {
+      // Pequeño delay para permitir que los estados se inicialicen
+      setTimeout(() => {
+        isInitialLoad.current = false;
+      }, 100);
+    } else {
+      isInitialLoad.current = true;
+      setIsDirty(false);
+    }
+  }, [mostrarFormulario]);
 
   async function cargarMedicamentos() {
     try {
@@ -127,6 +152,7 @@ export default function Medicamentos() {
           medicamentoEditando.id
         );
         await updateDoc(medicamentoRef, medicamentoData);
+        markAsSaved();
         alert('Medicamento actualizado exitosamente');
       } else {
         // Crear nuevo
@@ -134,6 +160,7 @@ export default function Medicamentos() {
           ...medicamentoData,
           creadoEn: new Date(),
         });
+        markAsSaved();
         alert('Medicamento creado exitosamente');
       }
 
@@ -250,15 +277,31 @@ export default function Medicamentos() {
             <h1 className="text-3xl font-bold text-gray-900">Pastillero Virtual</h1>
             <p className="text-gray-600 mt-1">Control de medicamentos</p>
           </div>
-          <button
-            onClick={() => {
-              limpiarFormulario();
-              setMostrarFormulario(!mostrarFormulario);
-            }}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-          >
-            {mostrarFormulario ? 'Cancelar' : '+ Nuevo Medicamento'}
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Indicador de cambios sin guardar */}
+            {mostrarFormulario && isDirty && (
+              <span className="text-sm text-orange-600 flex items-center gap-1">
+                <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                Cambios sin guardar
+              </span>
+            )}
+            <button
+              onClick={() => {
+                if (mostrarFormulario) {
+                  confirmNavigation(() => {
+                    limpiarFormulario();
+                    setMostrarFormulario(false);
+                  });
+                } else {
+                  limpiarFormulario();
+                  setMostrarFormulario(true);
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            >
+              {mostrarFormulario ? 'Cancelar' : '+ Nuevo Medicamento'}
+            </button>
+          </div>
         </div>
 
         {/* Formulario */}
@@ -500,8 +543,10 @@ export default function Medicamentos() {
                 <button
                   type="button"
                   onClick={() => {
-                    limpiarFormulario();
-                    setMostrarFormulario(false);
+                    confirmNavigation(() => {
+                      limpiarFormulario();
+                      setMostrarFormulario(false);
+                    });
                   }}
                   className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
                 >

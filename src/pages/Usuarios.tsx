@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { Usuario } from '../types';
 import Layout from '../components/common/Layout';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -19,9 +20,32 @@ export default function Usuarios() {
     activo: true
   });
 
+  // Hook para detectar cambios sin guardar
+  const { isDirty, setIsDirty, markAsSaved, confirmNavigation } = useUnsavedChanges();
+  const isInitialLoad = useRef(true);
+
   useEffect(() => {
     cargarUsuarios();
   }, []);
+
+  // Detectar cambios en el formulario cuando el modal está abierto
+  useEffect(() => {
+    if (showModal && !isInitialLoad.current) {
+      setIsDirty(true);
+    }
+  }, [formData, showModal]);
+
+  // Resetear el flag cuando se abre/cierra el modal
+  useEffect(() => {
+    if (showModal) {
+      setTimeout(() => {
+        isInitialLoad.current = false;
+      }, 100);
+    } else {
+      isInitialLoad.current = true;
+      setIsDirty(false);
+    }
+  }, [showModal]);
 
   async function cargarUsuarios() {
     try {
@@ -122,6 +146,7 @@ export default function Usuarios() {
         alert('Usuario creado exitosamente');
       }
 
+      markAsSaved();
       cerrarModal();
       cargarUsuarios();
     } catch (error: any) {
@@ -272,9 +297,18 @@ export default function Usuarios() {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+              </h2>
+              {/* Indicador de cambios sin guardar */}
+              {isDirty && (
+                <span className="text-sm text-orange-600 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                  Sin guardar
+                </span>
+              )}
+            </div>
 
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
@@ -368,7 +402,11 @@ export default function Usuarios() {
               <div className="flex gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={cerrarModal}
+                  onClick={() => {
+                    confirmNavigation(() => {
+                      cerrarModal();
+                    });
+                  }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancelar

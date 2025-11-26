@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useUnsavedChangesContext } from '../../context/UnsavedChangesContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -109,8 +110,13 @@ const menuItems: MenuItem[] = [
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { currentUser, userProfile, logout } = useAuth();
+  const { confirmAndNavigate } = useUnsavedChangesContext();
   const location = useLocation();
   const navigate = useNavigate();
+
+  function handleNavigation(path: string) {
+    confirmAndNavigate(path, navigate);
+  }
 
   async function handleLogout() {
     try {
@@ -161,9 +167,9 @@ export default function Layout({ children }: LayoutProps) {
               const isActive = location.pathname === item.path;
               return (
                 <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                  <button
+                    onClick={() => handleNavigation(item.path)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors w-full text-left ${
                       isActive
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-700 hover:bg-gray-100'
@@ -173,7 +179,7 @@ export default function Layout({ children }: LayoutProps) {
                     {sidebarOpen && (
                       <span className="font-medium">{item.name}</span>
                     )}
-                  </Link>
+                  </button>
                 </li>
               );
             })}

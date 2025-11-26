@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Paciente, RangoSignosVitales } from '../types';
 import Layout from '../components/common/Layout';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 const PACIENTE_ID = 'paciente-principal'; // ID fijo para el único paciente
 
@@ -38,9 +39,32 @@ export default function PacientePage() {
   const [nuevaAlergia, setNuevaAlergia] = useState('');
   const [nuevaCondicion, setNuevaCondicion] = useState('');
 
+  // Hook para detectar cambios sin guardar
+  const { isDirty, setIsDirty, markAsSaved, confirmNavigation, setOriginalData } = useUnsavedChanges();
+  const isInitialLoad = useRef(true);
+
   useEffect(() => {
     cargarPaciente();
   }, []);
+
+  // Detectar cambios en el formulario cuando está en modo edición
+  useEffect(() => {
+    if (editing && !isInitialLoad.current) {
+      setIsDirty(true);
+    }
+  }, [formData, editing]);
+
+  // Resetear el flag de carga inicial cuando se activa el modo edición
+  useEffect(() => {
+    if (editing) {
+      // Guardar datos originales al entrar en modo edición
+      setOriginalData(formData);
+      isInitialLoad.current = false;
+    } else {
+      isInitialLoad.current = true;
+      setIsDirty(false);
+    }
+  }, [editing]);
 
   async function cargarPaciente() {
     try {
@@ -135,6 +159,7 @@ export default function PacientePage() {
       };
 
       await setDoc(doc(db, 'pacientes', PACIENTE_ID), pacienteData);
+      markAsSaved();
       alert('Información del paciente guardada exitosamente');
       cargarPaciente();
     } catch (error) {
@@ -247,14 +272,23 @@ export default function PacientePage() {
                 {paciente ? 'Información completa del paciente' : 'Crear perfil del paciente'}
               </p>
             </div>
-            {paciente && !editing && (
-              <button
-                onClick={() => setEditing(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-              >
-                Editar
-              </button>
-            )}
+            <div className="flex items-center gap-4">
+              {/* Indicador de cambios sin guardar */}
+              {editing && isDirty && (
+                <span className="text-sm text-orange-600 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                  Cambios sin guardar
+                </span>
+              )}
+              {paciente && !editing && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  Editar
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Vista de solo lectura */}
@@ -874,8 +908,10 @@ export default function PacientePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setEditing(false);
-                      cargarPaciente();
+                      confirmNavigation(() => {
+                        setEditing(false);
+                        cargarPaciente();
+                      });
                     }}
                     className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
@@ -7,6 +7,7 @@ import Layout from '../components/common/Layout';
 import { ComidaProgramada, TipoComida, CategoriaComida, NivelConsumo, Receta } from '../types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -87,6 +88,44 @@ export default function MenuComida() {
     foto: '',
   });
 
+  // Hook para detectar cambios sin guardar
+  const { isDirty, setIsDirty, markAsSaved, confirmNavigation } = useUnsavedChanges();
+  const isInitialLoadComida = useRef(true);
+  const isInitialLoadReceta = useRef(true);
+
+  // Detectar cambios en el formulario de comida
+  useEffect(() => {
+    if (modalComida && !isInitialLoadComida.current) {
+      setIsDirty(true);
+    }
+  }, [formComida, modalComida]);
+
+  // Detectar cambios en el formulario de receta
+  useEffect(() => {
+    if (modalRecetaCRUD && !isInitialLoadReceta.current) {
+      setIsDirty(true);
+    }
+  }, [formReceta, modalRecetaCRUD]);
+
+  // Resetear flags cuando se abren/cierran modales
+  useEffect(() => {
+    if (modalComida) {
+      setTimeout(() => { isInitialLoadComida.current = false; }, 100);
+    } else {
+      isInitialLoadComida.current = true;
+      if (!modalRecetaCRUD) setIsDirty(false);
+    }
+  }, [modalComida]);
+
+  useEffect(() => {
+    if (modalRecetaCRUD) {
+      setTimeout(() => { isInitialLoadReceta.current = false; }, 100);
+    } else {
+      isInitialLoadReceta.current = true;
+      if (!modalComida) setIsDirty(false);
+    }
+  }, [modalRecetaCRUD]);
+
   const inicioSemana = startOfWeek(semanaActual, { weekStartsOn: 1 });
   const finSemana = endOfWeek(semanaActual, { weekStartsOn: 1 });
   const diasSemana = eachDayOfInterval({ start: inicioSemana, end: finSemana });
@@ -165,6 +204,7 @@ export default function MenuComida() {
     };
 
     await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'comidas'), nuevaComida);
+    markAsSaved();
     cerrarModalComida();
   }
 
@@ -300,6 +340,7 @@ export default function MenuComida() {
         });
       }
 
+      markAsSaved();
       cerrarModalReceta();
     } catch (error) {
       console.error('Error al guardar receta:', error);
@@ -872,20 +913,29 @@ export default function MenuComida() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={cerrarModalComida}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={crearComida}
-                  disabled={!formComida.platillo}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  Agregar al Menú
-                </button>
+              <div className="flex justify-between items-center mt-6">
+                {/* Indicador de cambios sin guardar */}
+                {isDirty && (
+                  <span className="text-sm text-orange-600 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                    Sin guardar
+                  </span>
+                )}
+                <div className="flex gap-3 ml-auto">
+                  <button
+                    onClick={() => confirmNavigation(cerrarModalComida)}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={crearComida}
+                    disabled={!formComida.platillo}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Agregar al Menú
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1250,20 +1300,29 @@ export default function MenuComida() {
                 </div>
 
                 {/* Botones */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={cerrarModalReceta}
-                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={guardarReceta}
-                    disabled={!formReceta.nombre.trim()}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {recetaEditando ? 'Actualizar' : 'Crear'} Receta
-                  </button>
+                <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                  {/* Indicador de cambios sin guardar */}
+                  {isDirty && (
+                    <span className="text-sm text-orange-600 flex items-center gap-1">
+                      <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                      Sin guardar
+                    </span>
+                  )}
+                  <div className="flex gap-3 ml-auto">
+                    <button
+                      onClick={() => confirmNavigation(cerrarModalReceta)}
+                      className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={guardarReceta}
+                      disabled={!formReceta.nombre.trim()}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {recetaEditando ? 'Actualizar' : 'Crear'} Receta
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

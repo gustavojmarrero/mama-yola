@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
+import { UnsavedChangesProvider } from './context/UnsavedChangesContext'
 import ErrorBoundary from './components/common/ErrorBoundary'
 
 createRoot(document.getElementById('root')!).render(
@@ -12,9 +13,11 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
+          <UnsavedChangesProvider>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </UnsavedChangesProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

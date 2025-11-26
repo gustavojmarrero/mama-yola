@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
@@ -7,6 +7,7 @@ import Layout from '../components/common/Layout';
 import { Actividad, TipoActividad, EstadoActividad, NivelEnergia, ParticipacionActividad, Usuario, PlantillaActividad } from '../types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -108,6 +109,44 @@ export default function Actividades() {
     favorita: false,
     foto: ''
   });
+
+  // Hook para detectar cambios sin guardar
+  const { isDirty, setIsDirty, markAsSaved, confirmNavigation } = useUnsavedChanges();
+  const isInitialLoadActividad = useRef(true);
+  const isInitialLoadPlantilla = useRef(true);
+
+  // Detectar cambios en el formulario de actividad
+  useEffect(() => {
+    if (modalAbierto && !isInitialLoadActividad.current) {
+      setIsDirty(true);
+    }
+  }, [formActividad, modalAbierto]);
+
+  // Detectar cambios en el formulario de plantilla
+  useEffect(() => {
+    if (modalPlantillaCRUD && !isInitialLoadPlantilla.current) {
+      setIsDirty(true);
+    }
+  }, [formPlantilla, modalPlantillaCRUD]);
+
+  // Resetear flags cuando se abren/cierran modales
+  useEffect(() => {
+    if (modalAbierto) {
+      setTimeout(() => { isInitialLoadActividad.current = false; }, 100);
+    } else {
+      isInitialLoadActividad.current = true;
+      if (!modalPlantillaCRUD) setIsDirty(false);
+    }
+  }, [modalAbierto]);
+
+  useEffect(() => {
+    if (modalPlantillaCRUD) {
+      setTimeout(() => { isInitialLoadPlantilla.current = false; }, 100);
+    } else {
+      isInitialLoadPlantilla.current = true;
+      if (!modalAbierto) setIsDirty(false);
+    }
+  }, [modalPlantillaCRUD]);
 
   // Obtener inicio y fin de semana
   const inicioSemana = startOfWeek(semanaActual, { weekStartsOn: 1 });
@@ -287,22 +326,30 @@ export default function Actividades() {
     }
 
     try {
-      const plantillaData = {
+      const plantillaData: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         nombre: formPlantilla.nombre.trim(),
         tipo: formPlantilla.tipo,
         descripcion: formPlantilla.descripcion,
         duracion: formPlantilla.duracion,
-        ubicacion: formPlantilla.ubicacion || undefined,
         materialesNecesarios: formPlantilla.materialesNecesarios,
         nivelEnergia: formPlantilla.nivelEnergia,
-        responsableDefault: formPlantilla.responsableDefault || undefined,
         etiquetas: formPlantilla.etiquetas,
         favorita: formPlantilla.favorita,
-        foto: formPlantilla.foto || undefined,
         activo: true,
         actualizadoEn: Timestamp.now()
       };
+
+      // Solo incluir campos opcionales si tienen valor
+      if (formPlantilla.ubicacion) {
+        plantillaData.ubicacion = formPlantilla.ubicacion;
+      }
+      if (formPlantilla.responsableDefault) {
+        plantillaData.responsableDefault = formPlantilla.responsableDefault;
+      }
+      if (formPlantilla.foto) {
+        plantillaData.foto = formPlantilla.foto;
+      }
 
       if (plantillaEditando) {
         await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'plantillasActividades', plantillaEditando.id), plantillaData);
@@ -313,6 +360,7 @@ export default function Actividades() {
         });
       }
 
+      markAsSaved();
       cerrarModalPlantilla();
     } catch (error) {
       console.error('Error al guardar plantilla:', error);
@@ -441,6 +489,7 @@ export default function Actividades() {
       });
     }
 
+    markAsSaved();
     cerrarModal();
   }
 
@@ -1011,7 +1060,7 @@ export default function Actividades() {
                 </div>
               </div>
 
-              <div className="flex justify-between mt-6">
+              <div className="flex justify-between items-center mt-6">
                 {modoEdicion && actividadSeleccionada && (
                   <button
                     onClick={() => {
@@ -1023,9 +1072,16 @@ export default function Actividades() {
                     🗑️ Eliminar
                   </button>
                 )}
+                {/* Indicador de cambios sin guardar */}
+                {isDirty && !modoEdicion && (
+                  <span className="text-sm text-orange-600 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                    Sin guardar
+                  </span>
+                )}
                 <div className="flex gap-3 ml-auto">
                   <button
-                    onClick={cerrarModal}
+                    onClick={() => confirmNavigation(cerrarModal)}
                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
                   >
                     Cancelar
@@ -1610,20 +1666,29 @@ export default function Actividades() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={cerrarModalPlantilla}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={guardarPlantilla}
-                  disabled={!formPlantilla.nombre.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {plantillaEditando ? 'Guardar Cambios' : 'Crear Plantilla'}
-                </button>
+              <div className="flex justify-between items-center mt-6">
+                {/* Indicador de cambios sin guardar */}
+                {isDirty && (
+                  <span className="text-sm text-orange-600 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                    Sin guardar
+                  </span>
+                )}
+                <div className="flex gap-3 ml-auto">
+                  <button
+                    onClick={() => confirmNavigation(cerrarModalPlantilla)}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarPlantilla}
+                    disabled={!formPlantilla.nombre.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {plantillaEditando ? 'Guardar Cambios' : 'Crear Plantilla'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
