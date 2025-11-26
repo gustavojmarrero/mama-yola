@@ -99,9 +99,13 @@ export default function PastilleroDiario() {
       for (const med of medicamentosActivos) {
         // Verificar si hoy es un día válido para este medicamento
         const diaHoy = hoy.getDay();
+        // Si tiene días específicos configurados (array no vacío), verificar si hoy es uno de esos días
+        // Si diasSemana está vacío o undefined, significa "todos los días"
         if (
           med.frecuencia.tipo === 'dias_especificos' &&
-          !med.frecuencia.diasSemana?.includes(diaHoy)
+          med.frecuencia.diasSemana &&
+          med.frecuencia.diasSemana.length > 0 &&
+          !med.frecuencia.diasSemana.includes(diaHoy)
         ) {
           continue;
         }
