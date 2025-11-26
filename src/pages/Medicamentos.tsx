@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
-import { Medicamento, FrecuenciaTipo } from '../types';
+import { Medicamento } from '../types';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
@@ -26,8 +26,6 @@ export default function Medicamentos() {
   const [nombre, setNombre] = useState('');
   const [dosis, setDosis] = useState('');
   const [presentacion, setPresentacion] = useState('tableta');
-  const [frecuenciaTipo, setFrecuenciaTipo] = useState<FrecuenciaTipo>('horas');
-  const [frecuenciaValor, setFrecuenciaValor] = useState(8);
   const [diasSemana, setDiasSemana] = useState<number[]>([]);
   const [horarios, setHorarios] = useState<string[]>(['']);
   const [instrucciones, setInstrucciones] = useState('');
@@ -47,7 +45,7 @@ export default function Medicamentos() {
     if (mostrarFormulario && !isInitialLoad.current) {
       setIsDirty(true);
     }
-  }, [nombre, dosis, presentacion, frecuenciaTipo, frecuenciaValor, diasSemana, horarios, instrucciones, fotoFile, mostrarFormulario]);
+  }, [nombre, dosis, presentacion, diasSemana, horarios, instrucciones, fotoFile, mostrarFormulario]);
 
   // Resetear el flag cuando se abre/cierra el formulario
   useEffect(() => {
@@ -125,9 +123,8 @@ export default function Medicamentos() {
         dosis,
         presentacion,
         frecuencia: {
-          tipo: frecuenciaTipo,
-          valor: frecuenciaValor,
-          ...(frecuenciaTipo === 'dias_especificos' && { diasSemana }),
+          tipo: 'dias_especificos',
+          diasSemana,
         },
         horarios: horariosLimpios,
         activo: true,
@@ -220,8 +217,6 @@ export default function Medicamentos() {
     setNombre(med.nombre);
     setDosis(med.dosis);
     setPresentacion(med.presentacion);
-    setFrecuenciaTipo(med.frecuencia.tipo);
-    setFrecuenciaValor(med.frecuencia.valor);
     setDiasSemana(med.frecuencia.diasSemana || []);
     setHorarios(med.horarios.length > 0 ? med.horarios : ['']);
     setInstrucciones(med.instrucciones || '');
@@ -235,8 +230,6 @@ export default function Medicamentos() {
     setNombre('');
     setDosis('');
     setPresentacion('tableta');
-    setFrecuenciaTipo('horas');
-    setFrecuenciaValor(8);
     setDiasSemana([]);
     setHorarios(['']);
     setInstrucciones('');
@@ -363,78 +356,27 @@ export default function Medicamentos() {
                 </div>
               </div>
 
-              {/* Frecuencia */}
+              {/* Días de la semana */}
               <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Frecuencia</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Frecuencia
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          value="horas"
-                          checked={frecuenciaTipo === 'horas'}
-                          onChange={(e) => setFrecuenciaTipo(e.target.value as FrecuenciaTipo)}
-                          className="mr-2"
-                        />
-                        Cada X horas
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          value="dias_especificos"
-                          checked={frecuenciaTipo === 'dias_especificos'}
-                          onChange={(e) => setFrecuenciaTipo(e.target.value as FrecuenciaTipo)}
-                          className="mr-2"
-                        />
-                        Días específicos
-                      </label>
-                    </div>
-                  </div>
-
-                  {frecuenciaTipo === 'horas' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cada cuántas horas
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="24"
-                        value={frecuenciaValor}
-                        onChange={(e) => setFrecuenciaValor(parseInt(e.target.value))}
-                        className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-600">horas</span>
-                    </div>
-                  )}
-
-                  {frecuenciaTipo === 'dias_especificos' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Días de la semana
-                      </label>
-                      <div className="flex gap-2">
-                        {diasSemanaLabels.map((dia, index) => (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => toggleDiaSemana(index)}
-                            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-                              diasSemana.includes(index)
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {dia}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Días de la semana</h3>
+                <p className="text-sm text-gray-500 mb-3">
+                  Si no seleccionas días, el medicamento aplica todos los días
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {diasSemanaLabels.map((dia, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => toggleDiaSemana(index)}
+                      className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                        diasSemana.includes(index)
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {dia}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -610,15 +552,13 @@ export default function Medicamentos() {
                       </span>
                     </div>
 
-                    {/* Frecuencia */}
+                    {/* Días */}
                     <div className="mb-2">
-                      <span className="text-sm font-medium text-gray-700">Frecuencia: </span>
+                      <span className="text-sm font-medium text-gray-700">Días: </span>
                       <span className="text-sm text-gray-600">
-                        {med.frecuencia.tipo === 'horas'
-                          ? `Cada ${med.frecuencia.valor} horas`
-                          : `Días: ${med.frecuencia.diasSemana
-                              ?.map((d) => diasSemanaLabels[d])
-                              .join(', ')}`}
+                        {!med.frecuencia.diasSemana || med.frecuencia.diasSemana.length === 0
+                          ? 'Todos los días'
+                          : med.frecuencia.diasSemana.map((d) => diasSemanaLabels[d]).join(', ')}
                       </span>
                     </div>
 
