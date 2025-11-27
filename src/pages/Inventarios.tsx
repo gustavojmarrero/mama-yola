@@ -10,7 +10,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { format, addDays, isBefore } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Layout from '../components/common/Layout';
 import {
@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 const PACIENTE_ID = 'paciente-principal';
+const DIAS_ALERTA_VENCIMIENTO = 3;
 
 // Tipo para las notificaciones toast
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -50,7 +51,8 @@ export default function Inventarios() {
   const [showHistorialModal, setShowHistorialModal] = useState(false);
   const [editando, setEditando] = useState<ItemInventario | null>(null);
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaInventario | 'todos'>('todos');
-  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'critico' | 'bajo' | 'por_vencer' | 'ok'>('todos');
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'critico' | 'bajo' | 'ok'>('todos');
+  const [filtroVidaUtil, setFiltroVidaUtil] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Control de permisos por rol
@@ -66,16 +68,44 @@ export default function Inventarios() {
     }, 3000);
   };
 
+  // Funciones para cálculo de vida útil
+  function calcularDiasRestantes(item: ItemInventario): number {
+    if (!item.porcentajeDiario || item.porcentajeDiario === 0 || item.cantidadOperativo <= 0) return 0;
+    // cantidadOperativo es el % restante (0-100), porcentajeDiario es los puntos % que se pierden cada día
+    // Ej: 60% restante / 2.22% diario = ~27 días restantes
+    return Math.ceil(item.cantidadOperativo / item.porcentajeDiario);
+  }
+
+  function calcularPorcentajeRestante(item: ItemInventario): number {
+    if (!item.vidaUtilDias || !item.fechaInicioConsumo) return 100;
+    const fechaInicio = item.fechaInicioConsumo instanceof Date
+      ? item.fechaInicioConsumo
+      : (item.fechaInicioConsumo as unknown as Timestamp).toDate();
+    const diasTranscurridos = differenceInDays(new Date(), fechaInicio);
+    const porcentaje = Math.max(0, 100 - (diasTranscurridos / item.vidaUtilDias * 100));
+    return Math.round(porcentaje);
+  }
+
+  function itemPorAgotarse(item: ItemInventario): boolean {
+    if (!item.tieneVidaUtil || !item.fechaInicioConsumo || item.cantidadOperativo <= 0) {
+      return false;
+    }
+    const diasRestantes = calcularDiasRestantes(item);
+    return diasRestantes <= DIAS_ALERTA_VENCIMIENTO && diasRestantes > 0;
+  }
+
+  // Items con alerta de vencimiento
+  const itemsConAlerta = items.filter(itemPorAgotarse);
+
   const [formData, setFormData] = useState({
     nombre: '',
     categoria: 'medicamento' as CategoriaInventario,
     presentacion: '',
-    fechaVencimiento: '',
-    cantidadMaestro: 0,
-    cantidadOperativo: 0,
+    cantidadMaestro: '' as string | number,
+    cantidadOperativo: '' as string | number,
     unidad: 'piezas',
-    nivelMinimoMaestro: 5,
-    nivelMinimoOperativo: 5,
+    nivelMinimoMaestro: '' as string | number,
+    nivelMinimoOperativo: '' as string | number,
     ubicacion: '',
     notas: '',
     // Vida útil
@@ -130,7 +160,6 @@ export default function Inventarios() {
           cantidadMaestro,
           cantidadOperativo,
           presentacion: data.presentacion,
-          fechaVencimiento: data.fechaVencimiento?.toDate(),
           vinculadoPastillero: data.vinculadoPastillero,
           medicamentoId: data.medicamentoId,
           // Vida útil
@@ -186,9 +215,6 @@ export default function Inventarios() {
         nombre: item.nombre,
         categoria: item.categoria,
         presentacion: item.presentacion || '',
-        fechaVencimiento: item.fechaVencimiento
-          ? format(item.fechaVencimiento, 'yyyy-MM-dd')
-          : '',
         cantidadMaestro: item.cantidadMaestro,
         cantidadOperativo: item.cantidadOperativo,
         unidad: item.unidad,
@@ -205,12 +231,11 @@ export default function Inventarios() {
         nombre: '',
         categoria: 'medicamento',
         presentacion: '',
-        fechaVencimiento: '',
-        cantidadMaestro: 0,
-        cantidadOperativo: 0,
+        cantidadMaestro: '',
+        cantidadOperativo: '',
         unidad: 'piezas',
-        nivelMinimoMaestro: 5,
-        nivelMinimoOperativo: 5,
+        nivelMinimoMaestro: '',
+        nivelMinimoOperativo: '',
         ubicacion: '',
         notas: '',
         tieneVidaUtil: false,
@@ -252,19 +277,16 @@ export default function Inventarios() {
         pacienteId: PACIENTE_ID,
         nombre: formData.nombre,
         categoria: formData.categoria,
-        cantidadMaestro: formData.cantidadMaestro,
-        cantidadOperativo: formData.cantidadOperativo,
+        cantidadMaestro: typeof formData.cantidadMaestro === 'number' ? formData.cantidadMaestro : 0,
+        cantidadOperativo: typeof formData.cantidadOperativo === 'number' ? formData.cantidadOperativo : 0,
         unidad: formData.unidad,
-        nivelMinimoMaestro: formData.nivelMinimoMaestro,
-        nivelMinimoOperativo: formData.nivelMinimoOperativo,
+        nivelMinimoMaestro: typeof formData.nivelMinimoMaestro === 'number' ? formData.nivelMinimoMaestro : 0,
+        nivelMinimoOperativo: typeof formData.nivelMinimoOperativo === 'number' ? formData.nivelMinimoOperativo : 0,
         actualizadoEn: ahora,
       };
 
       // Agregar campos opcionales solo si tienen valor
       if (formData.presentacion) itemData.presentacion = formData.presentacion;
-      if (formData.fechaVencimiento) {
-        itemData.fechaVencimiento = Timestamp.fromDate(new Date(formData.fechaVencimiento));
-      }
       if (formData.ubicacion) itemData.ubicacion = formData.ubicacion;
       if (formData.notas) itemData.notas = formData.notas;
 
@@ -273,6 +295,12 @@ export default function Inventarios() {
       if (formData.tieneVidaUtil && formData.vidaUtilDias > 0) {
         itemData.vidaUtilDias = formData.vidaUtilDias;
         itemData.porcentajeDiario = 100 / formData.vidaUtilDias;
+
+        // Si tiene vida útil y % operativo > 0, iniciar el conteo automáticamente
+        const cantidadOp = typeof formData.cantidadOperativo === 'number' ? formData.cantidadOperativo : 0;
+        if (cantidadOp > 0 && (!editando || !editando.fechaInicioConsumo)) {
+          itemData.fechaInicioConsumo = ahora;
+        }
       } else {
         itemData.vidaUtilDias = 0;
         itemData.porcentajeDiario = 0;
@@ -334,7 +362,12 @@ export default function Inventarios() {
       } else if (movimientoForm.tipo === 'transferencia') {
         // Transferencia: del maestro al operativo
         nuevaCantidadMaestro -= movimientoForm.cantidad;
-        nuevaCantidadOperativo += movimientoForm.cantidad;
+        // Para items con vida útil, establecer operativo en 100% (porcentaje)
+        if (item.tieneVidaUtil) {
+          nuevaCantidadOperativo = 100; // 100% al transferir
+        } else {
+          nuevaCantidadOperativo += movimientoForm.cantidad;
+        }
       } else if (movimientoForm.tipo === 'ajuste') {
         // Ajuste: se ajusta la cantidad del operativo (principal)
         nuevaCantidadOperativo = movimientoForm.cantidad;
@@ -388,13 +421,9 @@ export default function Inventarios() {
   }
 
   function getEstadoItem(item: ItemInventario) {
-    const hoy = new Date();
-    const en30Dias = addDays(hoy, 30);
     const cantidadTotal = item.cantidadMaestro + item.cantidadOperativo;
 
     if (cantidadTotal === 0) return 'critico';
-    if (item.fechaVencimiento && isBefore(item.fechaVencimiento, hoy)) return 'vencido';
-    if (item.fechaVencimiento && isBefore(item.fechaVencimiento, en30Dias)) return 'por_vencer';
     // Verificar si alguno de los inventarios está bajo
     if (item.cantidadMaestro <= item.nivelMinimoMaestro || item.cantidadOperativo <= item.nivelMinimoOperativo) return 'bajo';
     return 'ok';
@@ -403,10 +432,7 @@ export default function Inventarios() {
   function getEstadoColor(estado: string) {
     switch (estado) {
       case 'critico':
-      case 'vencido':
         return 'bg-red-100 text-red-800 border-red-200';
-      case 'por_vencer':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'bajo':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default:
@@ -418,10 +444,6 @@ export default function Inventarios() {
     switch (estado) {
       case 'critico':
         return '🔴 Sin Stock';
-      case 'vencido':
-        return '🔴 Vencido';
-      case 'por_vencer':
-        return '🟠 Por Vencer';
       case 'bajo':
         return '🟡 Bajo';
       default:
@@ -433,13 +455,13 @@ export default function Inventarios() {
   const itemsFiltrados = items.filter((item) => {
     const matchCategoria = filtroCategoria === 'todos' || item.categoria === filtroCategoria;
     const matchEstado = filtroEstado === 'todos' || getEstadoItem(item) === filtroEstado;
-    return matchCategoria && matchEstado;
+    const matchVidaUtil = !filtroVidaUtil || (item.tieneVidaUtil && item.fechaInicioConsumo && item.cantidadOperativo > 0);
+    return matchCategoria && matchEstado && matchVidaUtil;
   });
 
   // Alertas
-  const itemsCriticos = items.filter((i) => getEstadoItem(i) === 'critico' || getEstadoItem(i) === 'vencido');
+  const itemsCriticos = items.filter((i) => getEstadoItem(i) === 'critico');
   const itemsBajos = items.filter((i) => getEstadoItem(i) === 'bajo');
-  const itemsPorVencer = items.filter((i) => getEstadoItem(i) === 'por_vencer');
 
   if (loading) {
     return (
@@ -469,7 +491,7 @@ export default function Inventarios() {
           </div>
 
           {/* Alertas */}
-          {(itemsCriticos.length > 0 || itemsBajos.length > 0 || itemsPorVencer.length > 0) && (
+          {(itemsCriticos.length > 0 || itemsBajos.length > 0) && (
             <div className="mb-6 space-y-3">
               {itemsCriticos.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -503,7 +525,7 @@ export default function Inventarios() {
                         key={item.id}
                         className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm"
                       >
-                        {item.nombre}: M:{item.cantidadMaestro} O:{item.cantidadOperativo} {item.unidad}
+                        {item.nombre}: M:{item.cantidadMaestro} O:{item.tieneVidaUtil ? `${Math.round(item.cantidadOperativo)}%` : `${item.cantidadOperativo} ${item.unidad}`}
                       </span>
                     ))}
                     {itemsBajos.length > 5 && (
@@ -513,26 +535,6 @@ export default function Inventarios() {
                 </div>
               )}
 
-              {itemsPorVencer.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-orange-800 mb-2">
-                    📅 Por Vencer (30 días) ({itemsPorVencer.length})
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {itemsPorVencer.slice(0, 5).map((item) => (
-                      <span
-                        key={item.id}
-                        className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm"
-                      >
-                        {item.nombre} - {item.fechaVencimiento && format(item.fechaVencimiento, 'dd/MM/yyyy')}
-                      </span>
-                    ))}
-                    {itemsPorVencer.length > 5 && (
-                      <span className="text-sm text-orange-700">+{itemsPorVencer.length - 5} más</span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -565,9 +567,20 @@ export default function Inventarios() {
                   <option value="todos">Todos</option>
                   <option value="critico">🔴 Crítico</option>
                   <option value="bajo">🟡 Bajo</option>
-                  <option value="por_vencer">🟠 Por Vencer</option>
                   <option value="ok">🟢 OK</option>
                 </select>
+              </div>
+
+              <div className="flex items-center pt-7">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filtroVidaUtil}
+                    onChange={(e) => setFiltroVidaUtil(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <span className="text-sm text-gray-700">⏳ Solo vida útil activa</span>
+                </label>
               </div>
 
               <div className="flex items-end">
@@ -599,6 +612,24 @@ export default function Inventarios() {
             </p>
           </div>
 
+          {/* Alerta de items por agotarse (vida útil) */}
+          {itemsConAlerta.length > 0 && (
+            <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <h3 className="font-medium text-orange-800 flex items-center gap-2">
+                <span>⚠️</span>
+                {itemsConAlerta.length} item(s) por agotarse en los próximos {DIAS_ALERTA_VENCIMIENTO} días
+              </h3>
+              <ul className="mt-2 space-y-1">
+                {itemsConAlerta.map(item => (
+                  <li key={item.id} className="text-sm text-orange-700">
+                    • {item.nombre}: {calcularDiasRestantes(item)} días restantes
+                    ({Math.round(item.cantidadOperativo)}% restante)
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Lista de items */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
@@ -616,9 +647,6 @@ export default function Inventarios() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vencimiento
-                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
                   </th>
@@ -628,8 +656,9 @@ export default function Inventarios() {
                 {itemsFiltrados.map((item) => {
                   const estado = getEstadoItem(item);
                   const catInfo = categorias.find((c) => c.value === item.categoria);
+                  const porAgotarse = itemPorAgotarse(item);
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50">
+                    <tr key={item.id} className={`hover:bg-gray-50 ${porAgotarse ? 'bg-orange-50' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <span className="text-2xl mr-3">{catInfo?.icon}</span>
@@ -657,25 +686,37 @@ export default function Inventarios() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-sm text-gray-900 font-semibold">
-                          {item.tieneVidaUtil ? item.cantidadOperativo.toFixed(2) : item.cantidadOperativo} {item.unidad}
-                        </div>
-                        {item.tieneVidaUtil && item.vidaUtilDias && item.cantidadOperativo > 0 && (
-                          <div className="mt-1">
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div
-                                className="bg-purple-600 h-1.5 rounded-full"
-                                style={{ width: `${Math.min(100, item.cantidadOperativo)}%` }}
-                              ></div>
+                        {item.tieneVidaUtil ? (
+                          <div>
+                            <div className={`text-lg font-bold ${itemPorAgotarse(item) ? 'text-orange-600' : 'text-purple-600'}`}>
+                              {Math.round(item.cantidadOperativo)}%
                             </div>
-                            <div className="text-xs text-purple-600 mt-0.5">
-                              {item.cantidadOperativo.toFixed(1)}% restante
+                            <div className="mt-1">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${itemPorAgotarse(item) ? 'bg-orange-500' : 'bg-purple-600'}`}
+                                  style={{ width: `${Math.min(100, item.cantidadOperativo)}%` }}
+                                ></div>
+                              </div>
                             </div>
+                            {item.fechaInicioConsumo ? (
+                              <div className={`text-xs mt-1 ${itemPorAgotarse(item) ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
+                                {calcularDiasRestantes(item)} días restantes
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400 italic mt-1">
+                                Sin iniciar
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {!item.tieneVidaUtil && (
-                          <div className="text-xs text-gray-500">
-                            Mín: {item.nivelMinimoOperativo}
+                        ) : (
+                          <div>
+                            <div className="text-sm text-gray-900 font-semibold">
+                              {item.cantidadOperativo} {item.unidad}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Mín: {item.nivelMinimoOperativo}
+                            </div>
                           </div>
                         )}
                       </td>
@@ -685,11 +726,6 @@ export default function Inventarios() {
                         >
                           {getEstadoLabel(estado)}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.fechaVencimiento
-                          ? format(item.fechaVencimiento, 'dd/MM/yyyy')
-                          : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {puedeEditar ? (
@@ -823,9 +859,11 @@ export default function Inventarios() {
                       <input
                         type="number"
                         min="0"
+                        step="0.01"
                         value={formData.cantidadMaestro}
-                        onChange={(e) => setFormData({ ...formData, cantidadMaestro: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => setFormData({ ...formData, cantidadMaestro: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej: 10"
                       />
                     </div>
                     <div>
@@ -833,49 +871,82 @@ export default function Inventarios() {
                       <input
                         type="number"
                         min="0"
+                        step="0.01"
                         value={formData.nivelMinimoMaestro}
-                        onChange={(e) => setFormData({ ...formData, nivelMinimoMaestro: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => setFormData({ ...formData, nivelMinimoMaestro: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej: 5"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Sección Operativo */}
-                <div className="md:col-span-2 bg-green-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-green-800 mb-3">📋 Inventario Operativo</h4>
+                <div className={`md:col-span-2 p-4 rounded-lg ${formData.categoria === 'consumible' && formData.tieneVidaUtil ? 'bg-purple-50' : 'bg-green-50'}`}>
+                  <h4 className={`font-medium mb-3 ${formData.categoria === 'consumible' && formData.tieneVidaUtil ? 'text-purple-800' : 'text-green-800'}`}>
+                    {formData.categoria === 'consumible' && formData.tieneVidaUtil ? '⏳ Consumo por Vida Útil' : '📋 Inventario Operativo'}
+                  </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad Operativo</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.cantidadOperativo}
-                        onChange={(e) => setFormData({ ...formData, cantidadOperativo: parseInt(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {formData.categoria === 'consumible' && formData.tieneVidaUtil ? '% Restante' : 'Cantidad Operativo'}
+                      </label>
+                      {formData.categoria === 'consumible' && formData.tieneVidaUtil ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={formData.cantidadOperativo}
+                            onChange={(e) => setFormData({ ...formData, cantidadOperativo: e.target.value === '' ? '' : Math.min(100, Math.max(0, parseFloat(e.target.value))) })}
+                            className="w-24 px-3 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-center font-bold text-purple-700"
+                            placeholder="100"
+                          />
+                          <span className="text-purple-700 font-medium">%</span>
+                          {typeof formData.cantidadOperativo === 'number' && formData.cantidadOperativo > 0 && (
+                            <div className="flex-1 ml-2">
+                              <div className="w-full bg-purple-200 rounded-full h-3">
+                                <div
+                                  className="bg-purple-600 h-3 rounded-full transition-all"
+                                  style={{ width: `${Math.min(100, formData.cantidadOperativo)}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.cantidadOperativo}
+                          onChange={(e) => setFormData({ ...formData, cantidadOperativo: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Ej: 5"
+                        />
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Nivel Mínimo Operativo</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.nivelMinimoOperativo}
-                        onChange={(e) => setFormData({ ...formData, nivelMinimoOperativo: parseInt(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+                    {!(formData.categoria === 'consumible' && formData.tieneVidaUtil) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Nivel Mínimo Operativo</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.nivelMinimoOperativo}
+                          onChange={(e) => setFormData({ ...formData, nivelMinimoOperativo: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Ej: 3"
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha Vencimiento</label>
-                  <input
-                    type="date"
-                    value={formData.fechaVencimiento}
-                    onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  {formData.categoria === 'consumible' && formData.tieneVidaUtil && (
+                    <p className="text-xs text-purple-600 mt-2">
+                      Ingresa el porcentaje restante del producto (0-100%). Al transferir de maestro, inicia en 100%.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -922,10 +993,29 @@ export default function Inventarios() {
                         </div>
 
                         {formData.vidaUtilDias > 0 && (
-                          <p className="text-sm text-purple-700">
-                            Se descontará <strong>{(100 / formData.vidaUtilDias).toFixed(2)}%</strong> diario
-                            del inventario operativo.
-                          </p>
+                          <div className="space-y-2">
+                            <p className="text-sm text-purple-700">
+                              Se descontará <strong>{(100 / formData.vidaUtilDias).toFixed(2)}%</strong> diario
+                              del inventario operativo.
+                            </p>
+                            {typeof formData.cantidadOperativo === 'number' && formData.cantidadOperativo > 0 && (
+                              <div className="mt-3 p-3 bg-white rounded-lg border border-purple-200">
+                                <h4 className="text-sm font-medium text-purple-800 mb-2">📊 Info de Consumo Actual</h4>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div>
+                                    <span className="text-purple-600">Descuento diario:</span>
+                                    <span className="ml-1 font-medium">
+                                      {(100 / formData.vidaUtilDias).toFixed(2)}%
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-purple-600">Días restantes:</span>
+                                    <span className="ml-1 font-medium">~{Math.ceil(formData.cantidadOperativo / (100 / formData.vidaUtilDias))}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -1114,10 +1204,12 @@ export default function Inventarios() {
                                   ? 'bg-red-100 text-red-800'
                                   : mov.tipo === 'transferencia'
                                   ? 'bg-blue-100 text-blue-800'
+                                  : mov.tipo === 'consumo_automatico'
+                                  ? 'bg-purple-100 text-purple-800'
                                   : 'bg-gray-100 text-gray-800'
                               }`}
                             >
-                              {mov.tipo.charAt(0).toUpperCase() + mov.tipo.slice(1)}
+                              {mov.tipo === 'consumo_automatico' ? '⏳ Auto' : mov.tipo.charAt(0).toUpperCase() + mov.tipo.slice(1)}
                             </span>
                             <span className="font-medium text-gray-900">{mov.itemNombre}</span>
                           </div>

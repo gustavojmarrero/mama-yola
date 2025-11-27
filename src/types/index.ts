@@ -353,7 +353,6 @@ export interface ItemInventario {
 
   // Para medicamentos
   presentacion?: string;
-  fechaVencimiento?: Date;
   vinculadoPastillero?: boolean;
   medicamentoId?: string; // si está vinculado
 
@@ -587,6 +586,7 @@ export interface ComidaProgramada {
   valorNutricional?: ValorNutricional;
   instruccionesPreparacion?: string;
   recetaId?: string; // vinculado a banco de recetas
+  cantidad?: number; // porciones/unidades
 
   // Servido
   preparadoPor?: string;

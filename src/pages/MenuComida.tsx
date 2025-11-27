@@ -158,7 +158,8 @@ export default function MenuComida() {
     ingredientes: [] as string[],
     instrucciones: '',
     calorias: 0,
-    horaProgramada: '08:00'
+    horaProgramada: '08:00',
+    cantidad: '' as string | number
   });
 
   const [formConsumo, setFormConsumo] = useState({
@@ -492,6 +493,7 @@ export default function MenuComida() {
       ingredientes: formComida.ingredientes.length > 0 ? formComida.ingredientes : null,
       instruccionesPreparacion: formComida.instrucciones || null,
       valorNutricional: formComida.calorias > 0 ? { calorias: formComida.calorias, proteinas: 0, carbohidratos: 0, grasas: 0 } : null,
+      cantidad: typeof formComida.cantidad === 'number' ? formComida.cantidad : null,
       creadoEn: Timestamp.now(),
       actualizadoEn: Timestamp.now()
     };
@@ -560,7 +562,8 @@ export default function MenuComida() {
       ingredientes: [],
       instrucciones: '',
       calorias: 0,
-      horaProgramada: '08:00'
+      horaProgramada: '08:00',
+      cantidad: ''
     });
   }
 
@@ -1395,7 +1398,7 @@ export default function MenuComida() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
                     <select
@@ -1407,6 +1410,18 @@ export default function MenuComida() {
                         <option key={c.value} value={c.value}>{c.label}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                    <input
+                      type="number"
+                      value={formComida.cantidad}
+                      onChange={(e) => setFormComida({ ...formComida, cantidad: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                      className="w-full border rounded-lg px-3 py-2"
+                      placeholder="Ej: 1, 0.5"
+                      min="0"
+                      step="0.1"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Calorías</label>
