@@ -22,7 +22,6 @@ export const CONFIG_HORARIOS_DEFAULT: ConfiguracionHorarios = {
     nocturno: '21:00',
   },
   signosVitales: ['08:00', '18:00'],
-  kefir: ['06:30', '18:00'],
   actualizadoEn: new Date(),
 };
 
@@ -33,7 +32,6 @@ const ICONOS_PROCESO: Record<TipoProceso, string> = {
   chequeo: '📋',
   signosVitales: '💓',
   comida: '🍽️',
-  kefir: '🥛',
   actividad: '🎯',
 };
 
@@ -44,7 +42,6 @@ const ENLACES_PROCESO: Record<TipoProceso, string> = {
   chequeo: '/chequeo-diario',
   signosVitales: '/signos-vitales',
   comida: '/menu',
-  kefir: '/chequeo-diario',
   actividad: '/actividades',
 };
 
@@ -173,37 +170,6 @@ function signosVitalesCompletado(
   if (signo) {
     const horaSigno = horaStringADate(signo.hora, fecha);
     return { completado: true, horaCompletado: horaSigno };
-  }
-  return { completado: false };
-}
-
-/**
- * Verifica si el kéfir fue registrado (basado en el chequeo diario)
- */
-function kefirCompletado(
-  chequeos: ChequeoDiario[],
-  horaProgramada: string,
-  fecha: Date
-): { completado: boolean; horaCompletado?: Date } {
-  const hoy = fecha.toISOString().split('T')[0];
-  const horaProg = horaStringADate(horaProgramada, fecha);
-
-  // Buscar en los chequeos del día si hay registro de kéfir
-  const chequeo = chequeos.find(c => {
-    const fechaChequeo = c.fecha instanceof Date ? c.fecha : new Date(c.fecha);
-    if (fechaChequeo.toISOString().split('T')[0] !== hoy) return false;
-
-    if (c.alimentacion?.kefir?.hora) {
-      const horaKefir = horaStringADate(c.alimentacion.kefir.hora, fecha);
-      const diff = Math.abs(diferenciaMinutos(horaKefir, horaProg));
-      return diff <= 120; // dentro de 2 horas
-    }
-    return false;
-  });
-
-  if (chequeo?.alimentacion?.kefir?.hora) {
-    const horaKefir = horaStringADate(chequeo.alimentacion.kefir.hora, fecha);
-    return { completado: true, horaCompletado: horaKefir };
   }
   return { completado: false };
 }
@@ -368,31 +334,7 @@ export function calcularProcesosDelDia(
     });
   });
 
-  // 3. KÉFIR
-  config.kefir.forEach((hora, index) => {
-    const { completado, horaCompletado } = kefirCompletado(
-      registros.chequeosDiarios,
-      hora,
-      fechaHoy
-    );
-    const horaDate = horaStringADate(hora, fechaHoy);
-    const estado = calcularEstadoProceso(horaActual, horaDate, completado);
-
-    procesos.push({
-      id: `kefir-${index}`,
-      tipo: 'kefir',
-      nombre: 'Kéfir',
-      detalle: index === 0 ? 'Matutino' : 'Vespertino',
-      horaProgramada: hora,
-      horaDate,
-      estado,
-      horaCompletado,
-      icono: ICONOS_PROCESO.kefir,
-      enlace: ENLACES_PROCESO.kefir,
-    });
-  });
-
-  // 4. COMIDAS
+  // 3. COMIDAS
   const tiemposActivos = tiemposComida.filter(t => t.activo);
   for (const tiempo of tiemposActivos) {
     const { completado, horaCompletado } = comidaCompletada(
@@ -417,7 +359,7 @@ export function calcularProcesosDelDia(
     });
   }
 
-  // 5. MEDICAMENTOS
+  // 4. MEDICAMENTOS
   const medicamentosActivos = medicamentos.filter(m => m.activo);
   for (const med of medicamentosActivos) {
     // Verificar si el medicamento aplica hoy (por días de la semana)
@@ -453,7 +395,7 @@ export function calcularProcesosDelDia(
     }
   }
 
-  // 6. ACTIVIDADES (solo las del día)
+  // 5. ACTIVIDADES (solo las del día)
   const actividadesHoy = actividades.filter(a => {
     const fechaInicio = a.fechaInicio instanceof Date ? a.fechaInicio : new Date(a.fechaInicio);
     return fechaInicio.toISOString().split('T')[0] === fechaHoy.toISOString().split('T')[0] &&

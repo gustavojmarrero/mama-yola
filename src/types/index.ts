@@ -507,7 +507,7 @@ export type NivelConsumo = 'todo' | 'mayor_parte' | 'mitad' | 'poco' | 'nada';
 export type TiempoComidaId = 'desayuno' | 'colacion_am' | 'almuerzo' | 'colacion_pm' | 'cena';
 
 // Identificadores de componentes
-export type ComponenteId = 'primer_plato' | 'segundo_plato' | 'complemento' | 'postre' | 'snack' | 'bebida';
+export type ComponenteId = 'primer_plato' | 'segundo_plato' | 'complemento' | 'postre' | 'snack' | 'bebida' | 'lactobacilos';
 
 // Configuración de un componente dentro de un tiempo de comida
 export interface ComponenteConfig {
@@ -668,9 +668,6 @@ export interface ConfiguracionHorarios {
   // Signos Vitales - array de horarios sugeridos
   signosVitales: string[]; // ["08:00", "18:00"]
 
-  // Kéfir - array de horarios
-  kefir: string[]; // ["06:30", "18:00"]
-
   actualizadoEn: Date;
 }
 
@@ -678,7 +675,7 @@ export interface ConfiguracionHorarios {
 
 export type EstadoProceso = 'pendiente' | 'proximo' | 'activo' | 'vencido' | 'completado';
 
-export type TipoProceso = 'medicamento' | 'chequeo' | 'signosVitales' | 'comida' | 'kefir' | 'actividad';
+export type TipoProceso = 'medicamento' | 'chequeo' | 'signosVitales' | 'comida' | 'actividad';
 
 // Proceso unificado para mostrar en Dashboard
 export interface ProcesoDelDia {

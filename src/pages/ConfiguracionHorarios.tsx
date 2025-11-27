@@ -100,7 +100,6 @@ export default function ConfiguracionHorarios() {
         setConfig({
           chequeoDiario: data.chequeoDiario || CONFIG_HORARIOS_DEFAULT.chequeoDiario,
           signosVitales: data.signosVitales || CONFIG_HORARIOS_DEFAULT.signosVitales,
-          kefir: data.kefir || CONFIG_HORARIOS_DEFAULT.kefir,
           actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
         });
       }
@@ -142,31 +141,31 @@ export default function ConfiguracionHorarios() {
     setHasChanges(true);
   }
 
-  function agregarHora(campo: 'signosVitales' | 'kefir') {
+  function agregarHoraSignos() {
     setConfig((prev) => ({
       ...prev,
-      [campo]: [...prev[campo], '12:00'],
+      signosVitales: [...prev.signosVitales, '12:00'],
     }));
     setHasChanges(true);
   }
 
-  function actualizarHora(campo: 'signosVitales' | 'kefir', index: number, hora: string) {
+  function actualizarHoraSignos(index: number, hora: string) {
     setConfig((prev) => ({
       ...prev,
-      [campo]: prev[campo].map((h, i) => (i === index ? hora : h)),
+      signosVitales: prev.signosVitales.map((h, i) => (i === index ? hora : h)),
     }));
     setHasChanges(true);
   }
 
-  function eliminarHora(campo: 'signosVitales' | 'kefir', index: number) {
-    if (config[campo].length <= 1) {
+  function eliminarHoraSignos(index: number) {
+    if (config.signosVitales.length <= 1) {
       setMensaje({ tipo: 'error', texto: 'Debe haber al menos un horario' });
       setTimeout(() => setMensaje(null), 3000);
       return;
     }
     setConfig((prev) => ({
       ...prev,
-      [campo]: prev[campo].filter((_, i) => i !== index),
+      signosVitales: prev.signosVitales.filter((_, i) => i !== index),
     }));
     setHasChanges(true);
   }
@@ -270,39 +269,12 @@ export default function ConfiguracionHorarios() {
                   <HoraChip
                     key={index}
                     hora={hora}
-                    onChange={(h) => actualizarHora('signosVitales', index, h)}
-                    onRemove={() => eliminarHora('signosVitales', index)}
+                    onChange={(h) => actualizarHoraSignos(index, h)}
+                    onRemove={() => eliminarHoraSignos(index)}
                   />
                 ))}
                 <button
-                  onClick={() => agregarHora('signosVitales')}
-                  className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                >
-                  + Agregar
-                </button>
-              </div>
-            </div>
-
-            {/* Kéfir */}
-            <div className="bg-white rounded-lg shadow p-4 md:p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-2xl">🥛</span>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Kéfir</h2>
-                  <p className="text-sm text-gray-500">Horarios de administración</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {config.kefir.map((hora, index) => (
-                  <HoraChip
-                    key={index}
-                    hora={hora}
-                    onChange={(h) => actualizarHora('kefir', index, h)}
-                    onRemove={() => eliminarHora('kefir', index)}
-                  />
-                ))}
-                <button
-                  onClick={() => agregarHora('kefir')}
+                  onClick={() => agregarHoraSignos()}
                   className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                 >
                   + Agregar

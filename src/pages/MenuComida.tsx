@@ -43,6 +43,7 @@ const COMPONENTES_DISPONIBLES: { id: ComponenteId; nombre: string; icono: string
   { id: 'postre', nombre: 'Postre', icono: '🍮' },
   { id: 'snack', nombre: 'Snack', icono: '🍪' },
   { id: 'bebida', nombre: 'Bebida', icono: '🥤' },
+  { id: 'lactobacilos', nombre: 'Lactobacilos', icono: '🥛' },
 ];
 
 // Configuración default de tiempos de comida
@@ -56,6 +57,7 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
       { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 1 },
       { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 2 },
       { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 3 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: true, orden: 4 },
     ],
     orden: 1,
     activo: true,
@@ -68,6 +70,7 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
     componentes: [
       { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 1 },
       { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 2 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 3 },
     ],
     orden: 2,
     activo: true,
@@ -82,6 +85,7 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
       { id: 'segundo_plato', nombre: 'Segundo Plato', obligatorio: false, orden: 2 },
       { id: 'complemento', nombre: 'Complemento', obligatorio: false, orden: 3 },
       { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 4 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 5 },
     ],
     orden: 3,
     activo: true,
@@ -94,6 +98,7 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
     componentes: [
       { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 1 },
       { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 2 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 3 },
     ],
     orden: 4,
     activo: true,
@@ -107,6 +112,7 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
       { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 1 },
       { id: 'complemento', nombre: 'Complemento', obligatorio: false, orden: 2 },
       { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 3 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 4 },
     ],
     orden: 5,
     activo: true,
