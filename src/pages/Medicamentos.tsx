@@ -152,11 +152,29 @@ export default function Medicamentos() {
         markAsSaved();
         alert('Medicamento actualizado exitosamente');
       } else {
-        // Crear nuevo
-        await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'medicamentos'), {
+        // Crear nuevo medicamento
+        const medicamentoRef = await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'medicamentos'), {
           ...medicamentoData,
           creadoEn: new Date(),
         });
+
+        // Crear item de inventario vinculado automáticamente
+        await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'inventario'), {
+          pacienteId: PACIENTE_ID,
+          nombre: `${nombre} ${dosis}`,
+          categoria: 'medicamento',
+          cantidadMaestro: 0,
+          cantidadOperativo: 0,
+          presentacion: presentacion,
+          unidad: 'piezas',
+          nivelMinimoMaestro: 5,
+          nivelMinimoOperativo: 5,
+          vinculadoPastillero: true,
+          medicamentoId: medicamentoRef.id,
+          creadoEn: new Date(),
+          actualizadoEn: new Date(),
+        });
+
         markAsSaved();
         alert('Medicamento creado exitosamente');
       }

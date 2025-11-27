@@ -174,6 +174,14 @@ export interface ChequeoDiario {
     recomendacionesSiguienteTurno?: string;
   };
 
+  // Consumibles usados
+  consumiblesUsados?: Array<{
+    itemId: string;
+    itemNombre: string;
+    cantidad: number;
+    comentario?: string;
+  }>;
+
   completado: boolean;
   creadoEn: Date;
   actualizadoEn: Date;
@@ -349,6 +357,12 @@ export interface ItemInventario {
   vinculadoPastillero?: boolean;
   medicamentoId?: string; // si está vinculado
 
+  // Vida útil (ej: gel de cuerpo 45 días)
+  tieneVidaUtil?: boolean;
+  vidaUtilDias?: number;
+  fechaInicioConsumo?: Date; // Se establece al transferir al operativo
+  porcentajeDiario?: number; // Calculado: 100 / vidaUtilDias
+
   // Comunes
   unidad: string; // "piezas", "ml", "cajas"
   nivelMinimoMaestro: number;
@@ -360,7 +374,7 @@ export interface ItemInventario {
   actualizadoEn: Date;
 }
 
-export type TipoMovimiento = 'entrada' | 'salida' | 'transferencia' | 'ajuste';
+export type TipoMovimiento = 'entrada' | 'salida' | 'transferencia' | 'ajuste' | 'consumo_automatico';
 export type OrigenDestino = 'maestro' | 'operativo' | 'externo' | 'consumido';
 
 export interface MovimientoInventario {

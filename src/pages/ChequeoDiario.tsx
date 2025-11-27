@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc, query, where, getDocs, doc, updateDoc, getDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, doc, updateDoc, getDoc, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { ChequeoDiario, RegistroMedicamento } from '../types';
+import { ChequeoDiario, RegistroMedicamento, ItemInventario } from '../types';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
 import jsPDF from 'jspdf';
@@ -26,6 +26,9 @@ export default function ChequeoDiarioPage() {
   // Estados para adherencia de medicamentos
   const [registrosMedicamentos, setRegistrosMedicamentos] = useState<RegistroMedicamento[]>([]);
   const [adherenciaAutomatica, setAdherenciaAutomatica] = useState(false);
+
+  // Estados para consumibles
+  const [consumiblesDisponibles, setConsumiblesDisponibles] = useState<ItemInventario[]>([]);
 
   // Hook para detectar cambios sin guardar
   const { isDirty, setIsDirty, markAsSaved, confirmNavigation, setOriginalData } = useUnsavedChanges();
@@ -72,12 +75,16 @@ export default function ChequeoDiarioPage() {
     // Resumen
     resumenGeneral: '',
     observacionesImportantes: '',
-    recomendacionesSiguienteTurno: ''
+    recomendacionesSiguienteTurno: '',
+
+    // Consumibles usados
+    consumiblesUsados: [] as Array<{ itemId: string; itemNombre: string; cantidad: number; comentario: string }>,
   });
 
   useEffect(() => {
     cargarChequeoDelDia();
     verificarAdherenciaMedicamentos();
+    cargarConsumiblesDisponibles();
   }, []);
 
   // Detectar cambios en el formulario para marcar como dirty
@@ -202,6 +209,111 @@ export default function ChequeoDiarioPage() {
       }
     } catch (error) {
       console.error('Error verificando adherencia de medicamentos:', error);
+    }
+  }
+
+  // === FUNCIONES PARA CONSUMIBLES ===
+  async function cargarConsumiblesDisponibles() {
+    try {
+      const q = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'inventario'),
+        where('categoria', '==', 'consumible'),
+        orderBy('nombre', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      const items: ItemInventario[] = [];
+
+      snapshot.forEach((docItem) => {
+        const data = docItem.data();
+        items.push({
+          id: docItem.id,
+          pacienteId: data.pacienteId,
+          nombre: data.nombre,
+          categoria: data.categoria,
+          cantidadMaestro: data.cantidadMaestro || 0,
+          cantidadOperativo: data.cantidadOperativo || 0,
+          unidad: data.unidad,
+          nivelMinimoMaestro: data.nivelMinimoMaestro || 0,
+          nivelMinimoOperativo: data.nivelMinimoOperativo || 0,
+          creadoEn: data.creadoEn?.toDate() || new Date(),
+          actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
+        } as ItemInventario);
+      });
+
+      setConsumiblesDisponibles(items);
+    } catch (error) {
+      console.error('Error cargando consumibles:', error);
+    }
+  }
+
+  function agregarConsumible() {
+    setFormData({
+      ...formData,
+      consumiblesUsados: [...formData.consumiblesUsados, { itemId: '', itemNombre: '', cantidad: 1, comentario: '' }]
+    });
+  }
+
+  function eliminarConsumible(index: number) {
+    setFormData({
+      ...formData,
+      consumiblesUsados: formData.consumiblesUsados.filter((_, i) => i !== index)
+    });
+  }
+
+  function updateConsumible(index: number, campo: 'itemId' | 'cantidad' | 'comentario', valor: string | number) {
+    const nuevosConsumibles = [...formData.consumiblesUsados];
+
+    if (campo === 'itemId') {
+      const item = consumiblesDisponibles.find(c => c.id === valor);
+      nuevosConsumibles[index].itemId = valor as string;
+      nuevosConsumibles[index].itemNombre = item?.nombre || '';
+    } else if (campo === 'cantidad') {
+      nuevosConsumibles[index].cantidad = valor as number;
+    } else {
+      nuevosConsumibles[index].comentario = valor as string;
+    }
+
+    setFormData({ ...formData, consumiblesUsados: nuevosConsumibles });
+  }
+
+  async function descontarConsumiblesDelInventario() {
+    const ahora = Timestamp.now();
+
+    for (const consumible of formData.consumiblesUsados) {
+      if (!consumible.itemId || consumible.cantidad <= 0) continue;
+
+      try {
+        const itemRef = doc(db, 'pacientes', PACIENTE_ID, 'inventario', consumible.itemId);
+        const itemDoc = await getDoc(itemRef);
+
+        if (!itemDoc.exists()) continue;
+
+        const itemData = itemDoc.data();
+        const nuevaCantidad = Math.max(0, (itemData.cantidadOperativo || 0) - consumible.cantidad);
+
+        await updateDoc(itemRef, {
+          cantidadOperativo: nuevaCantidad,
+          actualizadoEn: ahora,
+        });
+
+        await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'movimientosInventario'), {
+          pacienteId: PACIENTE_ID,
+          tipo: 'salida',
+          itemId: consumible.itemId,
+          itemNombre: consumible.itemNombre,
+          origen: 'operativo',
+          destino: 'consumido',
+          cantidad: consumible.cantidad,
+          motivo: 'Consumo registrado en chequeo diario',
+          notas: consumible.comentario || undefined,
+          usuarioId: userProfile?.id || '',
+          usuarioNombre: userProfile?.nombre || 'Usuario',
+          fecha: ahora,
+          creadoEn: ahora,
+        });
+      } catch (error) {
+        console.error(`Error descontando consumible ${consumible.itemNombre}:`, error);
+      }
     }
   }
 
@@ -496,6 +608,11 @@ export default function ChequeoDiarioPage() {
         recomendacionesSiguienteTurno: formData.recomendacionesSiguienteTurno
       },
 
+      // Consumibles usados
+      ...(formData.consumiblesUsados.length > 0 && {
+        consumiblesUsados: formData.consumiblesUsados.filter(c => c.itemId && c.cantidad > 0)
+      }),
+
       completado,
       creadoEn: chequeoActual?.creadoEn || new Date(),
       actualizadoEn: new Date()
@@ -635,6 +752,11 @@ export default function ChequeoDiarioPage() {
           collection(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios'),
           datosChequeo
         );
+      }
+
+      // Descontar consumibles del inventario
+      if (formData.consumiblesUsados.length > 0) {
+        await descontarConsumiblesDelInventario();
       }
 
       // Generar alertas automáticas
@@ -1610,10 +1732,94 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 3: Medicación */}
+            {/* Sección 3: Consumibles Utilizados */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                3. Medicación
+                3. Consumibles Utilizados
+              </h2>
+
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Registre los consumibles utilizados durante el turno para descontarlos del inventario.
+                </p>
+
+                {/* Lista de consumibles agregados */}
+                {formData.consumiblesUsados.map((consumible, index) => (
+                  <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <select
+                        value={consumible.itemId}
+                        onChange={(e) => updateConsumible(index, 'itemId', e.target.value)}
+                        disabled={yaCompletado}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      >
+                        <option value="">Seleccionar consumible...</option>
+                        {consumiblesDisponibles
+                          .filter(c => c.cantidadOperativo > 0)
+                          .map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.nombre} (Disponible: {c.cantidadOperativo} {c.unidad})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="w-24">
+                      <input
+                        type="number"
+                        value={consumible.cantidad}
+                        onChange={(e) => updateConsumible(index, 'cantidad', parseFloat(e.target.value) || 0)}
+                        disabled={yaCompletado}
+                        placeholder="Cant."
+                        min="0"
+                        step="0.1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={consumible.comentario}
+                        onChange={(e) => updateConsumible(index, 'comentario', e.target.value)}
+                        disabled={yaCompletado}
+                        placeholder="Comentario (opcional)"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      />
+                    </div>
+                    {!yaCompletado && (
+                      <button
+                        type="button"
+                        onClick={() => eliminarConsumible(index)}
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Botón para agregar consumible */}
+                {!yaCompletado && (
+                  <button
+                    type="button"
+                    onClick={agregarConsumible}
+                    className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                  >
+                    + Agregar consumible
+                  </button>
+                )}
+
+                {consumiblesDisponibles.filter(c => c.cantidadOperativo > 0).length === 0 && (
+                  <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">
+                    No hay consumibles disponibles en el inventario operativo.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Sección 4: Medicación */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                4. Medicación
               </h2>
 
               <div className="space-y-4">
@@ -1791,10 +1997,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 4: Incidentes */}
+            {/* Sección 5: Incidentes */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                4. Incidentes
+                5. Incidentes
               </h2>
 
               <div className="space-y-4">
@@ -1883,10 +2089,10 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Sección 5: Resumen */}
+            {/* Sección 6: Resumen */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                5. Resumen del Día
+                6. Resumen del Día
               </h2>
 
               <div className="space-y-4">

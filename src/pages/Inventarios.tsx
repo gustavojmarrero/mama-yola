@@ -53,6 +53,9 @@ export default function Inventarios() {
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'critico' | 'bajo' | 'por_vencer' | 'ok'>('todos');
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // Control de permisos por rol
+  const puedeEditar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
+
   // Función para mostrar toast
   const showToast = (message: string, type: ToastType = 'success') => {
     const id = Date.now();
@@ -75,6 +78,9 @@ export default function Inventarios() {
     nivelMinimoOperativo: 5,
     ubicacion: '',
     notas: '',
+    // Vida útil
+    tieneVidaUtil: false,
+    vidaUtilDias: 0,
   });
 
   const [movimientoForm, setMovimientoForm] = useState({
@@ -127,6 +133,11 @@ export default function Inventarios() {
           fechaVencimiento: data.fechaVencimiento?.toDate(),
           vinculadoPastillero: data.vinculadoPastillero,
           medicamentoId: data.medicamentoId,
+          // Vida útil
+          tieneVidaUtil: data.tieneVidaUtil || false,
+          vidaUtilDias: data.vidaUtilDias || 0,
+          fechaInicioConsumo: data.fechaInicioConsumo?.toDate(),
+          porcentajeDiario: data.porcentajeDiario || 0,
           unidad: data.unidad,
           nivelMinimoMaestro,
           nivelMinimoOperativo,
@@ -185,6 +196,8 @@ export default function Inventarios() {
         nivelMinimoOperativo: item.nivelMinimoOperativo,
         ubicacion: item.ubicacion || '',
         notas: item.notas || '',
+        tieneVidaUtil: item.tieneVidaUtil || false,
+        vidaUtilDias: item.vidaUtilDias || 0,
       });
     } else {
       setEditando(null);
@@ -200,6 +213,8 @@ export default function Inventarios() {
         nivelMinimoOperativo: 5,
         ubicacion: '',
         notas: '',
+        tieneVidaUtil: false,
+        vidaUtilDias: 0,
       });
     }
     setShowModal(true);
@@ -252,6 +267,16 @@ export default function Inventarios() {
       }
       if (formData.ubicacion) itemData.ubicacion = formData.ubicacion;
       if (formData.notas) itemData.notas = formData.notas;
+
+      // Campos de vida útil
+      itemData.tieneVidaUtil = formData.tieneVidaUtil;
+      if (formData.tieneVidaUtil && formData.vidaUtilDias > 0) {
+        itemData.vidaUtilDias = formData.vidaUtilDias;
+        itemData.porcentajeDiario = 100 / formData.vidaUtilDias;
+      } else {
+        itemData.vidaUtilDias = 0;
+        itemData.porcentajeDiario = 0;
+      }
 
       if (editando) {
         await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'inventario', editando.id), itemData);
@@ -315,12 +340,21 @@ export default function Inventarios() {
         nuevaCantidadOperativo = movimientoForm.cantidad;
       }
 
-      // Actualizar item con las nuevas cantidades
-      await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'inventario', item.id), {
+      // Preparar actualización del item
+      const updateData: Record<string, unknown> = {
         cantidadMaestro: nuevaCantidadMaestro,
         cantidadOperativo: nuevaCantidadOperativo,
         actualizadoEn: ahora,
-      });
+      };
+
+      // Si es transferencia y el item tiene vida útil, establecer fecha de inicio de consumo
+      // Solo si no tiene ya una fecha (para no reiniciar el contador si se transfieren más unidades)
+      if (movimientoForm.tipo === 'transferencia' && item.tieneVidaUtil && !item.fechaInicioConsumo) {
+        updateData.fechaInicioConsumo = ahora;
+      }
+
+      // Actualizar item con las nuevas cantidades
+      await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'inventario', item.id), updateData);
 
       // Crear registro de movimiento
       const movimientoData: Record<string, unknown> = {
@@ -423,7 +457,14 @@ export default function Inventarios() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">📦 Control de Inventarios</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-900">📦 Control de Inventarios</h1>
+              {!puedeEditar && (
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                  👁️ Modo lectura
+                </span>
+              )}
+            </div>
             <p className="text-gray-600 mt-2">Gestiona los suministros del paciente</p>
           </div>
 
@@ -538,14 +579,16 @@ export default function Inventarios() {
                 </button>
               </div>
 
-              <div className="flex items-end">
-                <button
-                  onClick={() => abrirModal()}
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-                >
-                  + Nuevo Item
-                </button>
-              </div>
+              {puedeEditar && (
+                <div className="flex items-end">
+                  <button
+                    onClick={() => abrirModal()}
+                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                  >
+                    + Nuevo Item
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -591,7 +634,14 @@ export default function Inventarios() {
                         <div className="flex items-center">
                           <span className="text-2xl mr-3">{catInfo?.icon}</span>
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{item.nombre}</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.nombre}
+                              {item.tieneVidaUtil && item.vidaUtilDias && (
+                                <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                                  {item.vidaUtilDias}d
+                                </span>
+                              )}
+                            </div>
                             <div className="text-sm text-gray-500">
                               {item.presentacion && `${item.presentacion}`}
                             </div>
@@ -608,11 +658,26 @@ export default function Inventarios() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="text-sm text-gray-900 font-semibold">
-                          {item.cantidadOperativo} {item.unidad}
+                          {item.tieneVidaUtil ? item.cantidadOperativo.toFixed(2) : item.cantidadOperativo} {item.unidad}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          Mín: {item.nivelMinimoOperativo}
-                        </div>
+                        {item.tieneVidaUtil && item.vidaUtilDias && item.cantidadOperativo > 0 && (
+                          <div className="mt-1">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div
+                                className="bg-purple-600 h-1.5 rounded-full"
+                                style={{ width: `${Math.min(100, item.cantidadOperativo)}%` }}
+                              ></div>
+                            </div>
+                            <div className="text-xs text-purple-600 mt-0.5">
+                              {item.cantidadOperativo.toFixed(1)}% restante
+                            </div>
+                          </div>
+                        )}
+                        {!item.tieneVidaUtil && (
+                          <div className="text-xs text-gray-500">
+                            Mín: {item.nivelMinimoOperativo}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
@@ -627,36 +692,40 @@ export default function Inventarios() {
                           : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => abrirMovimientoModal(item, 'entrada')}
-                            className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs rounded transition-colors"
-                            title="Entrada (Compra al Maestro)"
-                          >
-                            ➕
-                          </button>
-                          <button
-                            onClick={() => abrirMovimientoModal(item, 'transferencia')}
-                            className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
-                            title="Transferir de Maestro a Operativo"
-                          >
-                            ↔️
-                          </button>
-                          <button
-                            onClick={() => abrirMovimientoModal(item, 'salida')}
-                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded transition-colors"
-                            title="Salida (Consumo del Operativo)"
-                          >
-                            ➖
-                          </button>
-                          <button
-                            onClick={() => abrirModal(item)}
-                            className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded transition-colors"
-                            title="Editar"
-                          >
-                            ✏️
-                          </button>
-                        </div>
+                        {puedeEditar ? (
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => abrirMovimientoModal(item, 'entrada')}
+                              className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs rounded transition-colors"
+                              title="Entrada (Compra al Maestro)"
+                            >
+                              ➕
+                            </button>
+                            <button
+                              onClick={() => abrirMovimientoModal(item, 'transferencia')}
+                              className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
+                              title="Transferir de Maestro a Operativo"
+                            >
+                              ↔️
+                            </button>
+                            <button
+                              onClick={() => abrirMovimientoModal(item, 'salida')}
+                              className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded transition-colors"
+                              title="Salida (Consumo del Operativo)"
+                            >
+                              ➖
+                            </button>
+                            <button
+                              onClick={() => abrirModal(item)}
+                              className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded transition-colors"
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">Solo lectura</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -667,12 +736,14 @@ export default function Inventarios() {
             {itemsFiltrados.length === 0 && (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-lg">No hay items en el inventario</p>
-                <button
-                  onClick={() => abrirModal()}
-                  className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  + Agregar primer item
-                </button>
+                {puedeEditar && (
+                  <button
+                    onClick={() => abrirModal()}
+                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    + Agregar primer item
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -817,6 +888,49 @@ export default function Inventarios() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
+                {/* Vida Útil - Solo para consumibles */}
+                {formData.categoria === 'consumible' && (
+                  <div className="md:col-span-2 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-3 mb-3">
+                      <input
+                        type="checkbox"
+                        id="tieneVidaUtil"
+                        checked={formData.tieneVidaUtil}
+                        onChange={(e) => setFormData({ ...formData, tieneVidaUtil: e.target.checked })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="tieneVidaUtil" className="text-sm font-medium text-purple-900">
+                        Tiene vida útil (se consume automáticamente con el tiempo)
+                      </label>
+                    </div>
+
+                    {formData.tieneVidaUtil && (
+                      <div className="ml-7 space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-purple-800 mb-1">
+                            Duración en días
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={formData.vidaUtilDias || ''}
+                            onChange={(e) => setFormData({ ...formData, vidaUtilDias: parseInt(e.target.value) || 0 })}
+                            placeholder="Ej: 45"
+                            className="w-32 px-3 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+
+                        {formData.vidaUtilDias > 0 && (
+                          <p className="text-sm text-purple-700">
+                            Se descontará <strong>{(100 / formData.vidaUtilDias).toFixed(2)}%</strong> diario
+                            del inventario operativo.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Notas</label>

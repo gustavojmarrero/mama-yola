@@ -8,6 +8,7 @@ import {
   query,
   where,
   orderBy,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Medicamento, RegistroMedicamento, EstadoMedicamento } from '../types';
@@ -24,8 +25,61 @@ interface DosisDelDia {
 }
 
 export default function PastilleroDiario() {
-  const { usuario } = useAuth();
+  const { usuario, userProfile } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  /**
+   * Descuenta 1 unidad del inventario operativo cuando se toma un medicamento
+   */
+  async function descontarInventarioMedicamento(
+    medicamentoId: string,
+    medicamentoNombre: string
+  ): Promise<void> {
+    try {
+      // Buscar item de inventario vinculado a este medicamento
+      const qInventario = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'inventario'),
+        where('medicamentoId', '==', medicamentoId)
+      );
+      const snapshot = await getDocs(qInventario);
+
+      if (snapshot.empty) {
+        console.log(`No hay item de inventario vinculado al medicamento ${medicamentoNombre}`);
+        return;
+      }
+
+      const itemDoc = snapshot.docs[0];
+      const item = itemDoc.data();
+      const nuevaCantidadOperativo = Math.max(0, (item.cantidadOperativo || 0) - 1);
+      const ahora = Timestamp.now();
+
+      // Actualizar cantidad en inventario
+      await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'inventario', itemDoc.id), {
+        cantidadOperativo: nuevaCantidadOperativo,
+        actualizadoEn: ahora,
+      });
+
+      // Registrar movimiento de salida
+      await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'movimientosInventario'), {
+        pacienteId: PACIENTE_ID,
+        tipo: 'salida',
+        itemId: itemDoc.id,
+        itemNombre: item.nombre,
+        origen: 'operativo',
+        destino: 'consumido',
+        cantidad: 1,
+        motivo: 'Consumo pastillero diario',
+        usuarioId: usuario?.uid || '',
+        usuarioNombre: userProfile?.nombre || 'Usuario',
+        fecha: ahora,
+        creadoEn: ahora,
+      });
+
+      console.log(`Descontado 1 unidad de ${item.nombre} del inventario operativo`);
+    } catch (error) {
+      console.error('Error al descontar inventario:', error);
+    }
+  }
   const [dosisDelDia, setDosisDelDia] = useState<DosisDelDia[]>([]);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [dosisSeleccionada, setDosisSeleccionada] = useState<DosisDelDia | null>(null);
@@ -236,6 +290,14 @@ export default function PastilleroDiario() {
       } else {
         // Crear nuevo registro
         await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'registroMedicamentos'), registroData);
+      }
+
+      // Descontar del inventario si el medicamento fue tomado
+      if (estadoSeleccionado === 'tomado') {
+        await descontarInventarioMedicamento(
+          dosisSeleccionada.medicamento.id,
+          dosisSeleccionada.medicamento.nombre
+        );
       }
 
       alert('Administración registrada exitosamente');
