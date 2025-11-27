@@ -78,10 +78,67 @@ export default {
         '3xl': '24px',
       },
       boxShadow: {
+        // Sombras suaves básicas
         'soft-sm': '0 1px 3px rgba(0,0,0,0.04)',
         'soft-md': '0 4px 12px rgba(0,0,0,0.06)',
         'soft-lg': '0 8px 24px rgba(0,0,0,0.08)',
         'soft-xl': '0 12px 32px rgba(0,0,0,0.10)',
+        // Sombras premium para cards
+        'card': '0 2px 8px -2px rgba(0,0,0,0.05), 0 4px 16px -4px rgba(0,0,0,0.05)',
+        'card-hover': '0 4px 12px -2px rgba(0,0,0,0.08), 0 8px 24px -4px rgba(0,0,0,0.08)',
+        'card-elevated': '0 4px 16px -4px rgba(139,123,184,0.15)',
+        // Sombras para botones
+        'btn-primary': '0 4px 14px -3px rgba(139,123,184,0.5)',
+        'btn-primary-hover': '0 6px 20px -3px rgba(139,123,184,0.6)',
+        'btn-danger': '0 4px 14px -3px rgba(239,68,68,0.4)',
+        // Sombra interna para inputs focus
+        'input-focus': '0 0 0 4px rgba(139,123,184,0.1)',
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.2s ease-out',
+        'slide-in-left': 'slideInLeft 0.3s ease-out',
+        'slide-in-right': 'slideInRight 0.3s ease-out',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'scale-in': 'scaleIn 0.2s ease-out',
+        'pulse-soft': 'pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'shimmer': 'shimmer 2s linear infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideInLeft: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
+        slideInRight: {
+          '0%': { transform: 'translateX(100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0.95)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        pulseSoft: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+      },
+      transitionTimingFunction: {
+        'bounce-soft': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      },
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
       },
     },
   },

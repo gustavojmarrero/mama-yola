@@ -367,9 +367,9 @@ export default function Dashboard() {
 
   function getFechaTexto(fecha: Date) {
     if (isToday(fecha)) {
-      return '🔴 Hoy';
+      return 'Hoy';
     } else if (isTomorrow(fecha)) {
-      return '🟡 Mañana';
+      return 'Mañana';
     } else {
       return format(fecha, "EEE d MMM", { locale: es });
     }
@@ -398,300 +398,369 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-warm-800 font-display">
+      {/* Header con saludo */}
+      <div className="mb-8 animate-slide-up">
+        <div className="flex items-center gap-4 mb-1">
+          <div className="hidden sm:flex w-14 h-14 bg-gradient-to-br from-lavender-400 to-lavender-600 rounded-2xl items-center justify-center shadow-lg shadow-lavender-500/20">
+            <span className="text-2xl">👋</span>
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-warm-800 font-display tracking-tight">
               ¡Hola, {userProfile?.nombre?.split(' ')[0] || 'Usuario'}!
-            </h2>
-            <p className="text-warm-500 text-sm md:text-base">
-              {format(new Date(), "EEEE d 'de' MMMM yyyy", { locale: es })}
+            </h1>
+            <p className="text-warm-500 capitalize">
+              {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
             </p>
           </div>
+        </div>
+      </div>
 
-          {/* Métricas Resumen */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
-            {/* Adherencia */}
-            <Link to="/adherencia" className="bg-white rounded-2xl shadow-soft-md p-4 hover:shadow-soft-lg transition-all border border-warm-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-2xl">💊</span>
-                {metrics.alertasActivas > 0 && (
-                  <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full">
-                    {metrics.alertasActivas} alertas
-                  </span>
-                )}
-              </div>
-              <div className={`text-2xl md:text-3xl font-bold ${
-                metrics.adherenciaMedicamentos >= 90 ? 'text-green-600' :
-                metrics.adherenciaMedicamentos >= 70 ? 'text-yellow-600' : 'text-red-600'
-              }`}>
-                {metrics.adherenciaMedicamentos}%
-              </div>
-              <div className="text-xs md:text-sm text-warm-500">Adherencia 7 días</div>
-            </Link>
-
-            {/* Medicamentos pendientes */}
-            <Link to="/pastillero-diario" className="bg-white rounded-2xl shadow-soft-md p-4 hover:shadow-soft-lg transition-all border border-warm-100">
-              <div className="text-2xl mb-2">⏰</div>
-              <div className={`text-2xl md:text-3xl font-bold ${
-                metrics.medicamentosPendientes === 0 ? 'text-green-600' : 'text-orange-600'
-              }`}>
-                {metrics.medicamentosPendientes}
-              </div>
-              <div className="text-xs md:text-sm text-warm-500">Medicamentos hoy</div>
-            </Link>
-
-            {/* Signos vitales */}
-            <Link to="/signos-vitales" className="bg-white rounded-2xl shadow-soft-md p-4 hover:shadow-soft-lg transition-all border border-warm-100">
-              <div className="text-2xl mb-2">💓</div>
-              {metrics.signosVitalesHoy ? (
-                <>
-                  <div className="text-lg md:text-xl font-bold text-lavender-600">
-                    {metrics.signosVitalesHoy.presionArterialSistolica || '--'}/{metrics.signosVitalesHoy.presionArterialDiastolica || '--'}
-                  </div>
-                  <div className="text-xs md:text-sm text-warm-500">PA hoy • SpO2: {metrics.signosVitalesHoy.spo2 || '--'}%</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-lg md:text-xl font-bold text-warm-400">--/--</div>
-                  <div className="text-xs md:text-sm text-warm-500">Sin registro hoy</div>
-                </>
-              )}
-            </Link>
-
-            {/* Chequeo */}
-            <Link to="/chequeo-diario" className="bg-white rounded-2xl shadow-soft-md p-4 hover:shadow-soft-lg transition-all border border-warm-100">
-              <div className="text-2xl mb-2">📋</div>
-              {metrics.ultimoChequeo?.completado ? (
-                <>
-                  <div className="text-lg md:text-xl font-bold text-green-600">✓ Completo</div>
-                  <div className="text-xs md:text-sm text-warm-500">Chequeo de hoy</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-lg md:text-xl font-bold text-orange-600">Pendiente</div>
-                  <div className="text-xs md:text-sm text-warm-500">Chequeo diario</div>
-                </>
-              )}
-            </Link>
+      {/* Métricas Resumen - Cards Premium */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Adherencia */}
+        <Link
+          to="/adherencia"
+          className="group bg-gradient-to-br from-white via-white to-lavender-50/50 border-l-4 border-lavender-400 rounded-xl p-4 md:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-10 h-10 bg-lavender-100 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              💊
+            </div>
+            {metrics.alertasActivas > 0 && (
+              <span className="px-2 py-0.5 bg-error-light text-error text-xs font-semibold rounded-full animate-pulse-soft">
+                {metrics.alertasActivas} alertas
+              </span>
+            )}
           </div>
+          <div className={`text-2xl md:text-3xl font-bold font-display ${
+            metrics.adherenciaMedicamentos >= 90 ? 'text-success' :
+            metrics.adherenciaMedicamentos >= 70 ? 'text-warning' : 'text-error'
+          }`}>
+            {metrics.adherenciaMedicamentos}%
+          </div>
+          <div className="text-sm text-warm-500 font-medium">Adherencia 7 días</div>
+        </Link>
 
-          {/* Accesos Rápidos */}
-          <div className="bg-white rounded-2xl shadow-soft-md p-4 md:p-6 mb-8 border border-warm-100">
-            <h3 className="text-lg md:text-xl font-bold text-warm-800 mb-4 font-display">⚡ Acceso Rápido</h3>
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
-              {[
-                { path: '/chequeo-diario', icon: '📋', label: 'Chequeo' },
-                { path: '/signos-vitales', icon: '💓', label: 'Signos' },
-                { path: '/pastillero-diario', icon: '💊', label: 'Pastillero' },
-                { path: '/menu-comida', icon: '🍽️', label: 'Menú' },
-                { path: '/turnos', icon: '👥', label: 'Turnos' },
-                { path: '/actividades', icon: '🎯', label: 'Actividades' },
-                { path: '/configuracion-horarios', icon: '⏰', label: 'Horarios' },
-                { path: '/analytics', icon: '📊', label: 'Analytics' },
-              ].map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className="flex flex-col items-center justify-center p-3 md:p-4 border border-warm-200 rounded-xl hover:border-lavender-400 hover:bg-lavender-50 transition-all"
-                >
-                  <span className="text-2xl md:text-3xl mb-1">{item.icon}</span>
-                  <span className="text-xs font-medium text-warm-700 text-center">{item.label}</span>
-                </Link>
-              ))}
+        {/* Medicamentos pendientes */}
+        <Link
+          to="/pastillero-diario"
+          className="group bg-gradient-to-br from-white via-white to-warning-light/50 border-l-4 border-warning rounded-xl p-4 md:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-10 h-10 bg-warning-light rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              ⏰
             </div>
           </div>
+          <div className={`text-2xl md:text-3xl font-bold font-display ${
+            metrics.medicamentosPendientes === 0 ? 'text-success' : 'text-warning-dark'
+          }`}>
+            {metrics.medicamentosPendientes}
+          </div>
+          <div className="text-sm text-warm-500 font-medium">Pendientes hoy</div>
+        </Link>
 
-          {/* Procesos del Día */}
-          {procesos.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-soft-md mb-8 border border-warm-100">
-              <div className="p-4 md:p-6 border-b border-warm-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg md:text-xl font-bold text-warm-800 font-display">
-                      Procesos del Día
-                    </h3>
-                    <p className="text-sm text-warm-500">
-                      {(() => {
-                        const stats = calcularEstadisticasProcesos(procesos);
-                        return `${stats.completados}/${stats.total} completados (${stats.porcentajeCompletado}%)`;
-                      })()}
-                    </p>
-                  </div>
-                  <Link
-                    to="/configuracion-horarios"
-                    className="p-2 text-warm-500 hover:text-lavender-600 hover:bg-lavender-50 rounded-xl transition-colors"
-                    title="Configurar horarios"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </Link>
-                </div>
-              </div>
-              <div className="p-4 md:p-6">
-                {(() => {
-                  const grupos = agruparProcesosPorEstado(procesos);
-                  return (
-                    <>
-                      <ProcesoGrupo
-                        titulo="Vencidos"
-                        procesos={grupos.vencidos}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Activos"
-                        procesos={grupos.activos}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Próximos"
-                        procesos={grupos.proximos}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Pendientes"
-                        procesos={grupos.pendientes}
-                        horaActual={horaActual}
-                      />
-                      <ProcesoGrupo
-                        titulo="Completados"
-                        procesos={grupos.completados}
-                        horaActual={horaActual}
-                        colapsable
-                        colapsadoDefault
-                      />
-                    </>
-                  );
-                })()}
-              </div>
+        {/* Signos vitales */}
+        <Link
+          to="/signos-vitales"
+          className="group bg-gradient-to-br from-white via-white to-error-light/30 border-l-4 border-error rounded-xl p-4 md:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-10 h-10 bg-error-light rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              💓
             </div>
+          </div>
+          {metrics.signosVitalesHoy ? (
+            <>
+              <div className="text-xl md:text-2xl font-bold text-warm-800 font-display">
+                {metrics.signosVitalesHoy.presionArterialSistolica || '--'}/{metrics.signosVitalesHoy.presionArterialDiastolica || '--'}
+              </div>
+              <div className="text-sm text-warm-500 font-medium">
+                PA • SpO2: {metrics.signosVitalesHoy.spo2 || '--'}%
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-xl md:text-2xl font-bold text-warm-400 font-display">--/--</div>
+              <div className="text-sm text-warm-500 font-medium">Sin registro hoy</div>
+            </>
           )}
+        </Link>
 
-          {/* Grid Citas y Contactos */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-            {/* Próximas Citas */}
-            <div className="lg:col-span-2 bg-white rounded-2xl shadow-soft-md border border-warm-100">
-              <div className="p-4 md:p-6 border-b border-warm-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg md:text-xl font-bold text-warm-800 font-display">📅 Próximas Citas</h3>
-                  <Link
-                    to="/eventos"
-                    className="text-sm text-lavender-600 hover:text-lavender-700 font-medium"
-                  >
-                    Ver todas →
-                  </Link>
-                </div>
+        {/* Chequeo */}
+        <Link
+          to="/chequeo-diario"
+          className="group bg-gradient-to-br from-white via-white to-success-light/50 border-l-4 border-success rounded-xl p-4 md:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-10 h-10 bg-success-light rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              📋
+            </div>
+          </div>
+          {metrics.ultimoChequeo?.completado ? (
+            <>
+              <div className="text-xl md:text-2xl font-bold text-success font-display flex items-center gap-2">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Completo
               </div>
-              <div className="p-4 md:p-6">
-                {proximasCitas.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-warm-500 mb-4">No hay citas en los próximos 7 días</p>
-                    <Link
-                      to="/eventos"
-                      className="inline-block px-4 py-2 bg-lavender-600 hover:bg-lavender-700 text-white text-sm font-medium rounded-xl"
-                    >
-                      + Crear Cita
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {proximasCitas.slice(0, 4).map((cita) => (
-                      <div
-                        key={cita.id}
-                        className="border border-warm-200 rounded-xl p-3 hover:shadow-soft-sm transition-all"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <span className="text-2xl flex-shrink-0">{getTipoIcono(cita.tipo)}</span>
-                            <div className="min-w-0">
-                              <h4 className="font-semibold text-warm-800 truncate">{cita.titulo}</h4>
-                              <p className="text-sm text-warm-600">
-                                {getFechaTexto(cita.fechaInicio)} • {format(cita.fechaInicio, 'HH:mm')}
-                              </p>
-                              {cita.contactoNombre && (
-                                <p className="text-xs text-warm-500 truncate">👤 {cita.contactoNombre}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0">
-                            {cita.estado === 'programada' ? (
-                              <button
-                                onClick={() => confirmarCita(cita)}
-                                className="px-3 py-1 bg-success hover:bg-success-dark text-white text-xs font-medium rounded-lg"
-                              >
-                                ✓ Confirmar
-                              </button>
-                            ) : (
-                              <span className="px-2 py-1 bg-success-light text-success-dark text-xs font-medium rounded-lg">
-                                Confirmada
-                              </span>
-                            )}
-                          </div>
+              <div className="text-sm text-warm-500 font-medium">Chequeo de hoy</div>
+            </>
+          ) : (
+            <>
+              <div className="text-xl md:text-2xl font-bold text-warning-dark font-display">Pendiente</div>
+              <div className="text-sm text-warm-500 font-medium">Chequeo diario</div>
+            </>
+          )}
+        </Link>
+      </div>
+
+      {/* Accesos Rápidos */}
+      <div className="bg-white rounded-2xl shadow-card p-5 md:p-6 mb-8 border border-warm-100">
+        <h2 className="text-lg font-bold text-warm-800 mb-4 font-display flex items-center gap-2">
+          <span className="text-xl">⚡</span> Acceso Rápido
+        </h2>
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
+          {[
+            { path: '/chequeo-diario', icon: '📋', label: 'Chequeo' },
+            { path: '/signos-vitales', icon: '💓', label: 'Signos' },
+            { path: '/pastillero-diario', icon: '💊', label: 'Pastillero' },
+            { path: '/menu-comida', icon: '🍽️', label: 'Menú' },
+            { path: '/turnos', icon: '👥', label: 'Turnos' },
+            { path: '/actividades', icon: '🎯', label: 'Actividades' },
+            { path: '/configuracion-horarios', icon: '⏰', label: 'Horarios' },
+            { path: '/analytics', icon: '📊', label: 'Analytics' },
+          ].map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className="group flex flex-col items-center justify-center p-3 md:p-4 bg-warm-50/50 border border-warm-100 rounded-xl hover:border-lavender-300 hover:bg-lavender-50 transition-all duration-200"
+            >
+              <span className="text-2xl md:text-3xl mb-1.5 group-hover:scale-110 transition-transform duration-200">
+                {item.icon}
+              </span>
+              <span className="text-xs font-medium text-warm-600 text-center group-hover:text-lavender-700">
+                {item.label}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Procesos del Día */}
+      {procesos.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-card mb-8 border border-warm-100 overflow-hidden">
+          <div className="p-5 md:p-6 border-b border-warm-100 bg-gradient-to-r from-warm-50/50 to-transparent">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-warm-800 font-display flex items-center gap-2">
+                  <span className="text-xl">📌</span> Procesos del Día
+                </h2>
+                <p className="text-sm text-warm-500 mt-0.5">
+                  {(() => {
+                    const stats = calcularEstadisticasProcesos(procesos);
+                    return (
+                      <span className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2 py-0.5 bg-lavender-100 text-lavender-700 rounded-full text-xs font-medium">
+                          {stats.completados}/{stats.total}
+                        </span>
+                        completados ({stats.porcentajeCompletado}%)
+                      </span>
+                    );
+                  })()}
+                </p>
+              </div>
+              <Link
+                to="/configuracion-horarios"
+                className="p-2.5 text-warm-500 hover:text-lavender-600 hover:bg-lavender-50 rounded-xl transition-all"
+                title="Configurar horarios"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+          <div className="p-5 md:p-6">
+            {(() => {
+              const grupos = agruparProcesosPorEstado(procesos);
+              return (
+                <>
+                  <ProcesoGrupo titulo="Vencidos" procesos={grupos.vencidos} horaActual={horaActual} />
+                  <ProcesoGrupo titulo="Activos" procesos={grupos.activos} horaActual={horaActual} />
+                  <ProcesoGrupo titulo="Próximos" procesos={grupos.proximos} horaActual={horaActual} />
+                  <ProcesoGrupo titulo="Pendientes" procesos={grupos.pendientes} horaActual={horaActual} />
+                  <ProcesoGrupo titulo="Completados" procesos={grupos.completados} horaActual={horaActual} colapsable colapsadoDefault />
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Grid Citas y Contactos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Próximas Citas */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-card border border-warm-100 overflow-hidden">
+          <div className="p-5 md:p-6 border-b border-warm-100 bg-gradient-to-r from-warm-50/50 to-transparent">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-warm-800 font-display flex items-center gap-2">
+                <span className="text-xl">📅</span> Próximas Citas
+              </h2>
+              <Link
+                to="/eventos"
+                className="text-sm text-lavender-600 hover:text-lavender-700 font-semibold flex items-center gap-1 group"
+              >
+                Ver todas
+                <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+          <div className="p-5 md:p-6">
+            {proximasCitas.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-warm-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                  <span className="text-3xl">📅</span>
+                </div>
+                <p className="text-warm-500 mb-4">No hay citas en los próximos 7 días</p>
+                <Link
+                  to="/eventos"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-lavender-500 to-lavender-600 text-white font-semibold rounded-xl shadow-btn-primary hover:shadow-btn-primary-hover transition-all active:scale-[0.98]"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Crear Cita
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {proximasCitas.slice(0, 4).map((cita) => (
+                  <div
+                    key={cita.id}
+                    className="group bg-warm-50/50 border border-warm-100 rounded-xl p-4 hover:border-lavender-200 hover:bg-white transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-2xl shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform">
+                          {getTipoIcono(cita.tipo)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-warm-800 truncate">{cita.titulo}</h4>
+                          <p className="text-sm text-warm-600 flex items-center gap-2 mt-0.5">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                              isToday(cita.fechaInicio)
+                                ? 'bg-error-light text-error-dark'
+                                : isTomorrow(cita.fechaInicio)
+                                ? 'bg-warning-light text-warning-dark'
+                                : 'bg-warm-100 text-warm-600'
+                            }`}>
+                              {getFechaTexto(cita.fechaInicio)}
+                            </span>
+                            <span className="text-warm-400">•</span>
+                            {format(cita.fechaInicio, 'HH:mm')}
+                          </p>
+                          {cita.contactoNombre && (
+                            <p className="text-xs text-warm-500 mt-1 flex items-center gap-1">
+                              <span>👤</span> {cita.contactoNombre}
+                            </p>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Contactos Favoritos */}
-            <div className="bg-white rounded-2xl shadow-soft-md border border-warm-100">
-              <div className="p-4 md:p-6 border-b border-warm-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg md:text-xl font-bold text-warm-800 font-display">⭐ Contactos</h3>
-                  <Link
-                    to="/contactos"
-                    className="text-sm text-lavender-600 hover:text-lavender-700 font-medium"
-                  >
-                    Ver todos →
-                  </Link>
-                </div>
-              </div>
-              <div className="p-4 md:p-6">
-                {contactos.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-warm-500 mb-3">Sin favoritos</p>
-                    <Link
-                      to="/contactos"
-                      className="text-sm text-lavender-600 hover:text-lavender-700 font-medium"
-                    >
-                      Agregar →
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {contactos.map((contacto) => (
-                      <div
-                        key={contacto.id}
-                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-lavender-50 transition-colors"
-                      >
-                        <div className="w-10 h-10 bg-warm-200 rounded-full flex items-center justify-center text-lg flex-shrink-0">
-                          {contacto.foto ? (
-                            <img src={contacto.foto} alt="" className="w-full h-full rounded-full object-cover" />
-                          ) : '👤'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-warm-800 text-sm truncate">{contacto.nombre}</p>
-                          <p className="text-xs text-warm-500 truncate">{contacto.especialidad || contacto.categoria}</p>
-                        </div>
-                        {contacto.telefonoPrincipal && (
-                          <a
-                            href={`tel:${contacto.telefonoPrincipal}`}
-                            className="p-2 bg-lavender-50 hover:bg-lavender-100 text-lavender-600 rounded-full flex-shrink-0"
+                      <div className="flex-shrink-0">
+                        {cita.estado === 'programada' ? (
+                          <button
+                            onClick={() => confirmarCita(cita)}
+                            className="px-3 py-1.5 bg-gradient-to-r from-success to-success-dark text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
                           >
-                            📞
-                          </a>
+                            Confirmar
+                          </button>
+                        ) : (
+                          <span className="px-3 py-1.5 bg-success-light text-success-dark text-xs font-semibold rounded-lg flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Confirmada
+                          </span>
                         )}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Contactos Favoritos */}
+        <div className="bg-white rounded-2xl shadow-card border border-warm-100 overflow-hidden">
+          <div className="p-5 md:p-6 border-b border-warm-100 bg-gradient-to-r from-warm-50/50 to-transparent">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-warm-800 font-display flex items-center gap-2">
+                <span className="text-xl">⭐</span> Contactos
+              </h2>
+              <Link
+                to="/contactos"
+                className="text-sm text-lavender-600 hover:text-lavender-700 font-semibold flex items-center gap-1 group"
+              >
+                Ver todos
+                <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
             </div>
+          </div>
+          <div className="p-5 md:p-6">
+            {contactos.length === 0 ? (
+              <div className="text-center py-6">
+                <div className="w-14 h-14 bg-warm-100 rounded-2xl mx-auto mb-3 flex items-center justify-center">
+                  <span className="text-2xl">👥</span>
+                </div>
+                <p className="text-sm text-warm-500 mb-3">Sin favoritos</p>
+                <Link
+                  to="/contactos"
+                  className="text-sm text-lavender-600 hover:text-lavender-700 font-semibold"
+                >
+                  Agregar favoritos →
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {contactos.map((contacto) => (
+                  <div
+                    key={contacto.id}
+                    className="group flex items-center gap-3 p-3 rounded-xl hover:bg-lavender-50 transition-all"
+                  >
+                    <div className="w-11 h-11 bg-gradient-to-br from-lavender-100 to-lavender-200 rounded-xl flex items-center justify-center text-lg flex-shrink-0 overflow-hidden">
+                      {contacto.foto ? (
+                        <img src={contacto.foto} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lavender-600 font-bold">
+                          {contacto.nombre.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-warm-800 text-sm truncate">{contacto.nombre}</p>
+                      <p className="text-xs text-warm-500 truncate">{contacto.especialidad || contacto.categoria}</p>
+                    </div>
+                    {contacto.telefonoPrincipal && (
+                      <a
+                        href={`tel:${contacto.telefonoPrincipal}`}
+                        className="p-2.5 bg-lavender-100 hover:bg-lavender-200 text-lavender-600 rounded-xl flex-shrink-0 transition-colors group-hover:scale-105"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

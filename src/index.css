@@ -1,6 +1,63 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
 
+/* Tailwind v4 Theme Configuration */
+@theme {
+  /* Paleta Lavanda */
+  --color-lavender-50: #F8F7FC;
+  --color-lavender-100: #EFEDF8;
+  --color-lavender-200: #DCD8F0;
+  --color-lavender-300: #C4BCE6;
+  --color-lavender-400: #A89BD8;
+  --color-lavender-500: #8B7BB8;
+  --color-lavender-600: #7565A3;
+  --color-lavender-700: #5F4F8E;
+  --color-lavender-800: #493B6E;
+  --color-lavender-900: #362A50;
+
+  /* Neutros Cálidos */
+  --color-warm-50: #FAFAF9;
+  --color-warm-100: #F5F4F2;
+  --color-warm-200: #E8E6E3;
+  --color-warm-300: #D4D1CC;
+  --color-warm-400: #A8A29E;
+  --color-warm-500: #78716C;
+  --color-warm-600: #57534E;
+  --color-warm-700: #44403C;
+  --color-warm-800: #292524;
+  --color-warm-900: #1C1917;
+
+  /* Estados */
+  --color-success-light: #ECFDF5;
+  --color-success: #10B981;
+  --color-success-dark: #059669;
+  --color-warning-light: #FFFBEB;
+  --color-warning: #F59E0B;
+  --color-warning-dark: #D97706;
+  --color-error-light: #FEF2F2;
+  --color-error: #EF4444;
+  --color-error-dark: #DC2626;
+  --color-info-light: #EFF6FF;
+  --color-info: #3B82F6;
+  --color-info-dark: #2563EB;
+
+  /* Sombras personalizadas */
+  --shadow-soft-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-soft-md: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-soft-lg: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-soft-xl: 0 12px 32px rgba(0,0,0,0.10);
+  --shadow-card: 0 2px 8px -2px rgba(0,0,0,0.05), 0 4px 16px -4px rgba(0,0,0,0.05);
+  --shadow-card-hover: 0 4px 12px -2px rgba(0,0,0,0.08), 0 8px 24px -4px rgba(0,0,0,0.08);
+  --shadow-card-elevated: 0 4px 16px -4px rgba(139,123,184,0.15);
+  --shadow-btn-primary: 0 4px 14px -3px rgba(139,123,184,0.5);
+  --shadow-btn-primary-hover: 0 6px 20px -3px rgba(139,123,184,0.6);
+  --shadow-btn-danger: 0 4px 14px -3px rgba(239,68,68,0.4);
+
+  /* Fuentes */
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+}
+
 :root {
   /* Tipografía */
   font-family: 'Inter', system-ui, sans-serif;
@@ -8,12 +65,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  /* Colores como variables CSS */
-  --color-lavender-500: #8B7BB8;
-  --color-lavender-600: #7565A3;
-  --color-warm-50: #FAFAF9;
-  --color-warm-100: #F5F4F2;
 }
 
 * {
@@ -34,34 +85,85 @@ h1, h2, h3, h4, h5, h6 {
   color: #292524;
 }
 
-/* Focus ring con color lavanda */
+/* Focus ring premium con color lavanda */
 *:focus-visible {
-  outline: 2px solid #8B7BB8;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(139, 123, 184, 0.3);
 }
 
-/* Scrollbar personalizado */
+/* Transiciones suaves globales para elementos interactivos */
+button, a, input, select, textarea, .transition-interactive {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Cards con transición de elevación */
+.card-interactive {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+}
+
+/* Scrollbar personalizado premium */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
   background: #F5F4F2;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D4D1CC;
-  border-radius: 4px;
+  background: linear-gradient(180deg, #D4D1CC 0%, #A8A29E 100%);
+  border-radius: 8px;
+  border: 2px solid #F5F4F2;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #A8A29E;
+  background: linear-gradient(180deg, #A8A29E 0%, #78716C 100%);
 }
 
-/* Toast Animation */
-@keyframes slide-in {
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #D4D1CC #F5F4F2;
+}
+
+/* Inputs con estado filled */
+input:not(:placeholder-shown),
+textarea:not(:placeholder-shown),
+select:not([value=""]) {
+  background-color: rgba(250, 250, 249, 0.5);
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--color-lavender-200);
+  color: var(--color-lavender-900);
+}
+
+/* Placeholder styling */
+::placeholder {
+  color: var(--color-warm-400);
+  opacity: 1;
+}
+
+/* Animations */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
   from {
     transform: translateX(100%);
     opacity: 0;
@@ -72,21 +174,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-.animate-slide-in {
-  animation: slide-in 0.3s ease-out;
-}
-
-/* Mobile drawer animation */
-@keyframes slide-in-left {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-@keyframes fade-in {
+@keyframes fadeIn {
   from {
     opacity: 0;
   }
@@ -95,15 +183,216 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(139, 123, 184, 0.5);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(139, 123, 184, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(139, 123, 184, 0);
+  }
+}
+
 .animate-slide-in-left {
-  animation: slide-in-left 0.3s ease-out;
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
 }
 
 .animate-fade-in {
-  animation: fade-in 0.2s ease-out;
+  animation: fadeIn 0.2s ease-out;
 }
 
-/* Transiciones suaves globales */
-button, a, input, select, textarea {
-  transition: all 0.2s ease;
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    #F5F4F2 0%,
+    #E8E6E3 50%,
+    #F5F4F2 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-lavender-600) 0%, var(--color-lavender-500) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Custom checkbox appearance */
+input[type="checkbox"].custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-warm-300);
+  border-radius: 6px;
+  background-color: white;
+  cursor: pointer;
+  position: relative;
+  transition: all 200ms ease;
+}
+
+input[type="checkbox"].custom-checkbox:checked {
+  background-color: var(--color-lavender-500);
+  border-color: var(--color-lavender-500);
+}
+
+input[type="checkbox"].custom-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"].custom-checkbox:hover {
+  border-color: var(--color-lavender-400);
+}
+
+input[type="checkbox"].custom-checkbox:focus-visible {
+  box-shadow: 0 0 0 3px rgba(139, 123, 184, 0.3);
+}
+
+/* Custom radio appearance */
+input[type="radio"].custom-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-warm-300);
+  border-radius: 50%;
+  background-color: white;
+  cursor: pointer;
+  position: relative;
+  transition: all 200ms ease;
+}
+
+input[type="radio"].custom-radio:checked {
+  border-color: var(--color-lavender-500);
+}
+
+input[type="radio"].custom-radio:checked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--color-lavender-500);
+}
+
+input[type="radio"].custom-radio:hover {
+  border-color: var(--color-lavender-400);
+}
+
+/* Disable default number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Premium button hover effect */
+.btn-hover-lift {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.btn-hover-lift:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-hover-lift:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Card hover shadow transition */
+.card-hover-shadow {
+  transition: box-shadow 300ms ease, transform 200ms ease;
+}
+
+.card-hover-shadow:hover {
+  box-shadow: 0 4px 12px -2px rgba(0,0,0,0.08), 0 8px 24px -4px rgba(0,0,0,0.08);
+}
+
+/* Smooth page transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease, transform 300ms ease;
 }
