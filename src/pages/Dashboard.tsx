@@ -24,7 +24,6 @@ import ProcesoCard, { ProcesoGrupo } from '../components/dashboard/ProcesoCard';
 import {
   calcularProcesosDelDia,
   agruparProcesosPorEstado,
-  calcularEstadisticasProcesos,
   CONFIG_HORARIOS_DEFAULT,
 } from '../utils/procesosDelDia';
 
@@ -554,20 +553,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-warm-800 font-display flex items-center gap-2">
-                  <span className="text-xl">📌</span> Procesos del Día
+                  <span className="text-xl">⚠️</span> Procesos Vencidos
                 </h2>
                 <p className="text-sm text-warm-500 mt-0.5">
-                  {(() => {
-                    const stats = calcularEstadisticasProcesos(procesos);
-                    return (
-                      <span className="flex items-center gap-2">
-                        <span className="inline-flex items-center px-2 py-0.5 bg-lavender-100 text-lavender-700 rounded-full text-xs font-medium">
-                          {stats.completados}/{stats.total}
-                        </span>
-                        completados ({stats.porcentajeCompletado}%)
-                      </span>
-                    );
-                  })()}
+                  Requieren atención inmediata
                 </p>
               </div>
               <Link
@@ -585,14 +574,19 @@ export default function Dashboard() {
           <div className="p-5 md:p-6">
             {(() => {
               const grupos = agruparProcesosPorEstado(procesos);
+              if (grupos.vencidos.length === 0) {
+                return (
+                  <div className="text-center py-6">
+                    <div className="w-14 h-14 bg-success-light rounded-2xl mx-auto mb-3 flex items-center justify-center">
+                      <span className="text-2xl">✓</span>
+                    </div>
+                    <p className="text-sm text-warm-600 font-medium">Sin procesos vencidos</p>
+                    <p className="text-xs text-warm-400 mt-1">Todo al día</p>
+                  </div>
+                );
+              }
               return (
-                <>
-                  <ProcesoGrupo titulo="Vencidos" procesos={grupos.vencidos} horaActual={horaActual} />
-                  <ProcesoGrupo titulo="Activos" procesos={grupos.activos} horaActual={horaActual} />
-                  <ProcesoGrupo titulo="Próximos" procesos={grupos.proximos} horaActual={horaActual} />
-                  <ProcesoGrupo titulo="Pendientes" procesos={grupos.pendientes} horaActual={horaActual} />
-                  <ProcesoGrupo titulo="Completados" procesos={grupos.completados} horaActual={horaActual} colapsable colapsadoDefault />
-                </>
+                <ProcesoGrupo titulo="Vencidos" procesos={grupos.vencidos} horaActual={horaActual} />
               );
             })()}
           </div>

@@ -63,10 +63,15 @@ export default function SignosVitales() {
         limit(30)
       );
       const querySnapshot = await getDocs(q);
-      const signosData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as SignoVital[];
+      const signosData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          fecha: data.fecha?.toDate() || new Date(),
+          creadoEn: data.creadoEn?.toDate() || new Date()
+        };
+      }) as SignoVital[];
       setHistorial(signosData);
     } catch (error) {
       console.error('Error cargando datos:', error);
