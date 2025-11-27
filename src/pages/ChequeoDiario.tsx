@@ -354,6 +354,15 @@ export default function ChequeoDiarioPage() {
     const doc = new jsPDF();
     let yPos = 20;
 
+    // Helper para convertir Timestamp de Firestore a Date
+    const toDate = (value: any): Date | null => {
+      if (!value) return null;
+      if (value instanceof Date) return value;
+      if (typeof value.toDate === 'function') return value.toDate();
+      if (typeof value === 'string' || typeof value === 'number') return new Date(value);
+      return null;
+    };
+
     // Header
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
@@ -363,14 +372,16 @@ export default function ChequeoDiarioPage() {
     // Fecha y cuidador
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    const fecha = chequeo.fecha instanceof Date
-      ? chequeo.fecha.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    const fechaDate = toDate(chequeo.fecha);
+    const fecha = fechaDate
+      ? fechaDate.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
       : 'Fecha no disponible';
     doc.text(`Fecha: ${fecha}`, 20, yPos);
     yPos += 7;
     doc.text(`Cuidador: ${chequeo.cuidadorNombre || 'No especificado'}`, 20, yPos);
     yPos += 7;
-    doc.text(`Hora de registro: ${chequeo.horaRegistro instanceof Date ? chequeo.horaRegistro.toLocaleTimeString('es-MX') : 'No disponible'}`, 20, yPos);
+    const horaDate = toDate(chequeo.horaRegistro);
+    doc.text(`Hora de registro: ${horaDate ? horaDate.toLocaleTimeString('es-MX') : 'No disponible'}`, 20, yPos);
     yPos += 12;
 
     // Sección 1: Estado General
@@ -379,18 +390,36 @@ export default function ChequeoDiarioPage() {
     doc.text('1. Estado General', 20, yPos);
     yPos += 8;
 
+    // Mapear actitudes a nombres legibles
+    const actitudLabels: Record<string, string> = {
+      positiva: 'Positiva / Adaptativa',
+      negativa: 'Negativa / Pesimista',
+      aislamiento: 'Aislamiento / Apatía',
+      enfado: 'Enfado / Resentimiento',
+      dependencia: 'Dependencia'
+    };
+    const actitudes = chequeo.estadoGeneral?.actitud?.map(a => actitudLabels[a] || a).join(', ') || 'No registrado';
+
+    // Construir info de dolor
+    let dolorInfo = 'Sin dolor';
+    if (chequeo.estadoGeneral?.dolor && chequeo.estadoGeneral.dolor.nivel !== 'sin_dolor') {
+      dolorInfo = `${chequeo.estadoGeneral.dolor.nivel}`;
+      if (chequeo.estadoGeneral.dolor.ubicacion) dolorInfo += ` - ${chequeo.estadoGeneral.dolor.ubicacion}`;
+      if (chequeo.estadoGeneral.dolor.descripcion) dolorInfo += ` (${chequeo.estadoGeneral.dolor.descripcion})`;
+    }
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     autoTable(doc, {
       startY: yPos,
       head: [['Campo', 'Valor']],
       body: [
-        ['Actitud', chequeo.actitud?.join(', ') || 'No registrado'],
-        ['Nivel de Actividad', chequeo.nivelActividad || 'No registrado'],
-        ['Nivel de Cooperación', chequeo.nivelCooperacion || 'No registrado'],
-        ['Estado del Sueño', chequeo.estadoSueno || 'No registrado'],
-        ['Dolor', chequeo.dolor || 'Sin dolor'],
-        ['Notas Generales', chequeo.notasGenerales || 'Ninguna']
+        ['Actitud', actitudes],
+        ['Nivel de Actividad', chequeo.estadoGeneral?.nivelActividad || 'No registrado'],
+        ['Nivel de Cooperación', chequeo.estadoGeneral?.nivelCooperacion || 'No registrado'],
+        ['Estado del Sueño', chequeo.estadoGeneral?.estadoSueno || 'No registrado'],
+        ['Dolor', dolorInfo],
+        ['Notas Generales', chequeo.estadoGeneral?.notasGenerales || 'Ninguna']
       ],
       theme: 'grid',
       headStyles: { fillColor: [66, 139, 202] },
@@ -408,16 +437,21 @@ export default function ChequeoDiarioPage() {
     doc.text('2. Funciones Corporales', 20, yPos);
     yPos += 8;
 
+    // Laxantes
+    const laxantes = chequeo.funcionesCorporales?.laxantesUsados?.map(l => `${l.nombre} (${l.cantidad})`).join(', ') || 'Ninguno';
+
     doc.setFontSize(10);
     autoTable(doc, {
       startY: yPos,
       head: [['Campo', 'Valor']],
       body: [
-        ['Número de micciones', `${chequeo.miccionesNumero || 0}`],
-        ['Características micciones', chequeo.miccionesCaracteristicas || 'Normal'],
-        ['Número de evacuaciones', `${chequeo.evacuacionesNumero || 0}`],
-        ['Consistencia evacuaciones', chequeo.evacuacionConsistencia || 'No registrada'],
-        ['Dificultad para evacuar', chequeo.dificultadEvacuar ? 'Sí' : 'No']
+        ['Número de micciones', `${chequeo.funcionesCorporales?.miccionesNumero ?? 0}`],
+        ['Características micciones', chequeo.funcionesCorporales?.miccionesCaracteristicas || 'Normal'],
+        ['Número de evacuaciones', `${chequeo.funcionesCorporales?.evacuacionesNumero ?? 0}`],
+        ['Consistencia evacuaciones', chequeo.funcionesCorporales?.evacuacionesConsistencia || 'No registrada'],
+        ['Color evacuaciones', chequeo.funcionesCorporales?.evacuacionesColor || 'No registrado'],
+        ['Dificultad para evacuar', chequeo.funcionesCorporales?.dificultadEvacuar ? 'Sí' : 'No'],
+        ['Laxantes utilizados', laxantes]
       ],
       theme: 'grid',
       headStyles: { fillColor: [240, 173, 78] },
@@ -425,47 +459,29 @@ export default function ChequeoDiarioPage() {
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Sección 3: Actividades
+    // Sección 3: Medicación
     if (yPos > 230) {
       doc.addPage();
       yPos = 20;
     }
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('3. Actividades Realizadas', 20, yPos);
+    doc.text('3. Medicación', 20, yPos);
     yPos += 8;
+
+    // Medicamentos adicionales y rechazados
+    const medsAdicionales = chequeo.medicacion?.medicamentosAdicionales?.map(m => `${m.nombre} ${m.dosis} - ${m.motivo} (${m.hora})`).join('; ') || 'Ninguno';
+    const medsRechazados = chequeo.medicacion?.medicamentosRechazados?.map(m => `${m.nombre} - ${m.motivo}`).join('; ') || 'Ninguno';
 
     doc.setFontSize(10);
     autoTable(doc, {
       startY: yPos,
-      head: [['Actividades']],
+      head: [['Campo', 'Valor']],
       body: [
-        [chequeo.actividades?.join(', ') || 'No registradas'],
-        ['Participación: ' + (chequeo.participacionActividades || 'No registrada')]
-      ],
-      theme: 'grid',
-      headStyles: { fillColor: [91, 192, 222] },
-      margin: { left: 20, right: 20 }
-    });
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-
-    // Sección 4: Medicación
-    if (yPos > 230) {
-      doc.addPage();
-      yPos = 20;
-    }
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('4. Medicación', 20, yPos);
-    yPos += 8;
-
-    doc.setFontSize(10);
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Estado']],
-      body: [
-        [chequeo.medicacionAdministrada ? '✓ Medicación administrada en tiempo y forma' : '✗ Medicación NO administrada correctamente'],
-        ['Observaciones: ' + (chequeo.observacionesMedicacion || 'Ninguna')]
+        ['Medicación en tiempo y forma', chequeo.medicacion?.medicacionEnTiempoForma ? '✓ Sí' : '✗ No'],
+        ['Medicamentos adicionales', medsAdicionales],
+        ['Medicamentos rechazados', medsRechazados],
+        ['Observaciones', chequeo.medicacion?.observaciones || 'Ninguna']
       ],
       theme: 'grid',
       headStyles: { fillColor: [217, 83, 79] },
@@ -473,8 +489,43 @@ export default function ChequeoDiarioPage() {
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
+    // Sección 4: Incidentes (si hay)
+    if (chequeo.incidentes && chequeo.incidentes.length > 0) {
+      if (yPos > 200) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('4. Incidentes Reportados', 20, yPos);
+      yPos += 8;
+
+      const incidentesData = chequeo.incidentes.map(inc => [
+        inc.tipo,
+        inc.descripcion,
+        inc.hora,
+        inc.gravedad,
+        inc.accionTomada
+      ]);
+
+      doc.setFontSize(10);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Tipo', 'Descripción', 'Hora', 'Gravedad', 'Acción Tomada']],
+        body: incidentesData,
+        theme: 'grid',
+        headStyles: { fillColor: [192, 57, 43] },
+        margin: { left: 20, right: 20 },
+        columnStyles: {
+          1: { cellWidth: 50 },
+          4: { cellWidth: 40 }
+        }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
     // Sección 5: Resumen
-    if (yPos > 220) {
+    if (yPos > 200) {
       doc.addPage();
       yPos = 20;
     }
@@ -485,18 +536,57 @@ export default function ChequeoDiarioPage() {
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    const resumen = chequeo.resumenGeneral || 'No se proporcionó resumen';
+    const resumen = chequeo.resumen?.resumenGeneral || 'No se proporcionó resumen';
     const splitResumen = doc.splitTextToSize(resumen, 170);
     doc.text(splitResumen, 20, yPos);
     yPos += splitResumen.length * 5 + 8;
 
-    if (chequeo.observacionesImportantes) {
+    if (chequeo.resumen?.observacionesImportantes) {
       doc.setFont('helvetica', 'bold');
       doc.text('Observaciones Importantes:', 20, yPos);
       yPos += 6;
       doc.setFont('helvetica', 'normal');
-      const splitObs = doc.splitTextToSize(chequeo.observacionesImportantes, 170);
+      const splitObs = doc.splitTextToSize(chequeo.resumen.observacionesImportantes, 170);
       doc.text(splitObs, 20, yPos);
+      yPos += splitObs.length * 5 + 8;
+    }
+
+    if (chequeo.resumen?.recomendacionesSiguienteTurno) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Recomendaciones Siguiente Turno:', 20, yPos);
+      yPos += 6;
+      doc.setFont('helvetica', 'normal');
+      const splitRec = doc.splitTextToSize(chequeo.resumen.recomendacionesSiguienteTurno, 170);
+      doc.text(splitRec, 20, yPos);
+      yPos += splitRec.length * 5 + 8;
+    }
+
+    // Sección 6: Consumibles (si hay)
+    if (chequeo.consumiblesUsados && chequeo.consumiblesUsados.length > 0) {
+      if (yPos > 220) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('6. Consumibles Utilizados', 20, yPos);
+      yPos += 8;
+
+      const consumiblesData = chequeo.consumiblesUsados.map(c => [
+        c.itemNombre,
+        `${c.cantidad}`,
+        c.comentario || '-'
+      ]);
+
+      doc.setFontSize(10);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Item', 'Cantidad', 'Comentario']],
+        body: consumiblesData,
+        theme: 'grid',
+        headStyles: { fillColor: [52, 152, 219] },
+        margin: { left: 20, right: 20 }
+      });
     }
 
     // Footer
@@ -510,7 +600,10 @@ export default function ChequeoDiarioPage() {
     }
 
     // Guardar PDF
-    const nombreArchivo = `chequeo-${fecha.replace(/,/g, '').replace(/ /g, '-')}.pdf`;
+    const fechaArchivo = fechaDate
+      ? fechaDate.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
+      : 'sin-fecha';
+    const nombreArchivo = `chequeo-${fechaArchivo}-${chequeo.cuidadorNombre || 'cuidador'}.pdf`;
     doc.save(nombreArchivo);
   }
 
@@ -979,28 +1072,28 @@ export default function ChequeoDiarioPage() {
                   <div>
                     <p className="text-xs text-gray-500 uppercase">Actitud</p>
                     <p className="text-sm font-medium text-gray-900">
-                      {chequeo.actitud?.join(', ') || 'N/A'}
+                      {chequeo.estadoGeneral?.actitud?.join(', ') || '-'}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase">Actividad</p>
                     <p className="text-sm font-medium text-gray-900">
-                      {chequeo.nivelActividad || 'N/A'}
+                      {chequeo.estadoGeneral?.nivelActividad || '-'}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase">Evacuaciones</p>
                     <p className="text-sm font-medium text-gray-900">
-                      {chequeo.evacuacionesNumero || 0}
+                      {chequeo.funcionesCorporales?.evacuacionesNumero || 0}
                     </p>
                   </div>
                 </div>
 
                 {/* Resumen general */}
-                {chequeo.resumenGeneral && (
+                {chequeo.resumen?.resumenGeneral && (
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-sm text-gray-700 line-clamp-2">
-                      {chequeo.resumenGeneral}
+                      {chequeo.resumen.resumenGeneral}
                     </p>
                   </div>
                 )}
@@ -1022,12 +1115,264 @@ export default function ChequeoDiarioPage() {
   function renderDetalleChequeo() {
     if (!chequeoSeleccionado) return null;
 
-    // Reutilizar la vista de lectura pero con el chequeo seleccionado
-    const chequeoTemp = chequeoActual;
-    setChequeoActual(chequeoSeleccionado);
-    const vista = renderVistaLectura();
-    setChequeoActual(chequeoTemp);
-    return vista;
+    // Usar directamente chequeoSeleccionado en lugar de modificar el estado
+    const chequeo = chequeoSeleccionado;
+
+    return (
+      <div className="space-y-6">
+        {/* Header con información del cuidador */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {chequeo.cuidadorNombre}
+              </h2>
+              <p className="text-sm text-gray-600">
+                {(chequeo.horaRegistro && typeof chequeo.horaRegistro.toDate === 'function'
+                  ? chequeo.horaRegistro.toDate()
+                  : new Date(chequeo.horaRegistro)
+                ).toLocaleString('es-MX', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => exportarAPDF(chequeo)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Exportar PDF
+              </button>
+              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                Completado
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 1. Estado General */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">1. Estado General</h3>
+
+          {chequeo.estadoGeneral?.actitud && chequeo.estadoGeneral.actitud.length > 0 && (
+            <div className="mb-3">
+              <span className="text-sm font-medium text-gray-700">Actitud:</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {chequeo.estadoGeneral.actitud.map(actId => {
+                  const actitudConfig: Record<string, { label: string; bg: string }> = {
+                    positiva: { label: 'Positiva / Adaptativa', bg: 'bg-green-100 text-green-800' },
+                    negativa: { label: 'Negativa / Pesimista', bg: 'bg-yellow-100 text-yellow-800' },
+                    aislamiento: { label: 'Aislamiento / Apatía', bg: 'bg-orange-100 text-orange-800' },
+                    enfado: { label: 'Enfado / Resentimiento', bg: 'bg-red-100 text-red-800' },
+                    dependencia: { label: 'Dependencia', bg: 'bg-blue-100 text-blue-900' },
+                  };
+                  const config = actitudConfig[actId] || { label: actId, bg: 'bg-gray-100 text-gray-800' };
+                  return (
+                    <span key={actId} className={`px-3 py-1 rounded-full text-sm font-medium ${config.bg}`}>
+                      {config.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {chequeo.estadoGeneral?.nivelActividad && (
+            <p className="mb-2">
+              <span className="text-sm font-medium text-gray-700">Nivel de actividad:</span>{' '}
+              <span className="text-gray-900">{chequeo.estadoGeneral.nivelActividad}</span>
+            </p>
+          )}
+
+          {chequeo.estadoGeneral?.nivelCooperacion && (
+            <p className="mb-2">
+              <span className="text-sm font-medium text-gray-700">Nivel de cooperación:</span>{' '}
+              <span className="text-gray-900">{chequeo.estadoGeneral.nivelCooperacion}</span>
+            </p>
+          )}
+
+          {chequeo.estadoGeneral?.estadoSueno && (
+            <p className="mb-2">
+              <span className="text-sm font-medium text-gray-700">Estado del sueño:</span>{' '}
+              <span className="text-gray-900">{chequeo.estadoGeneral.estadoSueno}</span>
+            </p>
+          )}
+
+          {chequeo.estadoGeneral?.dolor && chequeo.estadoGeneral.dolor.nivel !== 'sin_dolor' && (
+            <div className="mb-2 p-3 bg-red-50 rounded-lg">
+              <span className="text-sm font-medium text-red-700">Dolor reportado:</span>
+              <p className="text-red-900">
+                Nivel: {chequeo.estadoGeneral.dolor.nivel}
+                {chequeo.estadoGeneral.dolor.ubicacion && ` - ${chequeo.estadoGeneral.dolor.ubicacion}`}
+              </p>
+              {chequeo.estadoGeneral.dolor.descripcion && (
+                <p className="text-sm text-red-800 mt-1">{chequeo.estadoGeneral.dolor.descripcion}</p>
+              )}
+            </div>
+          )}
+
+          {chequeo.estadoGeneral?.notasGenerales && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm font-medium text-gray-700">Notas generales:</span>
+              <p className="text-gray-900 mt-1">{chequeo.estadoGeneral.notasGenerales}</p>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Funciones Corporales */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">2. Funciones Corporales</h3>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <span className="text-sm font-medium text-gray-700">Micciones:</span>{' '}
+              <span className="text-gray-900">{chequeo.funcionesCorporales?.miccionesNumero ?? 0}</span>
+              {chequeo.funcionesCorporales?.miccionesCaracteristicas && (
+                <p className="text-sm text-gray-600">{chequeo.funcionesCorporales.miccionesCaracteristicas}</p>
+              )}
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-700">Evacuaciones:</span>{' '}
+              <span className="text-gray-900">{chequeo.funcionesCorporales?.evacuacionesNumero ?? 0}</span>
+              {chequeo.funcionesCorporales?.evacuacionesConsistencia && (
+                <p className="text-sm text-gray-600">Consistencia: {chequeo.funcionesCorporales.evacuacionesConsistencia}</p>
+              )}
+            </div>
+          </div>
+
+          {chequeo.funcionesCorporales?.dificultadEvacuar && (
+            <p className="text-yellow-700 bg-yellow-50 p-2 rounded mb-2">⚠️ Reportó dificultad para evacuar</p>
+          )}
+
+          {chequeo.funcionesCorporales?.laxantesUsados && chequeo.funcionesCorporales.laxantesUsados.length > 0 && (
+            <div className="mt-2">
+              <span className="text-sm font-medium text-gray-700">Laxantes utilizados:</span>
+              <ul className="list-disc list-inside text-gray-900 mt-1">
+                {chequeo.funcionesCorporales.laxantesUsados.map((lax, i) => (
+                  <li key={i}>{lax.nombre} - {lax.cantidad}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* 3. Medicación */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">3. Medicación</h3>
+
+          <p className="mb-2">
+            <span className="text-sm font-medium text-gray-700">Medicación en tiempo y forma:</span>{' '}
+            <span className={chequeo.medicacion?.medicacionEnTiempoForma ? 'text-green-600' : 'text-red-600'}>
+              {chequeo.medicacion?.medicacionEnTiempoForma ? '✓ Sí' : '✗ No'}
+            </span>
+          </p>
+
+          {chequeo.medicacion?.medicamentosAdicionales && chequeo.medicacion.medicamentosAdicionales.length > 0 && (
+            <div className="mt-3">
+              <span className="text-sm font-medium text-gray-700">Medicamentos adicionales:</span>
+              <ul className="list-disc list-inside text-gray-900 mt-1">
+                {chequeo.medicacion.medicamentosAdicionales.map((med, i) => (
+                  <li key={i}>{med.nombre} - {med.dosis} ({med.motivo}) a las {med.hora}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {chequeo.medicacion?.medicamentosRechazados && chequeo.medicacion.medicamentosRechazados.length > 0 && (
+            <div className="mt-3 p-3 bg-red-50 rounded-lg">
+              <span className="text-sm font-medium text-red-700">Medicamentos rechazados:</span>
+              <ul className="list-disc list-inside text-red-900 mt-1">
+                {chequeo.medicacion.medicamentosRechazados.map((med, i) => (
+                  <li key={i}>{med.nombre} - Motivo: {med.motivo}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {chequeo.medicacion?.observaciones && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm font-medium text-gray-700">Observaciones:</span>
+              <p className="text-gray-900 mt-1">{chequeo.medicacion.observaciones}</p>
+            </div>
+          )}
+        </div>
+
+        {/* 4. Incidentes */}
+        {chequeo.incidentes && chequeo.incidentes.length > 0 && (
+          <div className="bg-white rounded-lg border border-red-200 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-red-900 mb-4">4. Incidentes Reportados</h3>
+            {chequeo.incidentes.map((inc, i) => (
+              <div key={i} className="mb-4 p-4 bg-red-50 rounded-lg last:mb-0">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-medium text-red-900">{inc.tipo}</span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    inc.gravedad === 'grave' ? 'bg-red-200 text-red-800' :
+                    inc.gravedad === 'moderada' ? 'bg-orange-200 text-orange-800' :
+                    'bg-yellow-200 text-yellow-800'
+                  }`}>
+                    {inc.gravedad}
+                  </span>
+                </div>
+                <p className="text-gray-900 mb-1">{inc.descripcion}</p>
+                <p className="text-sm text-gray-600">Hora: {inc.hora}</p>
+                <p className="text-sm text-gray-700 mt-2">
+                  <span className="font-medium">Acción tomada:</span> {inc.accionTomada}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 5. Resumen */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">5. Resumen del Día</h3>
+
+          {chequeo.resumen?.resumenGeneral && (
+            <div className="mb-4">
+              <span className="text-sm font-medium text-gray-700">Resumen general:</span>
+              <p className="text-gray-900 mt-1 whitespace-pre-wrap">{chequeo.resumen.resumenGeneral}</p>
+            </div>
+          )}
+
+          {chequeo.resumen?.observacionesImportantes && (
+            <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
+              <span className="text-sm font-medium text-yellow-700">Observaciones importantes:</span>
+              <p className="text-yellow-900 mt-1">{chequeo.resumen.observacionesImportantes}</p>
+            </div>
+          )}
+
+          {chequeo.resumen?.recomendacionesSiguienteTurno && (
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <span className="text-sm font-medium text-blue-700">Recomendaciones siguiente turno:</span>
+              <p className="text-blue-900 mt-1">{chequeo.resumen.recomendacionesSiguienteTurno}</p>
+            </div>
+          )}
+        </div>
+
+        {/* 6. Consumibles */}
+        {chequeo.consumiblesUsados && chequeo.consumiblesUsados.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">6. Consumibles Utilizados</h3>
+            <ul className="space-y-2">
+              {chequeo.consumiblesUsados.map((cons, i) => (
+                <li key={i} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                  <span className="text-gray-900">{cons.itemNombre}</span>
+                  <span className="text-gray-600">Cantidad: {cons.cantidad}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
   }
 
   // Vista de lectura del chequeo completado
