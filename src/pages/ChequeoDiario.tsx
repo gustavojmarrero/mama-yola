@@ -45,9 +45,9 @@ export default function ChequeoDiarioPage() {
     notasGenerales: '',
 
     // Funciones corporales
-    miccionesNumero: 0,
+    miccionesNumero: '' as string | number,
     miccionesCaracteristicas: '',
-    evacuacionesNumero: 0,
+    evacuacionesNumero: '' as string | number,
     evacuacionesConsistencia: '',
     evacuacionesColor: '',
     dificultadEvacuar: false,
@@ -138,9 +138,9 @@ export default function ChequeoDiarioPage() {
           dolorDescripcion: chequeoData.estadoGeneral?.dolor?.descripcion || '',
           notasGenerales: chequeoData.estadoGeneral?.notasGenerales || '',
 
-          miccionesNumero: chequeoData.funcionesCorporales?.miccionesNumero || 0,
+          miccionesNumero: chequeoData.funcionesCorporales?.miccionesNumero ?? '',
           miccionesCaracteristicas: chequeoData.funcionesCorporales?.miccionesCaracteristicas || '',
-          evacuacionesNumero: chequeoData.funcionesCorporales?.evacuacionesNumero || 0,
+          evacuacionesNumero: chequeoData.funcionesCorporales?.evacuacionesNumero ?? '',
           evacuacionesConsistencia: chequeoData.funcionesCorporales?.evacuacionesConsistencia || '',
           evacuacionesColor: chequeoData.funcionesCorporales?.evacuacionesColor || '',
           dificultadEvacuar: chequeoData.funcionesCorporales?.dificultadEvacuar || false,
@@ -158,7 +158,9 @@ export default function ChequeoDiarioPage() {
 
           resumenGeneral: chequeoData.resumen?.resumenGeneral || '',
           observacionesImportantes: chequeoData.resumen?.observacionesImportantes || '',
-          recomendacionesSiguienteTurno: chequeoData.resumen?.recomendacionesSiguienteTurno || ''
+          recomendacionesSiguienteTurno: chequeoData.resumen?.recomendacionesSiguienteTurno || '',
+
+          consumiblesUsados: chequeoData.consumiblesUsados || []
         });
       }
     } catch (error) {
@@ -1602,8 +1604,10 @@ export default function ChequeoDiarioPage() {
                     <input
                       type="number"
                       value={formData.miccionesNumero}
-                      onChange={(e) => setFormData({ ...formData, miccionesNumero: parseInt(e.target.value) || 0 })}
+                      onChange={(e) => setFormData({ ...formData, miccionesNumero: e.target.value === '' ? '' : parseInt(e.target.value) })}
                       disabled={yaCompletado}
+                      placeholder="0"
+                      min="0"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
                   </div>
@@ -1631,8 +1635,10 @@ export default function ChequeoDiarioPage() {
                     <input
                       type="number"
                       value={formData.evacuacionesNumero}
-                      onChange={(e) => setFormData({ ...formData, evacuacionesNumero: parseInt(e.target.value) || 0 })}
+                      onChange={(e) => setFormData({ ...formData, evacuacionesNumero: e.target.value === '' ? '' : parseInt(e.target.value) })}
                       disabled={yaCompletado}
+                      placeholder="0"
+                      min="0"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
                   </div>
