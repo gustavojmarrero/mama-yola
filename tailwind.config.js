@@ -102,6 +102,8 @@ export default {
         'scale-in': 'scaleIn 0.2s ease-out',
         'pulse-soft': 'pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'shimmer': 'shimmer 2s linear infinite',
+        'slide-out-left': 'slideOutLeft 0.25s ease-out forwards',
+        'slide-out-right': 'slideOutRight 0.25s ease-out forwards',
       },
       keyframes: {
         fadeIn: {
@@ -131,6 +133,14 @@ export default {
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        slideOutLeft: {
+          '0%': { transform: 'translateX(0)', opacity: '1' },
+          '100%': { transform: 'translateX(-100%)', opacity: '0' },
+        },
+        slideOutRight: {
+          '0%': { transform: 'translateX(0)', opacity: '1' },
+          '100%': { transform: 'translateX(100%)', opacity: '0' },
         },
       },
       transitionTimingFunction: {

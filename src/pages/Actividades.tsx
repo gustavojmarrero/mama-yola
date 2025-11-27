@@ -4,6 +4,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
+import { CalendarioActividades } from '../components/actividades';
 import { Actividad, TipoActividad, EstadoActividad, NivelEnergia, ParticipacionActividad, Usuario, PlantillaActividad } from '../types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -617,16 +618,19 @@ export default function Actividades() {
   return (
     <Layout>
       <div className="p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        {/* Header - Responsive */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">🎯 Actividades</h1>
-            <p className="text-gray-600">Programación y seguimiento de actividades del paciente</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Actividades</h1>
+            <p className="text-sm text-gray-600 hidden sm:block">Programación y seguimiento de actividades</p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setVista(vista === 'calendario' ? 'lista' : 'calendario')}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 min-h-[44px]
+                         bg-warm-100 text-warm-700 rounded-lg
+                         hover:bg-warm-200 active:scale-[0.98]
+                         transition-all touch-feedback text-sm sm:text-base"
             >
               {vista === 'calendario' ? '📋 Lista' : '📅 Calendario'}
             </button>
@@ -637,9 +641,13 @@ export default function Actividades() {
                   setFormActividad({ ...formActividad, fechaInicio: format(new Date(), 'yyyy-MM-dd') });
                   setModalAbierto(true);
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 min-h-[44px]
+                           bg-lavender-600 text-white rounded-lg
+                           hover:bg-lavender-700 active:scale-[0.98]
+                           transition-all touch-feedback text-sm sm:text-base
+                           shadow-btn-primary hover:shadow-btn-primary-hover"
               >
-                + Nueva Actividad
+                + Nueva
               </button>
             )}
           </div>
@@ -692,24 +700,27 @@ export default function Actividades() {
           </div>
         </div>
 
-        {/* Estadísticas de la semana */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4 text-center">
-            <div className="text-3xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-sm text-gray-500">Programadas</div>
+        {/* Estadísticas de la semana - Responsive con scroll horizontal en móvil */}
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4
+                        sm:mx-0 sm:px-0 sm:overflow-visible
+                        sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 mb-4 sm:mb-6
+                        scrollbar-hide">
+          <div className="flex-shrink-0 w-[130px] sm:w-auto bg-white rounded-lg shadow p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-blue-600">{stats.total}</div>
+            <div className="text-xs sm:text-sm text-gray-500">Programadas</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 text-center">
-            <div className="text-3xl font-bold text-green-600">{stats.completadas}</div>
-            <div className="text-sm text-gray-500">Completadas</div>
+          <div className="flex-shrink-0 w-[130px] sm:w-auto bg-white rounded-lg shadow p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-green-600">{stats.completadas}</div>
+            <div className="text-xs sm:text-sm text-gray-500">Completadas</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 text-center">
-            <div className="text-3xl font-bold text-purple-600">
+          <div className="flex-shrink-0 w-[130px] sm:w-auto bg-white rounded-lg shadow p-3 sm:p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-purple-600">
               {stats.total > 0 ? Math.round((stats.completadas / stats.total) * 100) : 0}%
             </div>
-            <div className="text-sm text-gray-500">Cumplimiento</div>
+            <div className="text-xs sm:text-sm text-gray-500">Cumplimiento</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500 mb-1">Por tipo:</div>
+          <div className="flex-shrink-0 w-[130px] sm:w-auto bg-white rounded-lg shadow p-3 sm:p-4">
+            <div className="text-xs sm:text-sm text-gray-500 mb-1">Por tipo:</div>
             <div className="flex flex-wrap gap-1">
               {Object.entries(stats.porTipo).map(([tipo, count]) => (
                 <span key={tipo} className={`text-xs px-2 py-0.5 rounded ${coloresTipo[tipo as TipoActividad]}`}>
@@ -720,96 +731,55 @@ export default function Actividades() {
           </div>
         </div>
 
-        {/* Navegación de semana */}
-        <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow">
-          <button
-            onClick={() => setSemanaActual(subWeeks(semanaActual, 1))}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            ← Anterior
-          </button>
-          <div className="text-center">
-            <h2 className="font-semibold">
-              {format(inicioSemana, "d 'de' MMMM", { locale: es })} - {format(finSemana, "d 'de' MMMM yyyy", { locale: es })}
-            </h2>
+        {/* Navegación de semana - Solo visible en vista lista */}
+        {vista === 'lista' && (
+          <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow">
             <button
-              onClick={() => setSemanaActual(new Date())}
-              className="text-sm text-blue-600 hover:underline"
+              onClick={() => setSemanaActual(subWeeks(semanaActual, 1))}
+              className="p-2 hover:bg-gray-100 rounded-lg"
             >
-              Ir a hoy
+              ← Anterior
+            </button>
+            <div className="text-center">
+              <h2 className="font-semibold text-sm sm:text-base">
+                <span className="sm:hidden">
+                  {format(inicioSemana, "d", { locale: es })}-{format(finSemana, "d MMM", { locale: es })}
+                </span>
+                <span className="hidden sm:inline">
+                  {format(inicioSemana, "d 'de' MMMM", { locale: es })} - {format(finSemana, "d 'de' MMMM yyyy", { locale: es })}
+                </span>
+              </h2>
+              <button
+                onClick={() => setSemanaActual(new Date())}
+                className="text-sm text-lavender-600 hover:underline"
+              >
+                Ir a hoy
+              </button>
+            </div>
+            <button
+              onClick={() => setSemanaActual(addWeeks(semanaActual, 1))}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              Siguiente →
             </button>
           </div>
-          <button
-            onClick={() => setSemanaActual(addWeeks(semanaActual, 1))}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-          >
-            Siguiente →
-          </button>
-        </div>
+        )}
 
         {vista === 'calendario' ? (
-          /* Vista Calendario */
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="grid grid-cols-7 border-b">
-              {diasSemana.map((dia, idx) => {
-                const esHoy = isSameDay(dia, new Date());
-                return (
-                  <div
-                    key={idx}
-                    className={`p-3 text-center border-r last:border-r-0 ${esHoy ? 'bg-blue-50' : ''}`}
-                  >
-                    <div className="text-sm text-gray-500">{format(dia, 'EEE', { locale: es })}</div>
-                    <div className={`text-lg font-semibold ${esHoy ? 'text-blue-600' : ''}`}>
-                      {format(dia, 'd')}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="grid grid-cols-7 min-h-[400px]">
-              {diasSemana.map((dia, idx) => {
-                const actsDia = actividadesDelDia(dia);
-                const esHoy = isSameDay(dia, new Date());
-
-                return (
-                  <div key={idx} className={`border-r last:border-r-0 p-2 ${esHoy ? 'bg-blue-50/30' : ''}`}>
-                    {actsDia.map(act => (
-                      <div
-                        key={act.id}
-                        onClick={() => abrirEditar(act)}
-                        className={`mb-2 p-2 rounded border-l-4 cursor-pointer hover:shadow-md transition-shadow text-sm ${coloresTipo[act.tipo]}`}
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>{tiposActividad.find(t => t.value === act.tipo)?.icon}</span>
-                          <span className="font-medium truncate">{act.nombre}</span>
-                        </div>
-                        <div className="text-xs opacity-75">
-                          {act.fechaInicio && format(act.fechaInicio, 'HH:mm')} ({act.duracion}min)
-                        </div>
-                        <span className={`inline-block mt-1 text-xs px-1.5 py-0.5 rounded ${coloresEstado[act.estado]}`}>
-                          {act.estado}
-                        </span>
-                      </div>
-                    ))}
-
-                    {(userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor') && (
-                      <button
-                        onClick={() => {
-                          setFechaSeleccionada(dia);
-                          setFormActividad({ ...formActividad, fechaInicio: format(dia, 'yyyy-MM-dd') });
-                          setModalAbierto(true);
-                        }}
-                        className="w-full p-2 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded border border-dashed border-gray-300"
-                      >
-                        + Agregar
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          /* Vista Calendario - Componente Adaptativo */
+          <CalendarioActividades
+            actividades={actividades}
+            onActividadClick={abrirEditar}
+            onAgregarClick={(fecha) => {
+              setFechaSeleccionada(fecha);
+              setFormActividad({ ...formActividad, fechaInicio: format(fecha, 'yyyy-MM-dd') });
+              setModalAbierto(true);
+            }}
+            puedeAgregar={userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor'}
+            coloresTipo={coloresTipo}
+            coloresEstado={coloresEstado}
+            tiposActividad={tiposActividad}
+          />
         ) : (
           /* Vista Lista */
           <div className="bg-white rounded-lg shadow">
@@ -894,13 +864,29 @@ export default function Actividades() {
           ))}
         </div>
 
-        {/* Modal Crear/Editar Actividad */}
+        {/* Modal Crear/Editar Actividad - Bottom Sheet en móvil */}
         {modalAbierto && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white rounded-lg max-w-2xl w-full p-6 my-8">
-              <h2 className="text-xl font-bold mb-4">
-                {modoEdicion ? '✏️ Editar Actividad' : '🎯 Nueva Actividad'}
-              </h2>
+          <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+            <div className="bg-white w-full sm:max-w-2xl sm:mx-4
+                            rounded-t-2xl sm:rounded-lg
+                            max-h-[92vh] sm:max-h-[85vh]
+                            overflow-hidden flex flex-col
+                            animate-slide-up-modal sm:animate-scale-in">
+
+              {/* Handle de drag - solo mobile */}
+              <div className="sm:hidden flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+              </div>
+
+              {/* Header sticky */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0">
+                <h2 className="text-lg sm:text-xl font-bold text-warm-800">
+                  {modoEdicion ? 'Editar Actividad' : 'Nueva Actividad'}
+                </h2>
+              </div>
+
+              {/* Contenido scrolleable */}
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
 
               {/* Botón para ver plantillas */}
               {!modoEdicion && (
@@ -915,14 +901,15 @@ export default function Actividades() {
               )}
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                {/* Nombre y Tipo - Stack en mobile, grid en desktop */}
+                <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
                     <input
                       type="text"
                       value={formActividad.nombre}
                       onChange={(e) => setFormActividad({ ...formActividad, nombre: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2"
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
                       placeholder="Nombre de la actividad"
                     />
                   </div>
@@ -931,7 +918,7 @@ export default function Actividades() {
                     <select
                       value={formActividad.tipo}
                       onChange={(e) => setFormActividad({ ...formActividad, tipo: e.target.value as TipoActividad })}
-                      className="w-full border rounded-lg px-3 py-2"
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
                     >
                       {tiposActividad.map(t => (
                         <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
@@ -940,14 +927,15 @@ export default function Actividades() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                {/* Fecha, Hora, Duración - Stack en mobile, grid en desktop */}
+                <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
                     <input
                       type="date"
                       value={formActividad.fechaInicio}
                       onChange={(e) => setFormActividad({ ...formActividad, fechaInicio: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2"
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
                     />
                   </div>
                   <div>
@@ -956,7 +944,7 @@ export default function Actividades() {
                       type="time"
                       value={formActividad.horaInicio}
                       onChange={(e) => setFormActividad({ ...formActividad, horaInicio: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2"
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
                     />
                   </div>
                   <div>
@@ -965,14 +953,15 @@ export default function Actividades() {
                       type="number"
                       value={formActividad.duracion}
                       onChange={(e) => setFormActividad({ ...formActividad, duracion: parseInt(e.target.value) || 30 })}
-                      className="w-full border rounded-lg px-3 py-2"
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
                       min="5"
                       step="5"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Ubicación y Responsable - Stack en mobile, grid en desktop */}
+                <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
                     <input
@@ -1059,197 +1048,250 @@ export default function Actividades() {
                   </div>
                 </div>
               </div>
-
-              <div className="flex justify-between items-center mt-6">
-                {modoEdicion && actividadSeleccionada && (
-                  <button
-                    onClick={() => {
-                      eliminarActividad(actividadSeleccionada);
-                      cerrarModal();
-                    }}
-                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                  >
-                    🗑️ Eliminar
-                  </button>
-                )}
-                {/* Indicador de cambios sin guardar */}
-                {isDirty && !modoEdicion && (
-                  <span className="text-sm text-orange-600 flex items-center gap-1">
-                    <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
-                    Sin guardar
-                  </span>
-                )}
-                <div className="flex gap-3 ml-auto">
-                  <button
-                    onClick={() => confirmNavigation(cerrarModal)}
-                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={guardarActividad}
-                    disabled={!formActividad.nombre || !formActividad.fechaInicio}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {modoEdicion ? 'Guardar Cambios' : 'Crear Actividad'}
-                  </button>
-                </div>
               </div>
-            </div>
-          </div>
-        )}
+              {/* Fin contenido scrolleable */}
 
-        {/* Modal Completar Actividad */}
-        {modalCompletar && actividadSeleccionada && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h2 className="text-xl font-bold mb-4">✓ Completar Actividad</h2>
-
-              <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                <p className="font-medium">{actividadSeleccionada.nombre}</p>
-                <p className="text-sm text-gray-600">
-                  {actividadSeleccionada.fechaInicio && format(actividadSeleccionada.fechaInicio, "HH:mm")} - {actividadSeleccionada.duracion}min
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nivel de participación
-                  </label>
-                  <select
-                    value={formCompletar.participacion}
-                    onChange={(e) => setFormCompletar({ ...formCompletar, participacion: e.target.value as ParticipacionActividad })}
-                    className="w-full border rounded-lg px-3 py-2"
-                  >
-                    <option value="activa">😊 Activa - Participó con entusiasmo</option>
-                    <option value="pasiva">😐 Pasiva - Participó con ayuda</option>
-                    <option value="minima">😔 Mínima - Poca participación</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estado de ánimo
-                  </label>
-                  <div className="flex gap-2">
-                    {['😊 Alegre', '😐 Neutral', '😔 Triste', '😴 Cansada', '😤 Irritada'].map(animo => (
+              {/* Footer sticky con safe-area */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t bg-white flex-shrink-0 safe-bottom-modal">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {modoEdicion && actividadSeleccionada && (
                       <button
-                        key={animo}
-                        type="button"
-                        onClick={() => setFormCompletar({ ...formCompletar, estadoAnimo: animo })}
-                        className={`px-3 py-2 rounded-lg text-sm ${
-                          formCompletar.estadoAnimo === animo
-                            ? 'bg-blue-100 border-blue-500 border-2'
-                            : 'bg-gray-100 hover:bg-gray-200'
-                        }`}
+                        onClick={() => {
+                          eliminarActividad(actividadSeleccionada);
+                          cerrarModal();
+                        }}
+                        className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] touch-feedback"
                       >
-                        {animo}
+                        Eliminar
                       </button>
-                    ))}
+                    )}
+                    {/* Indicador de cambios sin guardar */}
+                    {isDirty && !modoEdicion && (
+                      <span className="text-sm text-orange-600 flex items-center gap-1">
+                        <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
+                        Sin guardar
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2 sm:gap-3">
+                    <button
+                      onClick={() => confirmNavigation(cerrarModal)}
+                      className="flex-1 sm:flex-none px-4 py-3 sm:py-2 min-h-[44px]
+                                 text-gray-600 hover:bg-gray-100 rounded-lg touch-feedback"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={guardarActividad}
+                      disabled={!formActividad.nombre || !formActividad.fechaInicio}
+                      className="flex-1 sm:flex-none px-4 py-3 sm:py-2 min-h-[44px]
+                                 bg-lavender-600 text-white rounded-lg
+                                 hover:bg-lavender-700 disabled:opacity-50
+                                 touch-feedback shadow-btn-primary"
+                    >
+                      {modoEdicion ? 'Guardar' : 'Crear'}
+                    </button>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notas adicionales
-                  </label>
-                  <textarea
-                    value={formCompletar.notas}
-                    onChange={(e) => setFormCompletar({ ...formCompletar, notas: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
-                    rows={2}
-                    placeholder="Observaciones sobre la actividad..."
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    const motivo = prompt('Motivo de cancelación:');
-                    if (motivo) {
-                      cancelarActividad(actividadSeleccionada, motivo);
-                      setModalCompletar(false);
-                      setActividadSeleccionada(null);
-                    }
-                  }}
-                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                >
-                  Cancelar Actividad
-                </button>
-                <button
-                  onClick={() => {
-                    setModalCompletar(false);
-                    setActividadSeleccionada(null);
-                    setFormCompletar({ participacion: 'activa', estadoAnimo: '', notas: '' });
-                  }}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cerrar
-                </button>
-                <button
-                  onClick={completarActividad}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  ✓ Marcar Completada
-                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal de Selección de Plantillas */}
-        {modalPlantillas && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white rounded-lg max-w-4xl w-full p-6 my-8 max-h-[90vh] flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">📋 Plantillas de Actividades</h2>
-                <button
-                  onClick={() => setModalPlantillas(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
-                >
-                  ×
-                </button>
+        {/* Modal Completar Actividad - Bottom Sheet en móvil */}
+        {modalCompletar && actividadSeleccionada && (
+          <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+            <div className="bg-white w-full sm:max-w-md sm:mx-4
+                            rounded-t-2xl sm:rounded-lg
+                            max-h-[92vh] sm:max-h-[85vh]
+                            overflow-hidden flex flex-col
+                            animate-slide-up-modal sm:animate-scale-in">
+
+              {/* Handle de drag - solo mobile */}
+              <div className="sm:hidden flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
               </div>
 
-              {/* Filtros */}
-              <div className="flex flex-wrap gap-3 mb-4">
-                <input
-                  type="text"
-                  value={busquedaPlantilla}
-                  onChange={(e) => setBusquedaPlantilla(e.target.value)}
-                  placeholder="Buscar plantillas..."
-                  className="flex-1 min-w-[200px] border rounded-lg px-3 py-2"
-                />
-                <select
-                  value={filtroTipoPlantilla}
-                  onChange={(e) => setFiltroTipoPlantilla(e.target.value as TipoActividad | 'todas')}
-                  className="border rounded-lg px-3 py-2"
-                >
-                  <option value="todas">Todos los tipos</option>
-                  {tiposActividad.map(t => (
-                    <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setMostrarSoloFavoritas(!mostrarSoloFavoritas)}
-                  className={`px-4 py-2 rounded-lg ${
-                    mostrarSoloFavoritas ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  ⭐ Favoritas
-                </button>
-                <button
-                  onClick={() => abrirModalPlantilla()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  + Nueva Plantilla
-                </button>
+              {/* Header sticky */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0">
+                <h2 className="text-lg sm:text-xl font-bold text-warm-800">Completar Actividad</h2>
+              </div>
+
+              {/* Contenido scrolleable */}
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+                <div className="bg-lavender-50 p-3 rounded-lg mb-4">
+                  <p className="font-medium text-warm-800">{actividadSeleccionada.nombre}</p>
+                  <p className="text-sm text-warm-600">
+                    {actividadSeleccionada.fechaInicio && format(actividadSeleccionada.fechaInicio, "HH:mm")} - {actividadSeleccionada.duracion}min
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nivel de participación
+                    </label>
+                    <select
+                      value={formCompletar.participacion}
+                      onChange={(e) => setFormCompletar({ ...formCompletar, participacion: e.target.value as ParticipacionActividad })}
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
+                    >
+                      <option value="activa">Activa - Participó con entusiasmo</option>
+                      <option value="pasiva">Pasiva - Participó con ayuda</option>
+                      <option value="minima">Mínima - Poca participación</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Estado de ánimo
+                    </label>
+                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                      {['Alegre', 'Neutral', 'Triste', 'Cansada', 'Irritada'].map(animo => (
+                        <button
+                          key={animo}
+                          type="button"
+                          onClick={() => setFormCompletar({ ...formCompletar, estadoAnimo: animo })}
+                          className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-lg text-sm
+                                      active:scale-95 transition-transform touch-feedback ${
+                            formCompletar.estadoAnimo === animo
+                              ? 'bg-lavender-100 border-lavender-500 border-2 text-lavender-700'
+                              : 'bg-gray-100 hover:bg-gray-200'
+                          }`}
+                        >
+                          {animo}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notas adicionales
+                    </label>
+                    <textarea
+                      value={formCompletar.notas}
+                      onChange={(e) => setFormCompletar({ ...formCompletar, notas: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
+                      rows={2}
+                      placeholder="Observaciones sobre la actividad..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer sticky con safe-area */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t bg-white flex-shrink-0 safe-bottom-modal">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+                  <button
+                    onClick={() => {
+                      const motivo = prompt('Motivo de cancelación:');
+                      if (motivo) {
+                        cancelarActividad(actividadSeleccionada, motivo);
+                        setModalCompletar(false);
+                        setActividadSeleccionada(null);
+                      }
+                    }}
+                    className="px-4 py-3 sm:py-2 min-h-[44px] text-red-600 hover:bg-red-50 rounded-lg touch-feedback"
+                  >
+                    Cancelar Actividad
+                  </button>
+                  <button
+                    onClick={() => {
+                      setModalCompletar(false);
+                      setActividadSeleccionada(null);
+                      setFormCompletar({ participacion: 'activa', estadoAnimo: '', notas: '' });
+                    }}
+                    className="px-4 py-3 sm:py-2 min-h-[44px] text-gray-600 hover:bg-gray-100 rounded-lg touch-feedback"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    onClick={completarActividad}
+                    className="px-4 py-3 sm:py-2 min-h-[44px] bg-green-600 text-white rounded-lg
+                               hover:bg-green-700 touch-feedback shadow-sm"
+                  >
+                    Marcar Completada
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Selección de Plantillas - Bottom Sheet en móvil */}
+        {modalPlantillas && (
+          <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+            <div className="bg-white w-full sm:max-w-4xl sm:mx-4
+                            rounded-t-2xl sm:rounded-lg
+                            max-h-[95vh] sm:max-h-[90vh]
+                            overflow-hidden flex flex-col
+                            animate-slide-up-modal sm:animate-scale-in">
+
+              {/* Handle de drag - solo mobile */}
+              <div className="sm:hidden flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+              </div>
+
+              {/* Header sticky */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg sm:text-xl font-bold text-warm-800">Plantillas</h2>
+                  <button
+                    onClick={() => setModalPlantillas(false)}
+                    className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center
+                               text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                  >
+                    <span className="text-2xl">×</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filtros - Responsive */}
+              <div className="px-4 sm:px-6 py-3 border-b flex-shrink-0">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <input
+                    type="text"
+                    value={busquedaPlantilla}
+                    onChange={(e) => setBusquedaPlantilla(e.target.value)}
+                    placeholder="Buscar plantillas..."
+                    className="w-full sm:flex-1 sm:min-w-[200px] border rounded-lg px-3 py-3 sm:py-2 text-base"
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={filtroTipoPlantilla}
+                      onChange={(e) => setFiltroTipoPlantilla(e.target.value as TipoActividad | 'todas')}
+                      className="flex-1 sm:flex-none border rounded-lg px-3 py-3 sm:py-2 text-base"
+                    >
+                      <option value="todas">Todos</option>
+                      {tiposActividad.map(t => (
+                        <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setMostrarSoloFavoritas(!mostrarSoloFavoritas)}
+                      className={`p-3 sm:px-4 sm:py-2 min-h-[44px] rounded-lg touch-feedback ${
+                        mostrarSoloFavoritas ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      <span className="sm:hidden">⭐</span>
+                      <span className="hidden sm:inline">⭐ Favoritas</span>
+                    </button>
+                    <button
+                      onClick={() => abrirModalPlantilla()}
+                      className="p-3 sm:px-4 sm:py-2 min-h-[44px] bg-lavender-600 text-white rounded-lg
+                                 hover:bg-lavender-700 touch-feedback"
+                    >
+                      <span className="sm:hidden">+</span>
+                      <span className="hidden sm:inline">+ Nueva</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Grid de plantillas */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
                 {plantillasFiltradas.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <p className="text-4xl mb-2">📋</p>
@@ -1259,7 +1301,7 @@ export default function Actividades() {
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {plantillasFiltradas.map(plantilla => (
                       <div
                         key={plantilla.id}
@@ -1366,40 +1408,57 @@ export default function Actividades() {
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                <p className="text-sm text-gray-500">
-                  {plantillasFiltradas.length} de {plantillas.length} plantillas
-                </p>
-                <button
-                  onClick={() => setModalPlantillas(false)}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cerrar
-                </button>
+              {/* Footer sticky con safe-area */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t bg-white flex-shrink-0 safe-bottom-modal">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    {plantillasFiltradas.length} de {plantillas.length}
+                  </p>
+                  <button
+                    onClick={() => setModalPlantillas(false)}
+                    className="px-4 py-3 sm:py-2 min-h-[44px] text-gray-600 hover:bg-gray-100 rounded-lg touch-feedback"
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal CRUD de Plantilla */}
+        {/* Modal CRUD de Plantilla - Bottom Sheet en móvil */}
         {modalPlantillaCRUD && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 overflow-y-auto">
-            <div className="bg-white rounded-lg max-w-2xl w-full p-6 my-8">
-              <h2 className="text-xl font-bold mb-4">
-                {plantillaEditando ? '✏️ Editar Plantilla' : '📋 Nueva Plantilla'}
-              </h2>
+          <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[60]">
+            <div className="bg-white w-full sm:max-w-2xl sm:mx-4
+                            rounded-t-2xl sm:rounded-lg
+                            max-h-[95vh] sm:max-h-[90vh]
+                            overflow-hidden flex flex-col
+                            animate-slide-up-modal sm:animate-scale-in">
 
+              {/* Handle de drag - solo mobile */}
+              <div className="sm:hidden flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+              </div>
+
+              {/* Header sticky */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0">
+                <h2 className="text-lg sm:text-xl font-bold text-warm-800">
+                  {plantillaEditando ? 'Editar Plantilla' : 'Nueva Plantilla'}
+                </h2>
+              </div>
+
+              {/* Contenido scrolleable */}
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
               <div className="space-y-4">
-                {/* Info básica */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Info básica - responsive */}
+                <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
                     <input
                       type="text"
                       value={formPlantilla.nombre}
                       onChange={(e) => setFormPlantilla({ ...formPlantilla, nombre: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2"
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
                       placeholder="Nombre de la plantilla"
                     />
                   </div>
@@ -1408,7 +1467,7 @@ export default function Actividades() {
                     <select
                       value={formPlantilla.tipo}
                       onChange={(e) => setFormPlantilla({ ...formPlantilla, tipo: e.target.value as TipoActividad })}
-                      className="w-full border rounded-lg px-3 py-2"
+                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
                     >
                       {tiposActividad.map(t => (
                         <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
@@ -1417,7 +1476,8 @@ export default function Actividades() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                {/* Duración, Ubicación, Energía - responsive */}
+                <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Duración (min) *</label>
                     <input
@@ -1665,8 +1725,11 @@ export default function Actividades() {
                   </label>
                 </div>
               </div>
+              </div>
+              {/* Fin contenido scrolleable */}
 
-              <div className="flex justify-between items-center mt-6">
+              {/* Footer */}
+              <div className="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 border-t bg-white flex-shrink-0 safe-bottom-modal">
                 {/* Indicador de cambios sin guardar */}
                 {isDirty && (
                   <span className="text-sm text-orange-600 flex items-center gap-1">

@@ -396,3 +396,123 @@ input[type="number"] {
   transform: translateY(0);
   transition: opacity 300ms ease, transform 300ms ease;
 }
+
+/* ========== MOBILE RESPONSIVE UTILITIES ========== */
+
+/* Ocultar scrollbar pero mantener funcionalidad */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scroll snap para navegación táctil */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-center {
+  scroll-snap-align: center;
+}
+
+.snap-start {
+  scroll-snap-align: start;
+}
+
+/* Touch feedback mejorado */
+.touch-feedback {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Safe area para notch/home indicator iOS */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+.safe-bottom-modal {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* ========== BOTTOM SHEET ANIMATIONS ========== */
+
+@keyframes slideUpModal {
+  from {
+    transform: translateY(100%);
+    opacity: 0.8;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDownModal {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0.8;
+  }
+}
+
+.animate-slide-up-modal {
+  animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-down-modal {
+  animation: slideDownModal 0.25s ease-in forwards;
+}
+
+/* ========== CALENDARIO SWIPE ANIMATIONS ========== */
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-slide-out-left {
+  animation: slideOutLeft 0.25s ease-out forwards;
+}
+
+.animate-slide-out-right {
+  animation: slideOutRight 0.25s ease-out forwards;
+}
+
+/* ========== IOS INPUT ZOOM PREVENTION ========== */
+
+@media (max-width: 640px) {
+  input[type="date"],
+  input[type="time"],
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
