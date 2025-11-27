@@ -367,9 +367,9 @@ export default function MenuComida() {
 
     const nuevoPlatillo: PlatilloAsignado = {
       componenteId,
-      recetaId: receta?.id,
-      recetaNombre: receta?.nombre,
-      nombreCustom: nombreCustom || undefined,
+      ...(receta?.id && { recetaId: receta.id }),
+      ...(receta?.nombre && { recetaNombre: receta.nombre }),
+      ...(nombreCustom && { nombreCustom }),
     };
 
     try {
