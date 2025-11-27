@@ -38,7 +38,7 @@ const ICONOS_PROCESO: Record<TipoProceso, string> = {
 // ===== ENLACES POR TIPO DE PROCESO =====
 
 const ENLACES_PROCESO: Record<TipoProceso, string> = {
-  medicamento: '/medicamentos',
+  medicamento: '/pastillero-diario',
   chequeo: '/chequeo-diario',
   signosVitales: '/signos-vitales',
   comida: '/menu-comida',
