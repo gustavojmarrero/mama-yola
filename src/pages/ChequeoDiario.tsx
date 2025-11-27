@@ -731,7 +731,11 @@ export default function ChequeoDiarioPage() {
       return;
     }
 
-    if (!confirm('¿Estás seguro de completar el chequeo? No podrás modificarlo después.')) {
+    const mensajeConfirmacion = yaCompletado
+      ? '¿Estás seguro de actualizar el chequeo?'
+      : '¿Estás seguro de completar el chequeo?';
+
+    if (!confirm(mensajeConfirmacion)) {
       return;
     }
 
@@ -1368,8 +1372,6 @@ export default function ChequeoDiarioPage() {
             renderHistorial()
           ) : vistaActual === 'detalle' ? (
             renderDetalleChequeo()
-          ) : yaCompletado ? (
-            renderVistaLectura()
           ) : (
             <div className="space-y-6">
               {/* Sección 1: Estado General */}
@@ -1431,13 +1433,12 @@ export default function ChequeoDiarioPage() {
                       <div key={opcion.id} className="relative group">
                         <button
                           type="button"
-                          disabled={yaCompletado}
                           onClick={() => toggleActitud(opcion.id)}
                           className={`px-4 py-2 rounded-lg border-2 transition-all font-medium ${
                             formData.actitud.includes(opcion.id)
                               ? `${opcion.bgSelected} text-white border-transparent shadow-md`
                               : opcion.bgUnselected
-                          } ${yaCompletado ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          }`}
                         >
                           {opcion.label}
                         </button>
@@ -1480,7 +1481,6 @@ export default function ChequeoDiarioPage() {
                   <select
                     value={formData.nivelActividad}
                     onChange={(e) => setFormData({ ...formData, nivelActividad: e.target.value })}
-                    disabled={yaCompletado}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   >
                     <option value="">Seleccionar...</option>
@@ -1499,7 +1499,6 @@ export default function ChequeoDiarioPage() {
                   <select
                     value={formData.nivelCooperacion}
                     onChange={(e) => setFormData({ ...formData, nivelCooperacion: e.target.value })}
-                    disabled={yaCompletado}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   >
                     <option value="">Seleccionar...</option>
@@ -1518,7 +1517,6 @@ export default function ChequeoDiarioPage() {
                   <select
                     value={formData.estadoSueno}
                     onChange={(e) => setFormData({ ...formData, estadoSueno: e.target.value })}
-                    disabled={yaCompletado}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   >
                     <option value="">Seleccionar...</option>
@@ -1539,8 +1537,7 @@ export default function ChequeoDiarioPage() {
                       <select
                         value={formData.dolorNivel}
                         onChange={(e) => setFormData({ ...formData, dolorNivel: e.target.value as any })}
-                        disabled={yaCompletado}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       >
                         <option value="sin_dolor">Sin dolor</option>
                         <option value="leve">Leve</option>
@@ -1554,14 +1551,12 @@ export default function ChequeoDiarioPage() {
                           type="text"
                           value={formData.dolorUbicacion}
                           onChange={(e) => setFormData({ ...formData, dolorUbicacion: e.target.value })}
-                          disabled={yaCompletado}
                           placeholder="Ubicación del dolor"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                         />
                         <textarea
                           value={formData.dolorDescripcion}
                           onChange={(e) => setFormData({ ...formData, dolorDescripcion: e.target.value })}
-                          disabled={yaCompletado}
                           placeholder="Descripción del dolor"
                           rows={2}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
@@ -1579,7 +1574,6 @@ export default function ChequeoDiarioPage() {
                   <textarea
                     value={formData.notasGenerales}
                     onChange={(e) => setFormData({ ...formData, notasGenerales: e.target.value })}
-                    disabled={yaCompletado}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     placeholder="Observaciones generales sobre el estado del paciente..."
@@ -1605,8 +1599,7 @@ export default function ChequeoDiarioPage() {
                       type="number"
                       value={formData.miccionesNumero}
                       onChange={(e) => setFormData({ ...formData, miccionesNumero: e.target.value === '' ? '' : parseInt(e.target.value) })}
-                      disabled={yaCompletado}
-                      placeholder="0"
+                        placeholder="0"
                       min="0"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
@@ -1619,8 +1612,7 @@ export default function ChequeoDiarioPage() {
                       type="text"
                       value={formData.miccionesCaracteristicas}
                       onChange={(e) => setFormData({ ...formData, miccionesCaracteristicas: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Color, olor, etc."
+                        placeholder="Color, olor, etc."
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
                   </div>
@@ -1636,8 +1628,7 @@ export default function ChequeoDiarioPage() {
                       type="number"
                       value={formData.evacuacionesNumero}
                       onChange={(e) => setFormData({ ...formData, evacuacionesNumero: e.target.value === '' ? '' : parseInt(e.target.value) })}
-                      disabled={yaCompletado}
-                      placeholder="0"
+                        placeholder="0"
                       min="0"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
@@ -1649,8 +1640,7 @@ export default function ChequeoDiarioPage() {
                     <select
                       value={formData.evacuacionesConsistencia}
                       onChange={(e) => setFormData({ ...formData, evacuacionesConsistencia: e.target.value })}
-                      disabled={yaCompletado}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     >
                       <option value="">Seleccionar...</option>
                       <option value="normal">Normal</option>
@@ -1667,8 +1657,7 @@ export default function ChequeoDiarioPage() {
                       type="text"
                       value={formData.evacuacionesColor}
                       onChange={(e) => setFormData({ ...formData, evacuacionesColor: e.target.value })}
-                      disabled={yaCompletado}
-                      placeholder="Color"
+                        placeholder="Color"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
                   </div>
@@ -1681,7 +1670,6 @@ export default function ChequeoDiarioPage() {
                     id="dificultadEvacuar"
                     checked={formData.dificultadEvacuar}
                     onChange={(e) => setFormData({ ...formData, dificultadEvacuar: e.target.checked })}
-                    disabled={yaCompletado}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <label htmlFor="dificultadEvacuar" className="ml-2 block text-sm text-gray-700">
@@ -1695,15 +1683,13 @@ export default function ChequeoDiarioPage() {
                     <label className="block text-sm font-medium text-gray-700">
                       Laxantes utilizados
                     </label>
-                    {!yaCompletado && (
-                      <button
-                        type="button"
-                        onClick={agregarLaxante}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        + Agregar laxante
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={agregarLaxante}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      + Agregar laxante
+                    </button>
                   </div>
                   {formData.laxantes.map((laxante, index) => (
                     <div key={index} className="flex gap-2 mb-2">
@@ -1711,27 +1697,23 @@ export default function ChequeoDiarioPage() {
                         type="text"
                         value={laxante.nombre}
                         onChange={(e) => updateLaxante(index, 'nombre', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Nombre del laxante"
+                            placeholder="Nombre del laxante"
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
                       <input
                         type="text"
                         value={laxante.cantidad}
                         onChange={(e) => updateLaxante(index, 'cantidad', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Cantidad"
+                            placeholder="Cantidad"
                         className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
-                      {!yaCompletado && (
-                        <button
-                          type="button"
-                          onClick={() => eliminarLaxante(index)}
-                          className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          ✕
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => eliminarLaxante(index)}
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1756,8 +1738,7 @@ export default function ChequeoDiarioPage() {
                       <select
                         value={consumible.itemId}
                         onChange={(e) => updateConsumible(index, 'itemId', e.target.value)}
-                        disabled={yaCompletado}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       >
                         <option value="">Seleccionar consumible...</option>
                         {consumiblesDisponibles
@@ -1774,8 +1755,7 @@ export default function ChequeoDiarioPage() {
                         type="number"
                         value={consumible.cantidad}
                         onChange={(e) => updateConsumible(index, 'cantidad', parseFloat(e.target.value) || 0)}
-                        disabled={yaCompletado}
-                        placeholder="Cant."
+                            placeholder="Cant."
                         min="0"
                         step="0.1"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
@@ -1786,33 +1766,28 @@ export default function ChequeoDiarioPage() {
                         type="text"
                         value={consumible.comentario}
                         onChange={(e) => updateConsumible(index, 'comentario', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Comentario (opcional)"
+                            placeholder="Comentario (opcional)"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
                     </div>
-                    {!yaCompletado && (
-                      <button
-                        type="button"
-                        onClick={() => eliminarConsumible(index)}
-                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                      >
-                        ✕
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => eliminarConsumible(index)}
+                      className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
 
                 {/* Botón para agregar consumible */}
-                {!yaCompletado && (
-                  <button
-                    type="button"
-                    onClick={agregarConsumible}
-                    className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
-                  >
-                    + Agregar consumible
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={agregarConsumible}
+                  className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                >
+                  + Agregar consumible
+                </button>
 
                 {consumiblesDisponibles.filter(c => c.cantidadOperativo > 0).length === 0 && (
                   <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">
@@ -1836,7 +1811,6 @@ export default function ChequeoDiarioPage() {
                     id="medicacionEnTiempoForma"
                     checked={formData.medicacionEnTiempoForma}
                     onChange={(e) => setFormData({ ...formData, medicacionEnTiempoForma: e.target.checked })}
-                    disabled={yaCompletado}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <label htmlFor="medicacionEnTiempoForma" className="ml-2 block text-sm font-medium text-gray-700">
@@ -1881,15 +1855,13 @@ export default function ChequeoDiarioPage() {
                     <label className="block text-sm font-medium text-gray-700">
                       Medicamentos Adicionales (fuera del pastillero)
                     </label>
-                    {!yaCompletado && (
-                      <button
-                        type="button"
-                        onClick={agregarMedicamentoAdicional}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        + Agregar medicamento
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={agregarMedicamentoAdicional}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      + Agregar medicamento
+                    </button>
                   </div>
                   {formData.medicamentosAdicionales.map((med, index) => (
                     <div key={index} className="grid grid-cols-4 gap-2 mb-2">
@@ -1897,24 +1869,21 @@ export default function ChequeoDiarioPage() {
                         type="text"
                         value={med.nombre}
                         onChange={(e) => updateMedicamentoAdicional(index, 'nombre', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Nombre"
+                            placeholder="Nombre"
                         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
                       <input
                         type="text"
                         value={med.dosis}
                         onChange={(e) => updateMedicamentoAdicional(index, 'dosis', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Dosis"
+                            placeholder="Dosis"
                         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
                       <input
                         type="text"
                         value={med.motivo}
                         onChange={(e) => updateMedicamentoAdicional(index, 'motivo', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Motivo"
+                            placeholder="Motivo"
                         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
                       <div className="flex gap-2">
@@ -1922,18 +1891,15 @@ export default function ChequeoDiarioPage() {
                           type="time"
                           value={med.hora}
                           onChange={(e) => updateMedicamentoAdicional(index, 'hora', e.target.value)}
-                          disabled={yaCompletado}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                         />
-                        {!yaCompletado && (
-                          <button
-                            type="button"
-                            onClick={() => eliminarMedicamentoAdicional(index)}
-                            className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                          >
-                            ✕
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => eliminarMedicamentoAdicional(index)}
+                          className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          ✕
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1945,15 +1911,13 @@ export default function ChequeoDiarioPage() {
                     <label className="block text-sm font-medium text-gray-700">
                       Medicamentos Rechazados
                     </label>
-                    {!yaCompletado && (
-                      <button
-                        type="button"
-                        onClick={agregarMedicamentoRechazado}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        + Agregar
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={agregarMedicamentoRechazado}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      + Agregar
+                    </button>
                   </div>
                   {formData.medicamentosRechazados.map((med, index) => (
                     <div key={index} className="flex gap-2 mb-2">
@@ -1961,27 +1925,23 @@ export default function ChequeoDiarioPage() {
                         type="text"
                         value={med.nombre}
                         onChange={(e) => updateMedicamentoRechazado(index, 'nombre', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Nombre del medicamento"
+                            placeholder="Nombre del medicamento"
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
                       <input
                         type="text"
                         value={med.motivo}
                         onChange={(e) => updateMedicamentoRechazado(index, 'motivo', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Motivo"
+                            placeholder="Motivo"
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
-                      {!yaCompletado && (
-                        <button
-                          type="button"
-                          onClick={() => eliminarMedicamentoRechazado(index)}
-                          className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          ✕
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => eliminarMedicamentoRechazado(index)}
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1994,7 +1954,6 @@ export default function ChequeoDiarioPage() {
                   <textarea
                     value={formData.observacionesMedicacion}
                     onChange={(e) => setFormData({ ...formData, observacionesMedicacion: e.target.value })}
-                    disabled={yaCompletado}
                     rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     placeholder="Observaciones sobre la medicación..."
@@ -2014,15 +1973,13 @@ export default function ChequeoDiarioPage() {
                   <p className="text-sm text-gray-600">
                     Registra cualquier incidente o situación inusual
                   </p>
-                  {!yaCompletado && (
-                    <button
-                      type="button"
-                      onClick={agregarIncidente}
-                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg"
-                    >
-                      + Agregar Incidente
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={agregarIncidente}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg"
+                  >
+                    + Agregar Incidente
+                  </button>
                 </div>
 
                 {formData.incidentes.length === 0 ? (
@@ -2037,7 +1994,6 @@ export default function ChequeoDiarioPage() {
                           type="text"
                           value={incidente.tipo}
                           onChange={(e) => updateIncidente(index, 'tipo', e.target.value)}
-                          disabled={yaCompletado}
                           placeholder="Tipo de incidente"
                           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                         />
@@ -2046,15 +2002,13 @@ export default function ChequeoDiarioPage() {
                             type="time"
                             value={incidente.hora}
                             onChange={(e) => updateIncidente(index, 'hora', e.target.value)}
-                            disabled={yaCompletado}
-                            placeholder="Hora"
+                              placeholder="Hora"
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                           />
                           <select
                             value={incidente.gravedad}
                             onChange={(e) => updateIncidente(index, 'gravedad', e.target.value)}
-                            disabled={yaCompletado}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                           >
                             <option value="leve">Leve</option>
                             <option value="moderada">Moderada</option>
@@ -2065,8 +2019,7 @@ export default function ChequeoDiarioPage() {
                       <textarea
                         value={incidente.descripcion}
                         onChange={(e) => updateIncidente(index, 'descripcion', e.target.value)}
-                        disabled={yaCompletado}
-                        placeholder="Descripción del incidente..."
+                            placeholder="Descripción del incidente..."
                         rows={2}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 mb-2"
                       />
@@ -2074,20 +2027,17 @@ export default function ChequeoDiarioPage() {
                         <textarea
                           value={incidente.accionTomada}
                           onChange={(e) => updateIncidente(index, 'accionTomada', e.target.value)}
-                          disabled={yaCompletado}
                           placeholder="Acción tomada..."
                           rows={2}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                         />
-                        {!yaCompletado && (
-                          <button
-                            type="button"
-                            onClick={() => eliminarIncidente(index)}
-                            className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg self-start"
-                          >
-                            Eliminar
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => eliminarIncidente(index)}
+                          className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg self-start"
+                        >
+                          Eliminar
+                        </button>
                       </div>
                     </div>
                   ))
@@ -2109,7 +2059,6 @@ export default function ChequeoDiarioPage() {
                   <textarea
                     value={formData.resumenGeneral}
                     onChange={(e) => setFormData({ ...formData, resumenGeneral: e.target.value })}
-                    disabled={yaCompletado}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     placeholder="Resumen general del día..."
@@ -2123,7 +2072,6 @@ export default function ChequeoDiarioPage() {
                   <textarea
                     value={formData.observacionesImportantes}
                     onChange={(e) => setFormData({ ...formData, observacionesImportantes: e.target.value })}
-                    disabled={yaCompletado}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     placeholder="Observaciones importantes que el familiar o médico deben saber..."
@@ -2137,7 +2085,6 @@ export default function ChequeoDiarioPage() {
                   <textarea
                     value={formData.recomendacionesSiguienteTurno}
                     onChange={(e) => setFormData({ ...formData, recomendacionesSiguienteTurno: e.target.value })}
-                    disabled={yaCompletado}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     placeholder="Recomendaciones para el cuidador del siguiente turno..."
@@ -2162,7 +2109,7 @@ export default function ChequeoDiarioPage() {
                 disabled={saving}
                 className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                Completar Chequeo
+                {yaCompletado ? 'Actualizar Chequeo' : 'Completar Chequeo'}
               </button>
             </div>
           </div>
