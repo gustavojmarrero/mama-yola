@@ -41,7 +41,7 @@ const ENLACES_PROCESO: Record<TipoProceso, string> = {
   medicamento: '/medicamentos',
   chequeo: '/chequeo-diario',
   signosVitales: '/signos-vitales',
-  comida: '/menu',
+  comida: '/menu-comida',
   actividad: '/actividades',
 };
 

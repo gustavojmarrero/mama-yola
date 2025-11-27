@@ -54,10 +54,10 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
     horaDefault: '08:00',
     icono: '🌅',
     componentes: [
-      { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 1 },
-      { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 2 },
-      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 3 },
-      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: true, orden: 4 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: true, orden: 1 },
+      { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 2 },
+      { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 3 },
+      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 4 },
     ],
     orden: 1,
     activo: true,
@@ -68,9 +68,9 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
     horaDefault: '11:00',
     icono: '🍎',
     componentes: [
-      { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 1 },
-      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 2 },
-      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 3 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 1 },
+      { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 2 },
+      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 3 },
     ],
     orden: 2,
     activo: true,
@@ -81,11 +81,11 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
     horaDefault: '14:00',
     icono: '🍽️',
     componentes: [
-      { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 1 },
-      { id: 'segundo_plato', nombre: 'Segundo Plato', obligatorio: false, orden: 2 },
-      { id: 'complemento', nombre: 'Complemento', obligatorio: false, orden: 3 },
-      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 4 },
-      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 5 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 1 },
+      { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 2 },
+      { id: 'segundo_plato', nombre: 'Segundo Plato', obligatorio: false, orden: 3 },
+      { id: 'complemento', nombre: 'Complemento', obligatorio: false, orden: 4 },
+      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 5 },
     ],
     orden: 3,
     activo: true,
@@ -96,9 +96,9 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
     horaDefault: '17:00',
     icono: '🍪',
     componentes: [
-      { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 1 },
-      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 2 },
-      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 3 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 1 },
+      { id: 'snack', nombre: 'Snack', obligatorio: false, orden: 2 },
+      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 3 },
     ],
     orden: 4,
     activo: true,
@@ -109,10 +109,10 @@ const TIEMPOS_COMIDA_DEFAULT: TiempoComidaConfig[] = [
     horaDefault: '20:00',
     icono: '🌙',
     componentes: [
-      { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 1 },
-      { id: 'complemento', nombre: 'Complemento', obligatorio: false, orden: 2 },
-      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 3 },
-      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 4 },
+      { id: 'lactobacilos', nombre: 'Lactobacilos', obligatorio: false, orden: 1 },
+      { id: 'primer_plato', nombre: 'Primer Plato', obligatorio: false, orden: 2 },
+      { id: 'complemento', nombre: 'Complemento', obligatorio: false, orden: 3 },
+      { id: 'bebida', nombre: 'Bebida', obligatorio: true, orden: 4 },
     ],
     orden: 5,
     activo: true,
@@ -289,7 +289,21 @@ export default function MenuComida() {
         if (configSnap.exists()) {
           const data = configSnap.data();
           if (data.tiempos && Array.isArray(data.tiempos)) {
-            setTiemposComidaConfig(data.tiempos);
+            // Combinar configuración guardada con defaults para asegurar que todos los componentes existan
+            const tiemposActualizados = TIEMPOS_COMIDA_DEFAULT.map(defaultTiempo => {
+              const tiempoGuardado = data.tiempos.find((t: TiempoComidaConfig) => t.id === defaultTiempo.id);
+              if (tiempoGuardado) {
+                // Combinar componentes: usar orden y obligatorio del default
+                const componentesActualizados = defaultTiempo.componentes.map(defaultComp => {
+                  const compGuardado = tiempoGuardado.componentes?.find((c: any) => c.id === defaultComp.id);
+                  // Siempre usar orden y obligatorio del default
+                  return { ...defaultComp, ...(compGuardado || {}), orden: defaultComp.orden, obligatorio: defaultComp.obligatorio };
+                });
+                return { ...defaultTiempo, ...tiempoGuardado, componentes: componentesActualizados };
+              }
+              return defaultTiempo;
+            });
+            setTiemposComidaConfig(tiemposActualizados);
           }
         }
       } catch (error) {
@@ -1014,7 +1028,7 @@ export default function MenuComida() {
                               {tiempo.componentes.map(comp => {
                                 const platillo = getPlatillo(menu, comp.id);
                                 const compInfo = COMPONENTES_DISPONIBLES.find(c => c.id === comp.id);
-                                const esBebida = comp.id === 'bebida';
+                                const esObligatorio = comp.obligatorio;
 
                                 return (
                                   <div
@@ -1022,7 +1036,7 @@ export default function MenuComida() {
                                     className={`rounded-lg border ${
                                       platillo
                                         ? 'bg-green-50 border-green-200'
-                                        : esBebida && !platillo
+                                        : esObligatorio && !platillo
                                         ? 'bg-red-50 border-red-200'
                                         : 'bg-gray-50 border-gray-200'
                                     }`}
@@ -1031,7 +1045,7 @@ export default function MenuComida() {
                                     <div className="flex items-center gap-1 px-2 py-1 border-b border-inherit">
                                       <span className="text-sm">{compInfo?.icono}</span>
                                       <span className="text-xs font-medium text-gray-600">{comp.nombre}</span>
-                                      {esBebida && (
+                                      {esObligatorio && (
                                         <span className="text-xs text-red-500">*</span>
                                       )}
                                     </div>
@@ -1055,7 +1069,7 @@ export default function MenuComida() {
                                         <button
                                           onClick={() => abrirModalAsignar(dia, tiempo.id, comp.id, menu?.id)}
                                           className={`w-full text-xs py-1 rounded ${
-                                            esBebida
+                                            esObligatorio
                                               ? 'text-red-600 hover:bg-red-100'
                                               : 'text-gray-500 hover:bg-gray-100'
                                           }`}
@@ -1139,27 +1153,29 @@ export default function MenuComida() {
                     <div className="space-y-2">
                       {COMPONENTES_DISPONIBLES.map(comp => {
                         const estaActivo = tieneComponente(tiempo.id, comp.id);
-                        const esBebida = comp.id === 'bebida';
+                        // Buscar si es obligatorio en la configuración del tiempo actual
+                        const compEnTiempo = tiempo.componentes.find(c => c.id === comp.id);
+                        const esObligatorio = compEnTiempo?.obligatorio || false;
 
                         return (
                           <label
                             key={comp.id}
                             className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
                               estaActivo ? 'bg-blue-50' : 'hover:bg-gray-50'
-                            } ${esBebida ? 'cursor-not-allowed' : ''}`}
+                            } ${esObligatorio ? 'cursor-not-allowed' : ''}`}
                           >
                             <input
                               type="checkbox"
                               checked={estaActivo}
                               onChange={() => toggleComponente(tiempo.id, comp.id)}
-                              disabled={esBebida}
+                              disabled={esObligatorio}
                               className="h-4 w-4 rounded text-blue-600 disabled:opacity-50"
                             />
                             <span className="text-lg">{COMPONENTES_DISPONIBLES.find(c => c.id === comp.id)?.icono}</span>
                             <span className={`text-sm ${estaActivo ? 'font-medium' : 'text-gray-600'}`}>
                               {comp.nombre}
                             </span>
-                            {esBebida && (
+                            {esObligatorio && (
                               <span className="text-xs text-gray-400 ml-auto" title="Obligatorio">🔒</span>
                             )}
                           </label>
@@ -1181,8 +1197,8 @@ export default function MenuComida() {
             {/* Nota informativa */}
             <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
               <p className="text-sm text-amber-800">
-                <strong>Nota:</strong> La <span className="inline-flex items-center gap-1">🥤 Bebida</span> es obligatoria
-                en todos los tiempos de comida y no puede desactivarse.
+                <strong>Nota:</strong> Los componentes con 🔒 son obligatorios y no pueden desactivarse.
+                <span className="inline-flex items-center gap-1 ml-1">🥛 Lactobacilos</span> es obligatorio en Desayuno.
               </p>
             </div>
           </div>
