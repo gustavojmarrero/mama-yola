@@ -137,10 +137,12 @@ export default function Medicamentos() {
           nombre: `${data.nombre} ${data.dosis}`,
           categoria: 'medicamento',
           cantidadMaestro: 0,
+          cantidadTransito: 0, // Stock en tránsito para cuidadora
           cantidadOperativo: 0,
           presentacion: data.presentacion,
           unidad: 'piezas',
           nivelMinimoMaestro: 5,
+          nivelMinimoTransito: 7, // Una semana de stock en tránsito
           nivelMinimoOperativo: 5,
           vinculadoPastillero: true,
           medicamentoId: medicamentoRef.id,

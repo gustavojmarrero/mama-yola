@@ -11,18 +11,35 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Medicamento, RegistroMedicamento, EstadoMedicamento, DosisDelDia } from '../types';
+import { Medicamento, RegistroMedicamento, EstadoMedicamento, DosisDelDia, ItemSolicitudReposicion, UrgenciaSolicitud } from '../types';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
 import ViewToggle from '../components/common/ViewToggle';
 import DosisCard from '../components/pastillero/DosisCard';
 import HistorialCard from '../components/pastillero/HistorialCard';
+import TransitoPanel from '../components/transito/TransitoPanel';
+import RellenarPastilleroModal from '../components/pastillero/RellenarPastilleroModal';
+import SolicitudReposicionModal from '../components/transito/SolicitudReposicionModal';
+import { useTransito } from '../hooks/useTransito';
 
 const PACIENTE_ID = 'paciente-principal';
 
 export default function PastilleroDiario() {
   const { usuario, userProfile } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  // Hook de tránsito
+  const {
+    itemsTransito,
+    loading: loadingTransito,
+    crearSolicitudReposicion,
+    registrarCargaPastillero,
+    recargarDatos: recargarTransito,
+  } = useTransito();
+
+  // Estados para modales de tránsito
+  const [showRellenarModal, setShowRellenarModal] = useState(false);
+  const [showSolicitudModal, setShowSolicitudModal] = useState(false);
 
   /**
    * Descuenta 1 unidad del inventario operativo cuando se toma un medicamento
@@ -310,6 +327,22 @@ export default function PastilleroDiario() {
     }
   }
 
+  // Handler para rellenar pastillero
+  async function handleRellenarPastillero(items: Array<{ itemId: string; cantidad: number }>) {
+    if (!usuario) return;
+    await registrarCargaPastillero(items, usuario.uid, userProfile?.nombre || 'Usuario');
+  }
+
+  // Handler para solicitar reposición
+  async function handleSolicitarReposicion(
+    items: ItemSolicitudReposicion[],
+    notas: string,
+    urgencia: UrgenciaSolicitud
+  ) {
+    if (!usuario) return;
+    await crearSolicitudReposicion(items, notas, urgencia, usuario.uid, userProfile?.nombre || 'Usuario');
+  }
+
   function renderVistaDia() {
     if (dosisDelDia.length === 0) {
       return (
@@ -473,6 +506,14 @@ export default function PastilleroDiario() {
           </div>
         </div>
 
+        {/* Panel de Tránsito */}
+        <TransitoPanel
+          items={itemsTransito}
+          loading={loadingTransito}
+          onSolicitarReposicion={() => setShowSolicitudModal(true)}
+          onRellenarPastillero={() => setShowRellenarModal(true)}
+        />
+
         {/* Contenido */}
         {loading ? (
           <div className="text-center py-12">
@@ -568,6 +609,22 @@ export default function PastilleroDiario() {
             </div>
           </div>
         )}
+
+        {/* Modal de Rellenar Pastillero */}
+        <RellenarPastilleroModal
+          isOpen={showRellenarModal}
+          onClose={() => setShowRellenarModal(false)}
+          items={itemsTransito}
+          onConfirmar={handleRellenarPastillero}
+        />
+
+        {/* Modal de Solicitud de Reposición */}
+        <SolicitudReposicionModal
+          isOpen={showSolicitudModal}
+          onClose={() => setShowSolicitudModal(false)}
+          items={itemsTransito}
+          onEnviar={handleSolicitarReposicion}
+        />
       </div>
     </Layout>
   );

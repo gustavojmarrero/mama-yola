@@ -7,6 +7,7 @@ import { format, isToday, isTomorrow, addDays, startOfDay, subDays } from 'date-
 import { es } from 'date-fns/locale';
 import Layout from '../components/common/Layout';
 import { DashboardSkeleton } from '../components/common/Skeleton';
+import { useTransito } from '../hooks/useTransito';
 import {
   Evento,
   Contacto,
@@ -39,6 +40,7 @@ interface DashboardMetrics {
 
 export default function Dashboard() {
   const { currentUser, userProfile } = useAuth();
+  const { itemsTransito, itemsConStockBajo, loading: loadingTransito } = useTransito();
   const [proximasCitas, setProximasCitas] = useState<Evento[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -513,6 +515,52 @@ export default function Dashboard() {
           )}
         </Link>
       </div>
+
+      {/* Alertas de Tránsito */}
+      {!loadingTransito && itemsConStockBajo().length > 0 && (
+        <div className="bg-gradient-to-r from-orange-50 to-orange-100/50 border border-orange-200 rounded-2xl p-5 md:p-6 mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-orange-200 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
+                📦
+              </div>
+              <div>
+                <h3 className="font-bold text-orange-900 font-display">
+                  Stock Bajo en Tránsito
+                </h3>
+                <p className="text-sm text-orange-700 mt-1">
+                  {itemsConStockBajo().length} medicamento{itemsConStockBajo().length > 1 ? 's' : ''} necesita{itemsConStockBajo().length === 1 ? '' : 'n'} reposición
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {itemsConStockBajo().slice(0, 3).map((item) => (
+                    <span
+                      key={item.id}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
+                        (item.cantidadTransito || 0) === 0
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-orange-200 text-orange-800'
+                      }`}
+                    >
+                      {(item.cantidadTransito || 0) === 0 ? '🔴' : '🟡'} {item.nombre}
+                    </span>
+                  ))}
+                  {itemsConStockBajo().length > 3 && (
+                    <span className="inline-flex items-center px-2.5 py-1 bg-orange-200/50 text-orange-700 rounded-lg text-xs font-medium">
+                      +{itemsConStockBajo().length - 3} más
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <Link
+              to="/pastillero-diario"
+              className="flex-shrink-0 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md transition-all"
+            >
+              Ver Tránsito
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Accesos Rápidos */}
       <div className="bg-white rounded-2xl shadow-card p-5 md:p-6 mb-8 border border-warm-100">

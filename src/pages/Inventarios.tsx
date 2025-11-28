@@ -102,20 +102,26 @@ export default function Inventarios() {
     categoria: 'medicamento' as CategoriaInventario,
     presentacion: '',
     cantidadMaestro: '' as string | number,
+    cantidadTransito: '' as string | number,
     cantidadOperativo: '' as string | number,
     unidad: 'piezas',
     nivelMinimoMaestro: '' as string | number,
+    nivelMinimoTransito: '' as string | number,
     nivelMinimoOperativo: '' as string | number,
     ubicacion: '',
     notas: '',
     // Vida útil
     tieneVidaUtil: false,
     vidaUtilDias: 0,
+    // Vinculado a pastillero
+    vinculadoPastillero: false,
   });
 
   const [movimientoForm, setMovimientoForm] = useState({
     itemId: '',
     tipo: 'entrada' as TipoMovimiento,
+    destinoTransferencia: 'operativo' as 'transito' | 'operativo', // Para items con tránsito
+    origenTransferencia: 'maestro' as 'maestro' | 'transito', // Origen de la transferencia
     cantidad: 0,
     motivo: '',
     notas: '',
@@ -148,8 +154,10 @@ export default function Inventarios() {
         const data = doc.data();
         // Compatibilidad con modelo antiguo: convertir cantidad a cantidadMaestro/cantidadOperativo
         const cantidadMaestro = data.cantidadMaestro ?? (data.tipo === 'maestro' ? data.cantidad : 0) ?? 0;
+        const cantidadTransito = data.cantidadTransito ?? 0;
         const cantidadOperativo = data.cantidadOperativo ?? (data.tipo === 'operativo' ? data.cantidad : 0) ?? 0;
         const nivelMinimoMaestro = data.nivelMinimoMaestro ?? data.nivelMinimo ?? 5;
+        const nivelMinimoTransito = data.nivelMinimoTransito ?? 7;
         const nivelMinimoOperativo = data.nivelMinimoOperativo ?? data.nivelMinimo ?? 5;
 
         itemsData.push({
@@ -158,6 +166,7 @@ export default function Inventarios() {
           nombre: data.nombre,
           categoria: data.categoria,
           cantidadMaestro,
+          cantidadTransito,
           cantidadOperativo,
           presentacion: data.presentacion,
           vinculadoPastillero: data.vinculadoPastillero,
@@ -169,6 +178,7 @@ export default function Inventarios() {
           porcentajeDiario: data.porcentajeDiario || 0,
           unidad: data.unidad,
           nivelMinimoMaestro,
+          nivelMinimoTransito,
           nivelMinimoOperativo,
           ubicacion: data.ubicacion,
           notas: data.notas,
@@ -216,14 +226,17 @@ export default function Inventarios() {
         categoria: item.categoria,
         presentacion: item.presentacion || '',
         cantidadMaestro: item.cantidadMaestro,
+        cantidadTransito: item.cantidadTransito,
         cantidadOperativo: item.cantidadOperativo,
         unidad: item.unidad,
         nivelMinimoMaestro: item.nivelMinimoMaestro,
+        nivelMinimoTransito: item.nivelMinimoTransito || 7,
         nivelMinimoOperativo: item.nivelMinimoOperativo,
         ubicacion: item.ubicacion || '',
         notas: item.notas || '',
         tieneVidaUtil: item.tieneVidaUtil || false,
         vidaUtilDias: item.vidaUtilDias || 0,
+        vinculadoPastillero: item.vinculadoPastillero || false,
       });
     } else {
       setEditando(null);
@@ -232,14 +245,17 @@ export default function Inventarios() {
         categoria: 'medicamento',
         presentacion: '',
         cantidadMaestro: '',
+        cantidadTransito: '',
         cantidadOperativo: '',
         unidad: 'piezas',
         nivelMinimoMaestro: '',
+        nivelMinimoTransito: '',
         nivelMinimoOperativo: '',
         ubicacion: '',
         notas: '',
         tieneVidaUtil: false,
         vidaUtilDias: 0,
+        vinculadoPastillero: false,
       });
     }
     setShowModal(true);
@@ -250,10 +266,12 @@ export default function Inventarios() {
     setEditando(null);
   }
 
-  function abrirMovimientoModal(item: ItemInventario, tipo: TipoMovimiento = 'entrada') {
+  function abrirMovimientoModal(item: ItemInventario, tipo: TipoMovimiento = 'entrada', destino: 'transito' | 'operativo' = 'operativo', origen: 'maestro' | 'transito' = 'maestro') {
     setMovimientoForm({
       itemId: item.id,
       tipo,
+      destinoTransferencia: destino,
+      origenTransferencia: origen,
       cantidad: 0,
       motivo: '',
       notas: '',
@@ -278,10 +296,13 @@ export default function Inventarios() {
         nombre: formData.nombre,
         categoria: formData.categoria,
         cantidadMaestro: typeof formData.cantidadMaestro === 'number' ? formData.cantidadMaestro : 0,
+        cantidadTransito: typeof formData.cantidadTransito === 'number' ? formData.cantidadTransito : 0,
         cantidadOperativo: typeof formData.cantidadOperativo === 'number' ? formData.cantidadOperativo : 0,
         unidad: formData.unidad,
         nivelMinimoMaestro: typeof formData.nivelMinimoMaestro === 'number' ? formData.nivelMinimoMaestro : 0,
+        nivelMinimoTransito: typeof formData.nivelMinimoTransito === 'number' ? formData.nivelMinimoTransito : 7,
         nivelMinimoOperativo: typeof formData.nivelMinimoOperativo === 'number' ? formData.nivelMinimoOperativo : 0,
+        vinculadoPastillero: formData.vinculadoPastillero,
         actualizadoEn: ahora,
       };
 
@@ -336,14 +357,20 @@ export default function Inventarios() {
     const item = items.find((i) => i.id === movimientoForm.itemId);
     if (!item) return;
 
-    // Validar stock según tipo de movimiento
+    // Validar stock según tipo de movimiento y origen
     if (movimientoForm.tipo === 'salida' && movimientoForm.cantidad > item.cantidadOperativo) {
       showToast('No hay suficiente stock en el inventario operativo', 'error');
       return;
     }
-    if (movimientoForm.tipo === 'transferencia' && movimientoForm.cantidad > item.cantidadMaestro) {
-      showToast('No hay suficiente stock en el inventario maestro', 'error');
-      return;
+    if (movimientoForm.tipo === 'transferencia') {
+      if (movimientoForm.origenTransferencia === 'maestro' && movimientoForm.cantidad > item.cantidadMaestro) {
+        showToast('No hay suficiente stock en el inventario maestro', 'error');
+        return;
+      }
+      if (movimientoForm.origenTransferencia === 'transito' && movimientoForm.cantidad > item.cantidadTransito) {
+        showToast('No hay suficiente stock en el inventario de tránsito', 'error');
+        return;
+      }
     }
 
     try {
@@ -351,38 +378,69 @@ export default function Inventarios() {
 
       // Calcular nuevas cantidades según tipo de movimiento
       let nuevaCantidadMaestro = item.cantidadMaestro;
+      let nuevaCantidadTransito = item.cantidadTransito;
       let nuevaCantidadOperativo = item.cantidadOperativo;
+
+      // Determinar origen y destino reales
+      let origenReal = 'externo';
+      let destinoReal = 'maestro';
 
       if (movimientoForm.tipo === 'entrada') {
         // Entrada: suma al maestro
         nuevaCantidadMaestro += movimientoForm.cantidad;
+        origenReal = 'externo';
+        destinoReal = 'maestro';
       } else if (movimientoForm.tipo === 'salida') {
         // Salida: resta del operativo
         nuevaCantidadOperativo -= movimientoForm.cantidad;
+        origenReal = 'operativo';
+        destinoReal = 'consumido';
       } else if (movimientoForm.tipo === 'transferencia') {
-        // Transferencia: del maestro al operativo
-        nuevaCantidadMaestro -= movimientoForm.cantidad;
-        // Para items con vida útil, establecer operativo en 100% (porcentaje)
-        if (item.tieneVidaUtil) {
-          nuevaCantidadOperativo = 100; // 100% al transferir
-        } else {
-          nuevaCantidadOperativo += movimientoForm.cantidad;
+        // Transferencia con soporte para tránsito
+        origenReal = movimientoForm.origenTransferencia;
+        destinoReal = movimientoForm.destinoTransferencia;
+
+        if (movimientoForm.origenTransferencia === 'maestro') {
+          nuevaCantidadMaestro -= movimientoForm.cantidad;
+          if (movimientoForm.destinoTransferencia === 'transito') {
+            // Maestro → Tránsito
+            nuevaCantidadTransito += movimientoForm.cantidad;
+          } else {
+            // Maestro → Operativo (comportamiento original para items sin tránsito)
+            if (item.tieneVidaUtil) {
+              nuevaCantidadOperativo = 100; // 100% al transferir
+            } else {
+              nuevaCantidadOperativo += movimientoForm.cantidad;
+            }
+          }
+        } else if (movimientoForm.origenTransferencia === 'transito') {
+          // Tránsito → Operativo
+          nuevaCantidadTransito -= movimientoForm.cantidad;
+          if (item.tieneVidaUtil) {
+            nuevaCantidadOperativo = 100; // 100% al transferir
+          } else {
+            nuevaCantidadOperativo += movimientoForm.cantidad;
+          }
         }
       } else if (movimientoForm.tipo === 'ajuste') {
         // Ajuste: se ajusta la cantidad del operativo (principal)
         nuevaCantidadOperativo = movimientoForm.cantidad;
+        origenReal = 'operativo';
+        destinoReal = 'operativo';
       }
 
       // Preparar actualización del item
       const updateData: Record<string, unknown> = {
         cantidadMaestro: nuevaCantidadMaestro,
+        cantidadTransito: nuevaCantidadTransito,
         cantidadOperativo: nuevaCantidadOperativo,
         actualizadoEn: ahora,
       };
 
-      // Si es transferencia y el item tiene vida útil, establecer fecha de inicio de consumo
-      // Solo si no tiene ya una fecha (para no reiniciar el contador si se transfieren más unidades)
-      if (movimientoForm.tipo === 'transferencia' && item.tieneVidaUtil && !item.fechaInicioConsumo) {
+      // Si es transferencia al operativo y el item tiene vida útil, establecer fecha de inicio de consumo
+      if (movimientoForm.tipo === 'transferencia' &&
+          movimientoForm.destinoTransferencia === 'operativo' &&
+          item.tieneVidaUtil && !item.fechaInicioConsumo) {
         updateData.fechaInicioConsumo = ahora;
       }
 
@@ -395,10 +453,8 @@ export default function Inventarios() {
         tipo: movimientoForm.tipo,
         itemId: item.id,
         itemNombre: item.nombre,
-        origen: movimientoForm.tipo === 'entrada' ? 'externo' :
-                movimientoForm.tipo === 'transferencia' ? 'maestro' : 'operativo',
-        destino: movimientoForm.tipo === 'entrada' ? 'maestro' :
-                 movimientoForm.tipo === 'transferencia' ? 'operativo' : 'consumido',
+        origen: origenReal,
+        destino: destinoReal,
         cantidad: movimientoForm.cantidad,
         usuarioId: currentUser?.uid || '',
         usuarioNombre: userProfile?.nombre || 'Usuario',
@@ -421,11 +477,13 @@ export default function Inventarios() {
   }
 
   function getEstadoItem(item: ItemInventario) {
-    const cantidadTotal = item.cantidadMaestro + item.cantidadOperativo;
+    const cantidadTotal = item.cantidadMaestro + (item.cantidadTransito || 0) + item.cantidadOperativo;
 
     if (cantidadTotal === 0) return 'critico';
     // Verificar si alguno de los inventarios está bajo
     if (item.cantidadMaestro <= item.nivelMinimoMaestro || item.cantidadOperativo <= item.nivelMinimoOperativo) return 'bajo';
+    // Verificar tránsito solo para items vinculados al pastillero
+    if (item.vinculadoPastillero && (item.cantidadTransito || 0) <= (item.nivelMinimoTransito || 0)) return 'bajo';
     return 'ok';
   }
 
@@ -642,7 +700,10 @@ export default function Inventarios() {
                     🏪 Maestro
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    📋 Operativo
+                    📦 Tránsito
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    💊 Operativo
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
@@ -684,6 +745,20 @@ export default function Inventarios() {
                         <div className="text-xs text-gray-500">
                           Mín: {item.nivelMinimoMaestro}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {item.vinculadoPastillero ? (
+                          <div>
+                            <div className={`text-sm font-semibold ${(item.cantidadTransito || 0) <= (item.nivelMinimoTransito || 0) ? 'text-orange-600' : 'text-blue-600'}`}>
+                              {item.cantidadTransito || 0} {item.unidad}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Mín: {item.nivelMinimoTransito || 7}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         {item.tieneVidaUtil ? (
@@ -729,7 +804,7 @@ export default function Inventarios() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {puedeEditar ? (
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1 flex-wrap">
                             <button
                               onClick={() => abrirMovimientoModal(item, 'entrada')}
                               className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs rounded transition-colors"
@@ -737,13 +812,32 @@ export default function Inventarios() {
                             >
                               ➕
                             </button>
-                            <button
-                              onClick={() => abrirMovimientoModal(item, 'transferencia')}
-                              className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
-                              title="Transferir de Maestro a Operativo"
-                            >
-                              ↔️
-                            </button>
+                            {item.vinculadoPastillero ? (
+                              <>
+                                <button
+                                  onClick={() => abrirMovimientoModal(item, 'transferencia', 'transito', 'maestro')}
+                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
+                                  title="Maestro → Tránsito"
+                                >
+                                  M→T
+                                </button>
+                                <button
+                                  onClick={() => abrirMovimientoModal(item, 'transferencia', 'operativo', 'transito')}
+                                  className="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs rounded transition-colors"
+                                  title="Tránsito → Operativo (Cargar Pastillero)"
+                                >
+                                  T→O
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => abrirMovimientoModal(item, 'transferencia', 'operativo', 'maestro')}
+                                className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
+                                title="Transferir de Maestro a Operativo"
+                              >
+                                ↔️
+                              </button>
+                            )}
                             <button
                               onClick={() => abrirMovimientoModal(item, 'salida')}
                               className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded transition-colors"
@@ -1054,18 +1148,48 @@ export default function Inventarios() {
       )}
 
       {/* Modal movimiento */}
-      {showMovimientoModal && (
+      {showMovimientoModal && (() => {
+        const itemActual = items.find((i) => i.id === movimientoForm.itemId);
+        const esTransferencia = movimientoForm.tipo === 'transferencia';
+        const flujoTexto = esTransferencia
+          ? `${movimientoForm.origenTransferencia === 'maestro' ? '🏪 Maestro' : '📦 Tránsito'} → ${movimientoForm.destinoTransferencia === 'transito' ? '📦 Tránsito' : '💊 Operativo'}`
+          : '';
+
+        return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Registrar Movimiento</h2>
+              {esTransferencia && (
+                <p className="text-sm text-blue-600 mt-1 font-medium">{flujoTexto}</p>
+              )}
             </div>
 
             <form onSubmit={handleMovimiento} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Item: <strong>{items.find((i) => i.id === movimientoForm.itemId)?.nombre}</strong>
+                  Item: <strong>{itemActual?.nombre}</strong>
                 </label>
+                {itemActual && esTransferencia && (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <div className="text-xs text-gray-500">🏪 Maestro</div>
+                        <div className="font-semibold">{itemActual.cantidadMaestro}</div>
+                      </div>
+                      {itemActual.vinculadoPastillero && (
+                        <div>
+                          <div className="text-xs text-gray-500">📦 Tránsito</div>
+                          <div className="font-semibold text-blue-600">{itemActual.cantidadTransito || 0}</div>
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-xs text-gray-500">💊 Operativo</div>
+                        <div className="font-semibold">{itemActual.cantidadOperativo}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1077,7 +1201,7 @@ export default function Inventarios() {
                 >
                   <option value="entrada">➕ Entrada (Compra/Recepción)</option>
                   <option value="salida">➖ Salida (Consumo)</option>
-                  <option value="transferencia">↔️ Transferencia</option>
+                  <option value="transferencia">↔️ Transferencia {flujoTexto}</option>
                   <option value="ajuste">🔧 Ajuste de inventario</option>
                 </select>
               </div>
@@ -1135,7 +1259,8 @@ export default function Inventarios() {
             </form>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-50 space-y-2">

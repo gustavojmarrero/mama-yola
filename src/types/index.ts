@@ -357,6 +357,7 @@ export interface ItemInventario {
 
   // Cantidades por almacén
   cantidadMaestro: number;
+  cantidadTransito: number; // Stock en tránsito (solo si vinculadoPastillero)
   cantidadOperativo: number;
 
   // Para medicamentos
@@ -373,6 +374,7 @@ export interface ItemInventario {
   // Comunes
   unidad: string; // "piezas", "ml", "cajas"
   nivelMinimoMaestro: number;
+  nivelMinimoTransito?: number; // Nivel mínimo variable por medicamento
   nivelMinimoOperativo: number;
   ubicacion?: string;
   notas?: string;
@@ -382,7 +384,7 @@ export interface ItemInventario {
 }
 
 export type TipoMovimiento = 'entrada' | 'salida' | 'transferencia' | 'ajuste' | 'consumo_automatico';
-export type OrigenDestino = 'maestro' | 'operativo' | 'externo' | 'consumido';
+export type OrigenDestino = 'maestro' | 'transito' | 'operativo' | 'externo' | 'consumido';
 
 export interface MovimientoInventario {
   id: string;
@@ -697,4 +699,30 @@ export interface ProcesoDelDia {
   horaCompletado?: Date;
   icono: string;
   enlace: string;
+}
+
+// ===== TIPOS DE TRÁNSITO (INVENTARIO) =====
+
+export type EstadoSolicitudReposicion = 'pendiente' | 'parcial' | 'completada' | 'rechazada';
+export type UrgenciaSolicitud = 'normal' | 'urgente';
+
+export interface ItemSolicitudReposicion {
+  itemId: string;
+  itemNombre: string;
+  cantidadSolicitada: number;
+  cantidadActualTransito: number;
+}
+
+export interface SolicitudReposicion {
+  id: string;
+  pacienteId: string;
+  solicitadoPor: string; // userId cuidadora
+  solicitadoPorNombre: string;
+  items: ItemSolicitudReposicion[];
+  estado: EstadoSolicitudReposicion;
+  notas?: string;
+  urgencia: UrgenciaSolicitud;
+  atendidoPor?: string;
+  atendidoEn?: Date;
+  creadoEn: Date;
 }
