@@ -197,6 +197,7 @@ export default function MenuComida() {
   const { isDirty, setIsDirty, markAsSaved, confirmNavigation } = useUnsavedChanges();
   const isInitialLoadComida = useRef(true);
   const isInitialLoadReceta = useRef(true);
+  const hoyRef = useRef<HTMLDivElement>(null);
 
   // Detectar cambios en el formulario de comida
   useEffect(() => {
@@ -973,7 +974,12 @@ export default function MenuComida() {
                   {format(inicioSemana, "d 'de' MMMM", { locale: es })} - {format(finSemana, "d 'de' MMMM yyyy", { locale: es })}
                 </h2>
                 <button
-                  onClick={() => setSemanaActual(new Date())}
+                  onClick={() => {
+                    setSemanaActual(new Date());
+                    setTimeout(() => {
+                      hoyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                  }}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   Ir a hoy
@@ -994,6 +1000,7 @@ export default function MenuComida() {
                 return (
                   <div
                     key={dia.toISOString()}
+                    ref={esHoy ? hoyRef : null}
                     className={`bg-white rounded-lg shadow ${esHoy ? 'ring-2 ring-blue-500' : ''}`}
                   >
                     {/* Header del día */}
