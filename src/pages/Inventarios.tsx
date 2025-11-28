@@ -975,6 +975,42 @@ export default function Inventarios() {
                   </div>
                 </div>
 
+                {/* Sección Tránsito - Solo si está vinculado al pastillero */}
+                {formData.vinculadoPastillero && (
+                  <div className="md:col-span-2 bg-orange-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-orange-800 mb-3">📦 Inventario Tránsito (Cuidadora)</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad Tránsito</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formData.cantidadTransito}
+                          onChange={(e) => setFormData({ ...formData, cantidadTransito: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          placeholder="Ej: 14"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Nivel Mínimo Tránsito</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formData.nivelMinimoTransito}
+                          onChange={(e) => setFormData({ ...formData, nivelMinimoTransito: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          placeholder="Ej: 7"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-orange-600 mt-2">
+                      Stock disponible para la cuidadora. Nivel mínimo típico: 1 semana de dosis.
+                    </p>
+                  </div>
+                )}
+
                 {/* Sección Operativo */}
                 <div className={`md:col-span-2 p-4 rounded-lg ${formData.categoria === 'consumible' && formData.tieneVidaUtil ? 'bg-purple-50' : 'bg-green-50'}`}>
                   <h4 className={`font-medium mb-3 ${formData.categoria === 'consumible' && formData.tieneVidaUtil ? 'text-purple-800' : 'text-green-800'}`}>
