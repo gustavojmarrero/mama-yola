@@ -366,7 +366,7 @@ export default function ChequeoDiarioPage() {
     // Header
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('Chequeo Diario - Mama Yola', 105, yPos, { align: 'center' });
+    doc.text('Chequeo Diario - Mamá Yola', 105, yPos, { align: 'center' });
     yPos += 10;
 
     // Fecha y cuidador
@@ -596,7 +596,7 @@ export default function ChequeoDiarioPage() {
       doc.setFontSize(8);
       doc.setTextColor(150);
       doc.text(`Página ${i} de ${pageCount}`, 105, 285, { align: 'center' });
-      doc.text('Generado con Mama Yola - Sistema de Gestión de Cuidado', 105, 290, { align: 'center' });
+      doc.text('Generado con Mamá Yola - Sistema de Gestión de Cuidado', 105, 290, { align: 'center' });
     }
 
     // Guardar PDF

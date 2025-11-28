@@ -126,7 +126,7 @@ export default function Layout({ children }: LayoutProps) {
           {expanded && (
             <div className="animate-fade-in">
               <h1 className="text-lg font-bold text-warm-800 font-display tracking-tight">
-                Mama Yola
+                Mamá Yola
               </h1>
               <p className="text-xs text-warm-500 -mt-0.5">Sistema de Cuidado</p>
             </div>
@@ -282,7 +282,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className="w-8 h-8 bg-gradient-to-br from-lavender-400 to-lavender-600 rounded-xl flex items-center justify-center shadow-sm">
               <span className="text-sm">🏥</span>
             </div>
-            <h1 className="text-lg font-bold text-warm-800 font-display">Mama Yola</h1>
+            <h1 className="text-lg font-bold text-warm-800 font-display">Mamá Yola</h1>
           </div>
 
           <div className="w-10" /> {/* Spacer */}

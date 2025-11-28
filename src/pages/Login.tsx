@@ -41,7 +41,7 @@ export default function Login() {
           <span className="text-5xl">🏥</span>
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-warm-800 font-display tracking-tight mb-3">
-          Mama Yola
+          Mamá Yola
         </h1>
         <p className="text-warm-500 text-lg font-medium">
           Sistema de Gestión de Cuidado
@@ -201,7 +201,7 @@ export default function Login() {
 
       {/* Footer */}
       <p className="mt-10 text-center text-sm text-warm-400 relative z-10">
-        © {new Date().getFullYear()} Mama Yola. Sistema de cuidado integral.
+        © {new Date().getFullYear()} Mamá Yola. Sistema de cuidado integral.
       </p>
     </div>
   );

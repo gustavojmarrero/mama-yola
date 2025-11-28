@@ -1,4 +1,4 @@
-# 🏥 Mama Yola - Sistema de Gestión de Cuidado de Adultos Mayores
+# 🏥 Mamá Yola - Sistema de Gestión de Cuidado de Adultos Mayores
 
 Sistema web privado para coordinar y gestionar el cuidado integral de adultos mayores, facilitando la colaboración entre cuidadores, supervisores y familiares.
 
