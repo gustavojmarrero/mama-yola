@@ -175,6 +175,8 @@ export default function MenuComida() {
   // Estados para CRUD de recetas
   const [modalRecetaCRUD, setModalRecetaCRUD] = useState(false);
   const [recetaEditando, setRecetaEditando] = useState<Receta | null>(null);
+  const [modalVerReceta, setModalVerReceta] = useState(false);
+  const [recetaVisualizando, setRecetaVisualizando] = useState<Receta | null>(null);
   const [busquedaReceta, setBusquedaReceta] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaComida | 'todas'>('todas');
   const [mostrarSoloFavoritas, setMostrarSoloFavoritas] = useState(false);
@@ -643,6 +645,16 @@ export default function MenuComida() {
   }
 
   // ========== FUNCIONES CRUD DE RECETAS ==========
+
+  function verReceta(receta: Receta) {
+    setRecetaVisualizando(receta);
+    setModalVerReceta(true);
+  }
+
+  function cerrarVistaReceta() {
+    setModalVerReceta(false);
+    setRecetaVisualizando(null);
+  }
 
   function abrirModalReceta(receta?: Receta) {
     if (receta) {
@@ -1331,7 +1343,13 @@ export default function MenuComida() {
 
 
                       {/* Botones de acción */}
-                      <div className="grid grid-cols-3 gap-2 mb-2">
+                      <div className="grid grid-cols-4 gap-2 mb-2">
+                        <button
+                          onClick={() => verReceta(receta)}
+                          className="py-1.5 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                        >
+                          Ver
+                        </button>
                         <button
                           onClick={() => abrirModalReceta(receta)}
                           className="py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
@@ -1664,6 +1682,126 @@ export default function MenuComida() {
                     </div>
                   </button>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Ver Receta (solo lectura) */}
+        {modalVerReceta && recetaVisualizando && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 z-10">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold">{recetaVisualizando.nombre}</h2>
+                    {recetaVisualizando.favorita && <span className="text-xl">⭐</span>}
+                  </div>
+                  <button
+                    onClick={cerrarVistaReceta}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido */}
+              <div className="p-6 space-y-6">
+                {/* Foto */}
+                {recetaVisualizando.foto ? (
+                  <img
+                    src={recetaVisualizando.foto}
+                    alt={recetaVisualizando.nombre}
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-6xl rounded-lg">
+                    🍽️
+                  </div>
+                )}
+
+                {/* Categoría */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">Categoría</h3>
+                  <span className="inline-block px-3 py-1 bg-gray-100 rounded-full text-sm">
+                    {categoriasComida.find(c => c.value === recetaVisualizando.categoria)?.label || recetaVisualizando.categoria}
+                  </span>
+                </div>
+
+                {/* Etiquetas */}
+                {recetaVisualizando.etiquetas && recetaVisualizando.etiquetas.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Etiquetas</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {recetaVisualizando.etiquetas.map(etq => (
+                        <span key={etq} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                          {etq}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ingredientes */}
+                {recetaVisualizando.ingredientes && recetaVisualizando.ingredientes.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Ingredientes</h3>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      {recetaVisualizando.ingredientes.map((ing, idx) => (
+                        <li key={idx}>{ing}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Instrucciones */}
+                {recetaVisualizando.instrucciones && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Instrucciones</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap text-gray-700">
+                      {recetaVisualizando.instrucciones}
+                    </div>
+                  </div>
+                )}
+
+                {/* Habilitaciones */}
+                {recetaVisualizando.habilitaciones && recetaVisualizando.habilitaciones.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Habilitada para</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {recetaVisualizando.habilitaciones.map((hab, idx) => {
+                        const tiempo = tiemposComidaConfig.find(t => t.id === hab.tiempoComidaId);
+                        const componente = COMPONENTES_DISPONIBLES.find(c => c.id === hab.componenteId);
+                        return (
+                          <span key={idx} className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+                            {tiempo?.icono} {tiempo?.nombre} → {componente?.nombre}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer con botones */}
+              <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex justify-between gap-3">
+                <button
+                  onClick={cerrarVistaReceta}
+                  className="px-4 py-2 text-gray-700 border rounded-lg hover:bg-gray-50"
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={() => {
+                    cerrarVistaReceta();
+                    abrirModalReceta(recetaVisualizando);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Editar receta
+                </button>
               </div>
             </div>
           </div>
