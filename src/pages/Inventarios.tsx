@@ -238,23 +238,26 @@ export default function Inventarios() {
   }
 
   function abrirModal(item?: ItemInventario) {
+    // Helper: convertir 0 a vacío para mejor UX en inputs numéricos
+    const zeroToEmpty = (val: number | undefined) => (val === 0 || val === undefined) ? '' : val;
+
     if (item) {
       setEditando(item);
       setFormData({
         nombre: item.nombre,
         categoria: item.categoria,
         presentacion: item.presentacion || '',
-        cantidadMaestro: item.cantidadMaestro,
-        cantidadTransito: item.cantidadTransito,
-        cantidadOperativo: item.cantidadOperativo,
+        cantidadMaestro: zeroToEmpty(item.cantidadMaestro),
+        cantidadTransito: zeroToEmpty(item.cantidadTransito),
+        cantidadOperativo: zeroToEmpty(item.cantidadOperativo),
         unidad: item.unidad,
-        nivelMinimoMaestro: item.nivelMinimoMaestro,
-        nivelMinimoTransito: item.nivelMinimoTransito || 7,
-        nivelMinimoOperativo: item.nivelMinimoOperativo,
+        nivelMinimoMaestro: zeroToEmpty(item.nivelMinimoMaestro),
+        nivelMinimoTransito: zeroToEmpty(item.nivelMinimoTransito),
+        nivelMinimoOperativo: zeroToEmpty(item.nivelMinimoOperativo),
         ubicacion: item.ubicacion || '',
         notas: item.notas || '',
         tieneVidaUtil: item.tieneVidaUtil || false,
-        vidaUtilDias: item.vidaUtilDias || 0,
+        vidaUtilDias: zeroToEmpty(item.vidaUtilDias),
         vinculadoPastillero: item.vinculadoPastillero || false,
       });
     } else {
@@ -968,15 +971,27 @@ export default function Inventarios() {
 
       {/* Modal crear/editar item */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 z-10">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowModal(false);
+              resetForm();
+            }
+          }}
+        >
+          <div className="bg-white w-full sm:max-w-2xl sm:rounded-lg rounded-t-2xl shadow-xl max-h-[92vh] sm:max-h-[85vh] flex flex-col animate-slide-up sm:animate-scale-in">
+            {/* Handle móvil */}
+            <div className="sm:hidden flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 z-10 rounded-t-2xl sm:rounded-t-lg">
               <h2 className="text-2xl font-bold text-gray-900">
                 {editando ? 'Editar Item' : 'Nuevo Item'}
               </h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
@@ -1071,7 +1086,7 @@ export default function Inventarios() {
                         <input
                           type="number"
                           min="0"
-                          step="1"
+                          step="0.5"
                           value={formData.cantidadTransito}
                           onChange={(e) => setFormData({ ...formData, cantidadTransito: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                           className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -1083,7 +1098,7 @@ export default function Inventarios() {
                         <input
                           type="number"
                           min="0"
-                          step="1"
+                          step="0.5"
                           value={formData.nivelMinimoTransito}
                           onChange={(e) => setFormData({ ...formData, nivelMinimoTransito: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                           className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"

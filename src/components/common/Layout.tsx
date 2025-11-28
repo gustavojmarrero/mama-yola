@@ -321,6 +321,7 @@ export default function Layout({ children }: LayoutProps) {
         <aside
           className={`
             ${sidebarExpanded ? 'w-72' : 'w-20'}
+            h-screen sticky top-0
             bg-white border-r border-warm-100
             transition-all duration-300 ease-out
             flex flex-col flex-shrink-0
