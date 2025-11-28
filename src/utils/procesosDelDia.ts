@@ -147,7 +147,8 @@ function chequeoCompletado(
 }
 
 /**
- * Verifica si los signos vitales fueron registrados cerca de una hora específica
+ * Verifica si los signos vitales fueron registrados para una hora específica
+ * Un registro es válido si fue hecho desde 30 min antes de la hora programada en adelante
  */
 function signosVitalesCompletado(
   signos: SignoVital[],
@@ -157,14 +158,18 @@ function signosVitalesCompletado(
   const hoy = fecha.toISOString().split('T')[0];
   const horaProg = horaStringADate(horaProgramada, fecha);
 
-  // Buscar un registro de signos vitales dentro de ±2 horas de la hora programada
+  // Buscar un registro de signos vitales que sea:
+  // 1. Del mismo día
+  // 2. Registrado desde 30 min antes de la hora programada en adelante
   const signo = signos.find(s => {
     const fechaSigno = s.fecha instanceof Date ? s.fecha : new Date(s.fecha);
     if (fechaSigno.toISOString().split('T')[0] !== hoy) return false;
 
     const horaSigno = horaStringADate(s.hora, fecha);
-    const diff = Math.abs(diferenciaMinutos(horaSigno, horaProg));
-    return diff <= 120; // dentro de 2 horas
+    const diffConProgramada = diferenciaMinutos(horaSigno, horaProg);
+
+    // El registro es válido si fue hecho desde 30 min antes de la hora programada en adelante
+    return diffConProgramada >= -30;
   });
 
   if (signo) {
