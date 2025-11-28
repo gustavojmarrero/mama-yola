@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   collection,
   getDocs,
@@ -15,6 +15,10 @@ import { Medicamento, RegistroMedicamento, EstadoMedicamento, DosisDelDia, ItemS
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
 import ViewToggle from '../components/common/ViewToggle';
+import SearchBar from '../components/common/SearchBar';
+import FilterPanel, { FilterSelect } from '../components/common/FilterPanel';
+import SortDropdown from '../components/common/SortDropdown';
+import LoadMoreButton from '../components/common/LoadMoreButton';
 import DosisCard from '../components/pastillero/DosisCard';
 import HistorialCard from '../components/pastillero/HistorialCard';
 import TransitoPanel from '../components/transito/TransitoPanel';
@@ -23,6 +27,21 @@ import SolicitudReposicionModal from '../components/transito/SolicitudReposicion
 import { useTransito } from '../hooks/useTransito';
 
 const PACIENTE_ID = 'paciente-principal';
+const ITEMS_PER_PAGE = 10;
+
+const SORT_OPTIONS_HOY = [
+  { value: 'horario_asc', label: 'Horario (temprano primero)' },
+  { value: 'horario_desc', label: 'Horario (tarde primero)' },
+  { value: 'nombre_asc', label: 'Nombre A-Z' },
+  { value: 'estado', label: 'Por estado' },
+];
+
+const SORT_OPTIONS_HISTORIAL = [
+  { value: 'fecha_desc', label: 'Más recientes' },
+  { value: 'fecha_asc', label: 'Más antiguos' },
+  { value: 'nombre_asc', label: 'Nombre A-Z' },
+  { value: 'estado', label: 'Por estado' },
+];
 
 export default function PastilleroDiario() {
   const { usuario, userProfile } = useAuth();
@@ -104,6 +123,16 @@ export default function PastilleroDiario() {
   const [filtroMedicamento, setFiltroMedicamento] = useState<string>('todos');
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
   const [vista, setVista] = useState<'grid' | 'list'>('list');
+
+  // Estados de búsqueda, filtros colapsables, ordenamiento y paginación
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtersOpenHoy, setFiltersOpenHoy] = useState(false);
+  const [filtersOpenHistorial, setFiltersOpenHistorial] = useState(false);
+  const [sortByHoy, setSortByHoy] = useState('horario_asc');
+  const [sortByHistorial, setSortByHistorial] = useState('fecha_desc');
+  const [filtroEstadoHoy, setFiltroEstadoHoy] = useState<string>('todos');
+  const [visibleCountHoy, setVisibleCountHoy] = useState(ITEMS_PER_PAGE);
+  const [visibleCountHistorial, setVisibleCountHistorial] = useState(ITEMS_PER_PAGE);
 
   useEffect(() => {
     cargarDosisDelDia();
@@ -343,94 +372,276 @@ export default function PastilleroDiario() {
     await crearSolicitudReposicion(items, notas, urgencia, usuario.uid, userProfile?.nombre || 'Usuario');
   }
 
-  function renderVistaDia() {
-    if (dosisDelDia.length === 0) {
-      return (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
-          <svg
-            className="w-16 h-16 text-gray-300 mx-auto mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
-            />
-          </svg>
-          <p className="text-gray-500 text-lg">No hay medicamentos programados para hoy</p>
-        </div>
+  // Lógica de filtrado y ordenamiento para Vista Hoy
+  const dosisFiltradas = useMemo(() => {
+    let resultado = [...dosisDelDia];
+
+    // Búsqueda por nombre de medicamento
+    if (searchTerm) {
+      const termLower = searchTerm.toLowerCase();
+      resultado = resultado.filter(
+        (dosis) =>
+          dosis.medicamento.nombre.toLowerCase().includes(termLower) ||
+          dosis.medicamento.dosis.toLowerCase().includes(termLower)
       );
     }
 
+    // Filtro por estado
+    if (filtroEstadoHoy !== 'todos') {
+      resultado = resultado.filter((dosis) => {
+        if (filtroEstadoHoy === 'pendiente') return !dosis.registro;
+        if (filtroEstadoHoy === 'tomado') return dosis.registro?.estado === 'tomado';
+        if (filtroEstadoHoy === 'rechazado') return dosis.registro?.estado === 'rechazado';
+        if (filtroEstadoHoy === 'omitido') return dosis.registro?.estado === 'omitido';
+        return true;
+      });
+    }
+
+    // Ordenamiento
+    resultado.sort((a, b) => {
+      switch (sortByHoy) {
+        case 'horario_asc':
+          return a.horario.localeCompare(b.horario);
+        case 'horario_desc':
+          return b.horario.localeCompare(a.horario);
+        case 'nombre_asc':
+          return a.medicamento.nombre.localeCompare(b.medicamento.nombre);
+        case 'estado':
+          const getEstadoOrder = (d: DosisDelDia) => {
+            if (!d.registro) return d.retrasoMinutos && d.retrasoMinutos > 0 ? 0 : 1;
+            if (d.registro.estado === 'tomado') return 2;
+            return 3;
+          };
+          return getEstadoOrder(a) - getEstadoOrder(b);
+        default:
+          return a.horario.localeCompare(b.horario);
+      }
+    });
+
+    return resultado;
+  }, [dosisDelDia, searchTerm, filtroEstadoHoy, sortByHoy]);
+
+  // Lógica de filtrado y ordenamiento para Historial
+  const historialFiltrado = useMemo(() => {
+    let resultado = [...historialRegistros];
+
+    // Búsqueda por nombre de medicamento
+    if (searchTerm) {
+      const termLower = searchTerm.toLowerCase();
+      resultado = resultado.filter((reg) =>
+        reg.medicamentoNombre.toLowerCase().includes(termLower)
+      );
+    }
+
+    // Filtro por medicamento
+    if (filtroMedicamento !== 'todos') {
+      resultado = resultado.filter((reg) => reg.medicamentoId === filtroMedicamento);
+    }
+
+    // Filtro por estado
+    if (filtroEstado !== 'todos') {
+      resultado = resultado.filter((reg) => reg.estado === filtroEstado);
+    }
+
+    // Ordenamiento
+    resultado.sort((a, b) => {
+      switch (sortByHistorial) {
+        case 'fecha_desc':
+          return b.fechaHoraProgramada.getTime() - a.fechaHoraProgramada.getTime();
+        case 'fecha_asc':
+          return a.fechaHoraProgramada.getTime() - b.fechaHoraProgramada.getTime();
+        case 'nombre_asc':
+          return a.medicamentoNombre.localeCompare(b.medicamentoNombre);
+        case 'estado':
+          return a.estado.localeCompare(b.estado);
+        default:
+          return b.fechaHoraProgramada.getTime() - a.fechaHoraProgramada.getTime();
+      }
+    });
+
+    return resultado;
+  }, [historialRegistros, searchTerm, filtroMedicamento, filtroEstado, sortByHistorial]);
+
+  // Items visibles con paginación
+  const dosisVisibles = dosisFiltradas.slice(0, visibleCountHoy);
+  const historialVisible = historialFiltrado.slice(0, visibleCountHistorial);
+  const hasMoreHoy = visibleCountHoy < dosisFiltradas.length;
+  const hasMoreHistorial = visibleCountHistorial < historialFiltrado.length;
+
+  // Contar filtros activos
+  const activeFiltersCountHoy = [filtroEstadoHoy !== 'todos'].filter(Boolean).length;
+  const activeFiltersCountHistorial = [
+    filtroMedicamento !== 'todos',
+    filtroEstado !== 'todos',
+  ].filter(Boolean).length;
+
+  // Resetear paginación cuando cambian filtros
+  useEffect(() => {
+    setVisibleCountHoy(ITEMS_PER_PAGE);
+  }, [searchTerm, filtroEstadoHoy, sortByHoy]);
+
+  useEffect(() => {
+    setVisibleCountHistorial(ITEMS_PER_PAGE);
+  }, [searchTerm, filtroMedicamento, filtroEstado, sortByHistorial]);
+
+  // Resetear búsqueda y paginación al cambiar de vista
+  useEffect(() => {
+    setSearchTerm('');
+    setVisibleCountHoy(ITEMS_PER_PAGE);
+    setVisibleCountHistorial(ITEMS_PER_PAGE);
+  }, [vistaActual]);
+
+  function handleLoadMoreHoy() {
+    setVisibleCountHoy((prev) => prev + ITEMS_PER_PAGE);
+  }
+
+  function handleLoadMoreHistorial() {
+    setVisibleCountHistorial((prev) => prev + ITEMS_PER_PAGE);
+  }
+
+  function handleClearFiltersHoy() {
+    setFiltroEstadoHoy('todos');
+  }
+
+  function handleClearFiltersHistorial() {
+    setFiltroMedicamento('todos');
+    setFiltroEstado('todos');
+  }
+
+  function renderVistaDia() {
     return (
-      <div
-        className={
-          vista === 'grid'
-            ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
-            : 'space-y-4'
-        }
-      >
-        {dosisDelDia.map((dosis, index) => (
-          <DosisCard
-            key={`${dosis.medicamento.id}-${dosis.horario}-${index}`}
-            dosis={dosis}
-            viewMode={vista}
-            onRegistrar={abrirModal}
+      <div className="space-y-6">
+        {/* Barra de herramientas */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Buscar medicamento..."
+            className="flex-1 max-w-md"
           />
-        ))}
+          <div className="flex items-center gap-3">
+            <FilterPanel
+              isOpen={filtersOpenHoy}
+              onToggle={() => setFiltersOpenHoy(!filtersOpenHoy)}
+              activeFiltersCount={activeFiltersCountHoy}
+              onClear={handleClearFiltersHoy}
+            >
+              <FilterSelect
+                label="Estado"
+                value={filtroEstadoHoy}
+                onChange={setFiltroEstadoHoy}
+                options={[
+                  { value: 'todos', label: 'Todos' },
+                  { value: 'pendiente', label: 'Pendiente' },
+                  { value: 'tomado', label: 'Tomado' },
+                  { value: 'rechazado', label: 'Rechazado' },
+                  { value: 'omitido', label: 'Omitido' },
+                ]}
+              />
+            </FilterPanel>
+            <SortDropdown value={sortByHoy} options={SORT_OPTIONS_HOY} onChange={setSortByHoy} />
+          </div>
+        </div>
+
+        {/* Lista de dosis */}
+        {dosisDelDia.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
+            <svg
+              className="w-16 h-16 text-gray-300 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+              />
+            </svg>
+            <p className="text-gray-500 text-lg">No hay medicamentos programados para hoy</p>
+          </div>
+        ) : dosisFiltradas.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center shadow-sm">
+            <p className="text-gray-500">No se encontraron dosis que coincidan con los filtros</p>
+          </div>
+        ) : (
+          <>
+            <div
+              className={
+                vista === 'grid'
+                  ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
+                  : 'space-y-4'
+              }
+            >
+              {dosisVisibles.map((dosis, index) => (
+                <DosisCard
+                  key={`${dosis.medicamento.id}-${dosis.horario}-${index}`}
+                  dosis={dosis}
+                  viewMode={vista}
+                  onRegistrar={abrirModal}
+                />
+              ))}
+            </div>
+            <LoadMoreButton
+              onClick={handleLoadMoreHoy}
+              hasMore={hasMoreHoy}
+              loadedCount={dosisVisibles.length}
+              totalCount={dosisFiltradas.length}
+              itemsPerLoad={ITEMS_PER_PAGE}
+            />
+          </>
+        )}
       </div>
     );
   }
 
   function renderHistorial() {
-    const registrosFiltrados = historialRegistros.filter((reg) => {
-      if (filtroMedicamento !== 'todos' && reg.medicamentoId !== filtroMedicamento) return false;
-      if (filtroEstado !== 'todos' && reg.estado !== filtroEstado) return false;
-      return true;
-    });
-
     return (
       <div className="space-y-6">
-        {/* Filtros */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-          <div className="flex gap-4 flex-wrap">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Medicamento:</label>
-              <select
+        {/* Barra de herramientas */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Buscar medicamento..."
+            className="flex-1 max-w-md"
+          />
+          <div className="flex items-center gap-3">
+            <FilterPanel
+              isOpen={filtersOpenHistorial}
+              onToggle={() => setFiltersOpenHistorial(!filtersOpenHistorial)}
+              activeFiltersCount={activeFiltersCountHistorial}
+              onClear={handleClearFiltersHistorial}
+            >
+              <FilterSelect
+                label="Medicamento"
                 value={filtroMedicamento}
-                onChange={(e) => setFiltroMedicamento(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="todos">Todos</option>
-                {medicamentos.map((med) => (
-                  <option key={med.id} value={med.id}>
-                    {med.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-              <select
+                onChange={setFiltroMedicamento}
+                options={[
+                  { value: 'todos', label: 'Todos' },
+                  ...medicamentos.map((med) => ({ value: med.id, label: med.nombre })),
+                ]}
+              />
+              <FilterSelect
+                label="Estado"
                 value={filtroEstado}
-                onChange={(e) => setFiltroEstado(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="todos">Todos</option>
-                <option value="tomado">Tomado</option>
-                <option value="rechazado">Rechazado</option>
-                <option value="omitido">Omitido</option>
-                <option value="pendiente">Pendiente</option>
-              </select>
-            </div>
+                onChange={setFiltroEstado}
+                options={[
+                  { value: 'todos', label: 'Todos' },
+                  { value: 'tomado', label: 'Tomado' },
+                  { value: 'rechazado', label: 'Rechazado' },
+                  { value: 'omitido', label: 'Omitido' },
+                  { value: 'pendiente', label: 'Pendiente' },
+                ]}
+              />
+            </FilterPanel>
+            <SortDropdown value={sortByHistorial} options={SORT_OPTIONS_HISTORIAL} onChange={setSortByHistorial} />
           </div>
         </div>
 
         {/* Lista/Grid */}
-        {registrosFiltrados.length === 0 ? (
+        {historialRegistros.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
             <svg
               className="w-16 h-16 text-gray-300 mx-auto mb-4"
@@ -447,18 +658,31 @@ export default function PastilleroDiario() {
             </svg>
             <p className="text-gray-500 text-lg">No hay registros en el historial</p>
           </div>
-        ) : (
-          <div
-            className={
-              vista === 'grid'
-                ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
-                : 'space-y-4'
-            }
-          >
-            {registrosFiltrados.map((reg) => (
-              <HistorialCard key={reg.id} registro={reg} viewMode={vista} />
-            ))}
+        ) : historialFiltrado.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center shadow-sm">
+            <p className="text-gray-500">No se encontraron registros que coincidan con los filtros</p>
           </div>
+        ) : (
+          <>
+            <div
+              className={
+                vista === 'grid'
+                  ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
+                  : 'space-y-4'
+              }
+            >
+              {historialVisible.map((reg) => (
+                <HistorialCard key={reg.id} registro={reg} viewMode={vista} />
+              ))}
+            </div>
+            <LoadMoreButton
+              onClick={handleLoadMoreHistorial}
+              hasMore={hasMoreHistorial}
+              loadedCount={historialVisible.length}
+              totalCount={historialFiltrado.length}
+              itemsPerLoad={ITEMS_PER_PAGE}
+            />
+          </>
         )}
       </div>
     );

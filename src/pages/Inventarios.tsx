@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   collection,
   addDoc,
@@ -13,6 +13,10 @@ import { db } from '../config/firebase';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Layout from '../components/common/Layout';
+import SearchBar from '../components/common/SearchBar';
+import FilterPanel, { FilterSelect, FilterCheckbox } from '../components/common/FilterPanel';
+import SortDropdown from '../components/common/SortDropdown';
+import LoadMoreButton from '../components/common/LoadMoreButton';
 import {
   ItemInventario,
   MovimientoInventario,
@@ -23,6 +27,15 @@ import { useAuth } from '../context/AuthContext';
 
 const PACIENTE_ID = 'paciente-principal';
 const DIAS_ALERTA_VENCIMIENTO = 3;
+const ITEMS_PER_PAGE = 10;
+
+const SORT_OPTIONS = [
+  { value: 'nombre_asc', label: 'Nombre A-Z' },
+  { value: 'nombre_desc', label: 'Nombre Z-A' },
+  { value: 'estado', label: 'Por estado' },
+  { value: 'categoria', label: 'Por categoría' },
+  { value: 'reciente', label: 'Más recientes' },
+];
 
 // Tipo para las notificaciones toast
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -54,6 +67,12 @@ export default function Inventarios() {
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'critico' | 'bajo' | 'ok'>('todos');
   const [filtroVidaUtil, setFiltroVidaUtil] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Estados de búsqueda, filtros colapsables, ordenamiento y paginación
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('nombre_asc');
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
 
   // Control de permisos por rol
   const puedeEditar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
@@ -509,13 +528,84 @@ export default function Inventarios() {
     }
   }
 
-  // Filtrar items
-  const itemsFiltrados = items.filter((item) => {
-    const matchCategoria = filtroCategoria === 'todos' || item.categoria === filtroCategoria;
-    const matchEstado = filtroEstado === 'todos' || getEstadoItem(item) === filtroEstado;
-    const matchVidaUtil = !filtroVidaUtil || (item.tieneVidaUtil && item.fechaInicioConsumo && item.cantidadOperativo > 0);
-    return matchCategoria && matchEstado && matchVidaUtil;
-  });
+  // Filtrar, buscar y ordenar items con useMemo
+  const itemsFiltrados = useMemo(() => {
+    let resultado = [...items];
+
+    // Búsqueda por nombre
+    if (searchTerm) {
+      const termLower = searchTerm.toLowerCase();
+      resultado = resultado.filter(
+        (item) =>
+          item.nombre.toLowerCase().includes(termLower) ||
+          (item.presentacion && item.presentacion.toLowerCase().includes(termLower))
+      );
+    }
+
+    // Filtro por categoría
+    if (filtroCategoria !== 'todos') {
+      resultado = resultado.filter((item) => item.categoria === filtroCategoria);
+    }
+
+    // Filtro por estado
+    if (filtroEstado !== 'todos') {
+      resultado = resultado.filter((item) => getEstadoItem(item) === filtroEstado);
+    }
+
+    // Filtro por vida útil
+    if (filtroVidaUtil) {
+      resultado = resultado.filter(
+        (item) => item.tieneVidaUtil && item.fechaInicioConsumo && item.cantidadOperativo > 0
+      );
+    }
+
+    // Ordenamiento
+    resultado.sort((a, b) => {
+      switch (sortBy) {
+        case 'nombre_asc':
+          return a.nombre.localeCompare(b.nombre);
+        case 'nombre_desc':
+          return b.nombre.localeCompare(a.nombre);
+        case 'estado':
+          const estadoOrder = { critico: 0, bajo: 1, ok: 2 };
+          return (estadoOrder[getEstadoItem(a)] || 2) - (estadoOrder[getEstadoItem(b)] || 2);
+        case 'categoria':
+          return a.categoria.localeCompare(b.categoria);
+        case 'reciente':
+          return b.creadoEn.getTime() - a.creadoEn.getTime();
+        default:
+          return a.nombre.localeCompare(b.nombre);
+      }
+    });
+
+    return resultado;
+  }, [items, searchTerm, filtroCategoria, filtroEstado, filtroVidaUtil, sortBy]);
+
+  // Items visibles con paginación
+  const itemsVisibles = itemsFiltrados.slice(0, visibleCount);
+  const hasMore = visibleCount < itemsFiltrados.length;
+
+  // Contar filtros activos
+  const activeFiltersCount = [
+    filtroCategoria !== 'todos',
+    filtroEstado !== 'todos',
+    filtroVidaUtil,
+  ].filter(Boolean).length;
+
+  // Resetear paginación cuando cambian filtros
+  useEffect(() => {
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, [searchTerm, filtroCategoria, filtroEstado, filtroVidaUtil, sortBy]);
+
+  function handleLoadMore() {
+    setVisibleCount((prev) => prev + ITEMS_PER_PAGE);
+  }
+
+  function handleClearFilters() {
+    setFiltroCategoria('todos');
+    setFiltroEstado('todos');
+    setFiltroVidaUtil(false);
+  }
 
   // Alertas
   const itemsCriticos = items.filter((i) => getEstadoItem(i) === 'critico');
@@ -596,78 +686,63 @@ export default function Inventarios() {
             </div>
           )}
 
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
-                <select
+          {/* Barra de herramientas: Búsqueda, Filtros, Ordenamiento */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <SearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Buscar por nombre o presentación..."
+              className="flex-1 max-w-md"
+            />
+            <div className="flex items-center gap-3 flex-wrap">
+              <FilterPanel
+                isOpen={filtersOpen}
+                onToggle={() => setFiltersOpen(!filtersOpen)}
+                activeFiltersCount={activeFiltersCount}
+                onClear={handleClearFilters}
+              >
+                <FilterSelect
+                  label="Categoría"
                   value={filtroCategoria}
-                  onChange={(e) => setFiltroCategoria(e.target.value as CategoriaInventario | 'todos')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="todos">Todas</option>
-                  {categorias.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.icon} {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
-                <select
+                  onChange={(v) => setFiltroCategoria(v as CategoriaInventario | 'todos')}
+                  options={[
+                    { value: 'todos', label: 'Todas' },
+                    ...categorias.map((cat) => ({ value: cat.value, label: `${cat.icon} ${cat.label}` })),
+                  ]}
+                />
+                <FilterSelect
+                  label="Estado"
                   value={filtroEstado}
-                  onChange={(e) => setFiltroEstado(e.target.value as typeof filtroEstado)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="todos">Todos</option>
-                  <option value="critico">🔴 Crítico</option>
-                  <option value="bajo">🟡 Bajo</option>
-                  <option value="ok">🟢 OK</option>
-                </select>
-              </div>
-
-              <div className="flex items-center pt-7">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filtroVidaUtil}
-                    onChange={(e) => setFiltroVidaUtil(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
-                  />
-                  <span className="text-sm text-gray-700">⏳ Solo vida útil activa</span>
-                </label>
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  onClick={() => setShowHistorialModal(true)}
-                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
-                >
-                  📜 Ver Movimientos
-                </button>
-              </div>
-
+                  onChange={(v) => setFiltroEstado(v as 'todos' | 'critico' | 'bajo' | 'ok')}
+                  options={[
+                    { value: 'todos', label: 'Todos' },
+                    { value: 'critico', label: 'Crítico' },
+                    { value: 'bajo', label: 'Bajo' },
+                    { value: 'ok', label: 'OK' },
+                  ]}
+                />
+                <FilterCheckbox
+                  label="Solo vida útil activa"
+                  checked={filtroVidaUtil}
+                  onChange={setFiltroVidaUtil}
+                />
+              </FilterPanel>
+              <SortDropdown value={sortBy} options={SORT_OPTIONS} onChange={setSortBy} />
+              <button
+                onClick={() => setShowHistorialModal(true)}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+              >
+                Movimientos
+              </button>
               {puedeEditar && (
-                <div className="flex items-end">
-                  <button
-                    onClick={() => abrirModal()}
-                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-                  >
-                    + Nuevo Item
-                  </button>
-                </div>
+                <button
+                  onClick={() => abrirModal()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  + Nuevo
+                </button>
               )}
             </div>
-          </div>
-
-          {/* Resumen */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600">
-              Mostrando <strong>{itemsFiltrados.length}</strong> items en inventario
-            </p>
           </div>
 
           {/* Alerta de items por agotarse (vida útil) */}
@@ -714,7 +789,7 @@ export default function Inventarios() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {itemsFiltrados.map((item) => {
+                {itemsVisibles.map((item) => {
                   const estado = getEstadoItem(item);
                   const catInfo = categorias.find((c) => c.value === item.categoria);
                   const porAgotarse = itemPorAgotarse(item);
@@ -877,6 +952,17 @@ export default function Inventarios() {
               </div>
             )}
           </div>
+
+          {/* Paginación Load More */}
+          {!loading && itemsFiltrados.length > 0 && (
+            <LoadMoreButton
+              onClick={handleLoadMore}
+              hasMore={hasMore}
+              loadedCount={itemsVisibles.length}
+              totalCount={itemsFiltrados.length}
+              itemsPerLoad={ITEMS_PER_PAGE}
+            />
+          )}
         </div>
       </div>
 

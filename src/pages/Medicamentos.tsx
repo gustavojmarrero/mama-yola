@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   collection,
   addDoc,
@@ -11,10 +11,36 @@ import { db, storage } from '../config/firebase';
 import { Medicamento } from '../types';
 import Layout from '../components/common/Layout';
 import ViewToggle from '../components/common/ViewToggle';
+import SearchBar from '../components/common/SearchBar';
+import FilterPanel, { FilterSelect } from '../components/common/FilterPanel';
+import SortDropdown from '../components/common/SortDropdown';
+import LoadMoreButton from '../components/common/LoadMoreButton';
 import MedicamentoCard from '../components/medicamentos/MedicamentoCard';
 import MedicamentoModal, { MedicamentoFormData } from '../components/medicamentos/MedicamentoModal';
 
 const PACIENTE_ID = 'paciente-principal';
+const ITEMS_PER_PAGE = 10;
+
+const PRESENTACIONES = [
+  { value: '', label: 'Todas' },
+  { value: 'tableta', label: 'Tableta' },
+  { value: 'capsula', label: 'Cápsula' },
+  { value: 'jarabe', label: 'Jarabe' },
+  { value: 'suspension', label: 'Suspensión' },
+  { value: 'gotas', label: 'Gotas' },
+  { value: 'inyectable', label: 'Inyectable' },
+  { value: 'supositorio', label: 'Supositorio' },
+  { value: 'parche', label: 'Parche' },
+  { value: 'crema', label: 'Crema' },
+  { value: 'otro', label: 'Otro' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'horario', label: 'Por horario' },
+  { value: 'nombre_asc', label: 'Nombre A-Z' },
+  { value: 'nombre_desc', label: 'Nombre Z-A' },
+  { value: 'reciente', label: 'Más recientes' },
+];
 
 export default function Medicamentos() {
   const [loading, setLoading] = useState(false);
@@ -22,6 +48,14 @@ export default function Medicamentos() {
   const [vista, setVista] = useState<'grid' | 'list'>('list');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [medicamentoEditando, setMedicamentoEditando] = useState<Medicamento | null>(null);
+
+  // Estados de filtros/búsqueda/ordenamiento
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterActivo, setFilterActivo] = useState<'todos' | 'activos' | 'inactivos'>('todos');
+  const [filterPresentacion, setFilterPresentacion] = useState('');
+  const [sortBy, setSortBy] = useState('horario');
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
 
   const diasSemanaLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -73,6 +107,86 @@ export default function Medicamentos() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Lógica de filtrado, búsqueda y ordenamiento
+  const medicamentosFiltrados = useMemo(() => {
+    let resultado = [...medicamentos];
+
+    // Filtro por búsqueda
+    if (searchTerm) {
+      const termLower = searchTerm.toLowerCase();
+      resultado = resultado.filter(
+        (med) =>
+          med.nombre.toLowerCase().includes(termLower) ||
+          med.dosis.toLowerCase().includes(termLower)
+      );
+    }
+
+    // Filtro por estado activo
+    if (filterActivo === 'activos') {
+      resultado = resultado.filter((med) => med.activo);
+    } else if (filterActivo === 'inactivos') {
+      resultado = resultado.filter((med) => !med.activo);
+    }
+
+    // Filtro por presentación
+    if (filterPresentacion) {
+      resultado = resultado.filter((med) => med.presentacion === filterPresentacion);
+    }
+
+    // Ordenamiento
+    const getMinHorario = (horarios: string[]) => {
+      if (!horarios || horarios.length === 0) return Infinity;
+      return Math.min(
+        ...horarios.map((h) => {
+          const [hora, min] = h.split(':').map(Number);
+          return hora * 60 + min;
+        })
+      );
+    };
+
+    resultado.sort((a, b) => {
+      switch (sortBy) {
+        case 'nombre_asc':
+          return a.nombre.localeCompare(b.nombre);
+        case 'nombre_desc':
+          return b.nombre.localeCompare(a.nombre);
+        case 'reciente':
+          return b.creadoEn.getTime() - a.creadoEn.getTime();
+        case 'horario':
+        default:
+          // Activos primero, luego por horario
+          if (a.activo !== b.activo) return a.activo ? -1 : 1;
+          return getMinHorario(a.horarios) - getMinHorario(b.horarios);
+      }
+    });
+
+    return resultado;
+  }, [medicamentos, searchTerm, filterActivo, filterPresentacion, sortBy]);
+
+  // Items visibles con paginación
+  const medicamentosVisibles = medicamentosFiltrados.slice(0, visibleCount);
+  const hasMore = visibleCount < medicamentosFiltrados.length;
+
+  // Contar filtros activos
+  const activeFiltersCount = [
+    filterActivo !== 'todos',
+    filterPresentacion !== '',
+  ].filter(Boolean).length;
+
+  // Resetear paginación cuando cambian filtros
+  useEffect(() => {
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, [searchTerm, filterActivo, filterPresentacion, sortBy]);
+
+  function handleLoadMore() {
+    setVisibleCount((prev) => prev + ITEMS_PER_PAGE);
+  }
+
+  function handleClearFilters() {
+    setFilterActivo('todos');
+    setFilterPresentacion('');
   }
 
   async function handleSave(data: MedicamentoFormData, isEdit: boolean) {
@@ -200,16 +314,8 @@ export default function Medicamentos() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Pastillero Virtual</h1>
-            <p className="text-gray-500 mt-1 text-sm flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Ordenados por primer horario del día
+            <p className="text-gray-500 mt-1 text-sm">
+              {medicamentosFiltrados.length} de {medicamentos.length} medicamentos
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -223,6 +329,42 @@ export default function Medicamentos() {
             >
               + Nuevo
             </button>
+          </div>
+        </div>
+
+        {/* Barra de herramientas: Búsqueda, Filtros, Ordenamiento */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Buscar por nombre o dosis..."
+            className="flex-1 max-w-md"
+          />
+          <div className="flex items-center gap-3">
+            <FilterPanel
+              isOpen={filtersOpen}
+              onToggle={() => setFiltersOpen(!filtersOpen)}
+              activeFiltersCount={activeFiltersCount}
+              onClear={handleClearFilters}
+            >
+              <FilterSelect
+                label="Estado"
+                value={filterActivo}
+                onChange={(v) => setFilterActivo(v as 'todos' | 'activos' | 'inactivos')}
+                options={[
+                  { value: 'todos', label: 'Todos' },
+                  { value: 'activos', label: 'Activos' },
+                  { value: 'inactivos', label: 'Inactivos' },
+                ]}
+              />
+              <FilterSelect
+                label="Presentación"
+                value={filterPresentacion}
+                onChange={setFilterPresentacion}
+                options={PRESENTACIONES}
+              />
+            </FilterPanel>
+            <SortDropdown value={sortBy} options={SORT_OPTIONS} onChange={setSortBy} />
           </div>
         </div>
 
@@ -259,7 +401,7 @@ export default function Medicamentos() {
                 : 'space-y-4'
             }
           >
-            {medicamentos.map((med) => (
+            {medicamentosVisibles.map((med) => (
               <MedicamentoCard
                 key={med.id}
                 medicamento={med}
@@ -270,6 +412,17 @@ export default function Medicamentos() {
               />
             ))}
           </div>
+        )}
+
+        {/* Paginación Load More */}
+        {!loading && medicamentosFiltrados.length > 0 && (
+          <LoadMoreButton
+            onClick={handleLoadMore}
+            hasMore={hasMore}
+            loadedCount={medicamentosVisibles.length}
+            totalCount={medicamentosFiltrados.length}
+            itemsPerLoad={ITEMS_PER_PAGE}
+          />
         )}
 
         {/* Modal */}
