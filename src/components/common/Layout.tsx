@@ -135,7 +135,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Navegación con grupos */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+      <nav className="flex-1 min-h-0 px-3 py-4 overflow-y-auto">
         {visibleGroups.map((group, groupIndex) => (
           <div key={group.label} className={groupIndex > 0 ? 'mt-6' : ''}>
             {/* Label del grupo */}
@@ -201,7 +201,7 @@ export default function Layout({ children }: LayoutProps) {
       </nav>
 
       {/* Footer - Usuario */}
-      <div className="mt-auto border-t border-warm-100 p-4">
+      <div className="flex-shrink-0 border-t border-warm-100 p-4">
         {expanded ? (
           <div className="bg-gradient-to-br from-warm-50 to-lavender-50/50 rounded-xl p-4 mb-3">
             <div className="flex items-center gap-3">

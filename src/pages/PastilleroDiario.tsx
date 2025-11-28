@@ -11,18 +11,14 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Medicamento, RegistroMedicamento, EstadoMedicamento } from '../types';
+import { Medicamento, RegistroMedicamento, EstadoMedicamento, DosisDelDia } from '../types';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
+import ViewToggle from '../components/common/ViewToggle';
+import DosisCard from '../components/pastillero/DosisCard';
+import HistorialCard from '../components/pastillero/HistorialCard';
 
 const PACIENTE_ID = 'paciente-principal';
-
-interface DosisDelDia {
-  medicamento: Medicamento;
-  horario: string;
-  registro?: RegistroMedicamento;
-  retrasoMinutos?: number;
-}
 
 export default function PastilleroDiario() {
   const { usuario, userProfile } = useAuth();
@@ -90,6 +86,7 @@ export default function PastilleroDiario() {
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
   const [filtroMedicamento, setFiltroMedicamento] = useState<string>('todos');
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
+  const [vista, setVista] = useState<'grid' | 'list'>('list');
 
   useEffect(() => {
     cargarDosisDelDia();
@@ -313,145 +310,44 @@ export default function PastilleroDiario() {
     }
   }
 
-  function getEstadoColor(estado?: EstadoMedicamento) {
-    if (!estado) return 'bg-gray-100 text-gray-800';
-    switch (estado) {
-      case 'tomado':
-        return 'bg-green-100 text-green-800';
-      case 'rechazado':
-        return 'bg-red-100 text-red-800';
-      case 'omitido':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'pendiente':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  }
-
-  function getEstadoLabel(estado?: EstadoMedicamento) {
-    if (!estado) return 'Pendiente';
-    switch (estado) {
-      case 'tomado':
-        return 'Tomado';
-      case 'rechazado':
-        return 'Rechazado';
-      case 'omitido':
-        return 'Omitido';
-      case 'pendiente':
-        return 'Pendiente';
-      default:
-        return estado;
-    }
-  }
-
   function renderVistaDia() {
+    if (dosisDelDia.length === 0) {
+      return (
+        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
+          <svg
+            className="w-16 h-16 text-gray-300 mx-auto mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+            />
+          </svg>
+          <p className="text-gray-500 text-lg">No hay medicamentos programados para hoy</p>
+        </div>
+      );
+    }
+
     return (
-      <div className="space-y-4">
-        {dosisDelDia.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
-            <p className="text-gray-500 text-lg">No hay medicamentos programados para hoy</p>
-          </div>
-        ) : (
-          dosisDelDia.map((dosis, index) => {
-            const estado = dosis.registro?.estado || 'pendiente';
-            const tieneRetraso = dosis.retrasoMinutos && dosis.retrasoMinutos > 30;
-
-            return (
-              <div
-                key={index}
-                className={`bg-white rounded-lg border p-6 shadow-sm ${
-                  tieneRetraso ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'
-                }`}
-              >
-                <div className="flex gap-4">
-                  {/* Foto */}
-                  {dosis.medicamento.foto && (
-                    <div className="flex-shrink-0">
-                      <img
-                        src={dosis.medicamento.foto}
-                        alt={dosis.medicamento.nombre}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                    </div>
-                  )}
-
-                  {/* Información */}
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {dosis.medicamento.nombre}
-                        </h3>
-                        <p className="text-gray-600">
-                          {dosis.medicamento.dosis} - {dosis.medicamento.presentacion}
-                        </p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getEstadoColor(estado)}`}>
-                        {getEstadoLabel(estado)}
-                      </span>
-                    </div>
-
-                    {/* Horario */}
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="text-2xl font-bold text-blue-600">{dosis.horario}</span>
-                      {tieneRetraso && (
-                        <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded">
-                          Retraso: {dosis.retrasoMinutos} min
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Instrucciones */}
-                    {dosis.medicamento.instrucciones && (
-                      <div className="mb-3">
-                        <span className="text-sm font-medium text-gray-700">Instrucciones: </span>
-                        <span className="text-sm text-gray-600">{dosis.medicamento.instrucciones}</span>
-                      </div>
-                    )}
-
-                    {/* Información del registro */}
-                    {dosis.registro && (
-                      <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                        {dosis.registro.fechaHoraReal && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Hora real:</strong>{' '}
-                            {dosis.registro.fechaHoraReal.toLocaleTimeString('es-MX', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </p>
-                        )}
-                        {dosis.registro.retrasoMinutos !== undefined && dosis.registro.retrasoMinutos > 0 && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Retraso:</strong> {dosis.registro.retrasoMinutos} minutos
-                          </p>
-                        )}
-                        {dosis.registro.notas && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Notas:</strong> {dosis.registro.notas}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Botones */}
-                    {!dosis.registro && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => abrirModal(dosis)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          Registrar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+      <div
+        className={
+          vista === 'grid'
+            ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
+            : 'space-y-4'
+        }
+      >
+        {dosisDelDia.map((dosis, index) => (
+          <DosisCard
+            key={`${dosis.medicamento.id}-${dosis.horario}-${index}`}
+            dosis={dosis}
+            viewMode={vista}
+            onRegistrar={abrirModal}
+          />
+        ))}
       </div>
     );
   }
@@ -500,54 +396,34 @@ export default function PastilleroDiario() {
           </div>
         </div>
 
-        {/* Lista */}
+        {/* Lista/Grid */}
         {registrosFiltrados.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
+            <svg
+              className="w-16 h-16 text-gray-300 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
             <p className="text-gray-500 text-lg">No hay registros en el historial</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div
+            className={
+              vista === 'grid'
+                ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
+                : 'space-y-4'
+            }
+          >
             {registrosFiltrados.map((reg) => (
-              <div key={reg.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h4 className="text-lg font-semibold text-gray-900">{reg.medicamentoNombre}</h4>
-                    <p className="text-sm text-gray-600">
-                      <strong>Programado:</strong>{' '}
-                      {reg.fechaHoraProgramada.toLocaleString('es-MX', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                    {reg.fechaHoraReal && (
-                      <p className="text-sm text-gray-600">
-                        <strong>Real:</strong>{' '}
-                        {reg.fechaHoraReal.toLocaleString('es-MX', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    )}
-                    {reg.retrasoMinutos !== undefined && reg.retrasoMinutos > 0 && (
-                      <p className="text-sm text-gray-600">
-                        <strong>Retraso:</strong> {reg.retrasoMinutos} minutos
-                      </p>
-                    )}
-                    {reg.notas && (
-                      <p className="text-sm text-gray-600">
-                        <strong>Notas:</strong> {reg.notas}
-                      </p>
-                    )}
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getEstadoColor(reg.estado)}`}>
-                    {getEstadoLabel(reg.estado)}
-                  </span>
-                </div>
-              </div>
+              <HistorialCard key={reg.id} registro={reg} viewMode={vista} />
             ))}
           </div>
         )}
@@ -559,38 +435,41 @@ export default function PastilleroDiario() {
     <Layout>
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Pastillero Diario</h1>
             <p className="text-gray-600 mt-1">Control de administración de medicamentos</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setVistaActual('hoy');
-                cargarDosisDelDia();
-              }}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                vistaActual === 'hoy'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => {
-                setVistaActual('historial');
-                cargarHistorial();
-              }}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                vistaActual === 'historial'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Historial
-            </button>
+          <div className="flex items-center gap-3">
+            <ViewToggle view={vista} onChange={setVista} />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setVistaActual('hoy');
+                  cargarDosisDelDia();
+                }}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  vistaActual === 'hoy'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Hoy
+              </button>
+              <button
+                onClick={() => {
+                  setVistaActual('historial');
+                  cargarHistorial();
+                }}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  vistaActual === 'historial'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Historial
+              </button>
+            </div>
           </div>
         </div>
 

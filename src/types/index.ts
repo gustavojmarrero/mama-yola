@@ -225,6 +225,14 @@ export interface RegistroMedicamento {
   creadoEn: Date;
 }
 
+// Dosis programada para el día (usado en Pastillero Diario)
+export interface DosisDelDia {
+  medicamento: Medicamento;
+  horario: string;
+  registro?: RegistroMedicamento;
+  retrasoMinutos?: number;
+}
+
 // ===== TIPOS DE NOTIFICACIONES =====
 
 export type PrioridadNotificacion = 'alta' | 'media' | 'baja';
