@@ -10,7 +10,6 @@ import {
   MenuTiempoComida,
   Actividad,
   TiempoComidaConfig,
-  Turno,
 } from '../types';
 
 // ===== CONFIGURACIÓN DEFAULT =====
@@ -122,29 +121,6 @@ export function calcularEstadoProceso(
 }
 
 // ===== VERIFICADORES DE COMPLETADO =====
-
-/**
- * Verifica si un chequeo diario fue completado para un turno específico
- */
-function chequeoCompletado(
-  chequeos: ChequeoDiario[],
-  turno: Turno,
-  fecha: Date
-): { completado: boolean; horaCompletado?: Date } {
-  const hoy = fecha.toISOString().split('T')[0];
-  const chequeo = chequeos.find(c => {
-    const fechaChequeo = c.fecha instanceof Date ? c.fecha : new Date(c.fecha);
-    return fechaChequeo.toISOString().split('T')[0] === hoy && c.turno === turno;
-  });
-
-  if (chequeo?.completado) {
-    const horaRegistro = chequeo.horaRegistro instanceof Date
-      ? chequeo.horaRegistro
-      : new Date(chequeo.horaRegistro);
-    return { completado: true, horaCompletado: horaRegistro };
-  }
-  return { completado: false };
-}
 
 /**
  * Verifica si los signos vitales fueron registrados para una hora específica
@@ -285,37 +261,7 @@ export function calcularProcesosDelDia(
   const fechaHoy = new Date(horaActual);
   fechaHoy.setHours(0, 0, 0, 0);
 
-  // 1. CHEQUEOS DIARIOS (por turno)
-  const turnos: { turno: Turno; hora: string; nombre: string }[] = [
-    { turno: 'matutino', hora: config.chequeoDiario.matutino, nombre: 'Chequeo Matutino' },
-    { turno: 'vespertino', hora: config.chequeoDiario.vespertino, nombre: 'Chequeo Vespertino' },
-    { turno: 'nocturno', hora: config.chequeoDiario.nocturno, nombre: 'Chequeo Nocturno' },
-  ];
-
-  for (const { turno, hora, nombre } of turnos) {
-    const { completado, horaCompletado } = chequeoCompletado(
-      registros.chequeosDiarios,
-      turno,
-      fechaHoy
-    );
-    const horaDate = horaStringADate(hora, fechaHoy);
-    const estado = calcularEstadoProceso(horaActual, horaDate, completado);
-
-    procesos.push({
-      id: `chequeo-${turno}`,
-      tipo: 'chequeo',
-      nombre,
-      detalle: `Turno ${turno}`,
-      horaProgramada: hora,
-      horaDate,
-      estado,
-      horaCompletado,
-      icono: ICONOS_PROCESO.chequeo,
-      enlace: ENLACES_PROCESO.chequeo,
-    });
-  }
-
-  // 2. SIGNOS VITALES
+  // 1. SIGNOS VITALES
   config.signosVitales.forEach((hora, index) => {
     const { completado, horaCompletado } = signosVitalesCompletado(
       registros.signosVitales,
