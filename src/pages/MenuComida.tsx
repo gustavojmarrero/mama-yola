@@ -7,7 +7,7 @@ import Layout from '../components/common/Layout';
 import Carousel from '../components/ui/Carousel';
 import { RecetaCarouselCard } from '../components/menu/RecetaCarouselCard';
 import { ComidaProgramada, TipoComida, CategoriaComida, NivelConsumo, Receta, TiempoComidaId, ComponenteId, TiempoComidaConfig, ComponenteConfig, RecetaHabilitacion, MenuTiempoComida, PlatilloAsignado } from '../types';
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
@@ -127,7 +127,17 @@ export default function MenuComida() {
   const [recetas, setRecetas] = useState<Receta[]>([]);
   const [loading, setLoading] = useState(true);
   const [semanaActual, setSemanaActual] = useState(new Date());
+  const [diaSeleccionado, setDiaSeleccionado] = useState(new Date()); // Vista móvil: día actual por defecto
   const [vista, setVista] = useState<'menu' | 'recetas' | 'configuracion'>('menu');
+
+  // Detectar si es móvil
+  const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setEsMovil(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Estado para configuración de tiempos de comida
   const [tiemposComidaConfig, setTiemposComidaConfig] = useState<TiempoComidaConfig[]>(TIEMPOS_COMIDA_DEFAULT);
@@ -1086,216 +1096,419 @@ export default function MenuComida() {
         </div>
 
         {vista === 'menu' ? (
-          <>
-            {/* Estadísticas */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow p-4 text-center">
-                <div className="text-3xl font-bold text-blue-600">{stats.registradas}</div>
-                <div className="text-sm text-gray-500">Comidas registradas</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4 text-center">
-                <div className="text-3xl font-bold text-green-600">{stats.promedioConsumo}%</div>
-                <div className="text-sm text-gray-500">Promedio consumo</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4 text-center">
-                <div className="text-3xl font-bold text-orange-600">{stats.totalCalorias}</div>
-                <div className="text-sm text-gray-500">Calorías consumidas</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="text-sm text-gray-500 mb-1">Por nivel:</div>
-                <div className="flex flex-wrap gap-1">
-                  {Object.entries(stats.porNivel).map(([nivel, count]) => {
-                    const config = nivelesConsumo.find(n => n.value === nivel);
+          esMovil ? (
+            /* ═══════════════════════════════════════════════════════════════
+               VISTA MÓVIL - DÍA A DÍA
+               ═══════════════════════════════════════════════════════════════ */
+            <div className="space-y-4">
+              {/* Header con fecha y navegación */}
+              <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 rounded-2xl p-4 shadow-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    onClick={() => setDiaSeleccionado(subDays(diaSeleccionado, 1))}
+                    className="w-10 h-10 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white hover:bg-white/30 active:scale-95 transition-all"
+                  >
+                    ←
+                  </button>
+                  <div className="text-center">
+                    <div className="text-white/80 text-sm font-medium">
+                      {format(diaSeleccionado, 'EEEE', { locale: es })}
+                    </div>
+                    <div className="text-white text-2xl font-bold">
+                      {format(diaSeleccionado, "d 'de' MMMM", { locale: es })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDiaSeleccionado(addDays(diaSeleccionado, 1))}
+                    className="w-10 h-10 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white hover:bg-white/30 active:scale-95 transition-all"
+                  >
+                    →
+                  </button>
+                </div>
+
+                {/* Selector de días tipo pills */}
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const fecha = addDays(subDays(new Date(), 3), i);
+                    const esHoy = isSameDay(fecha, new Date());
+                    const esSeleccionado = isSameDay(fecha, diaSeleccionado);
                     return (
-                      <span key={nivel} className={`text-xs px-2 py-0.5 rounded text-white ${config?.color}`}>
-                        {config?.label}: {count}
-                      </span>
+                      <button
+                        key={i}
+                        onClick={() => setDiaSeleccionado(fecha)}
+                        className={`flex-shrink-0 w-12 py-2 rounded-xl text-center transition-all ${
+                          esSeleccionado
+                            ? 'bg-white text-orange-600 shadow-lg scale-105'
+                            : 'bg-white/20 text-white hover:bg-white/30'
+                        }`}
+                      >
+                        <div className="text-[10px] font-medium uppercase">
+                          {format(fecha, 'EEE', { locale: es })}
+                        </div>
+                        <div className={`text-lg font-bold ${esHoy && !esSeleccionado ? 'underline' : ''}`}>
+                          {format(fecha, 'd')}
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
-              </div>
-            </div>
 
-            {/* Navegación de semana */}
-            <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow">
-              <button
-                onClick={() => setSemanaActual(subWeeks(semanaActual, 1))}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                ← Anterior
-              </button>
-              <div className="text-center">
-                <h2 className="font-semibold">
-                  {format(inicioSemana, "d 'de' MMMM", { locale: es })} - {format(finSemana, "d 'de' MMMM yyyy", { locale: es })}
-                </h2>
-                <button
-                  onClick={() => {
-                    setSemanaActual(new Date());
-                    setTimeout(() => {
-                      hoyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 100);
-                  }}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  Ir a hoy
-                </button>
-              </div>
-              <button
-                onClick={() => setSemanaActual(addWeeks(semanaActual, 1))}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                Siguiente →
-              </button>
-            </div>
-
-            {/* Calendario de menú con componentes */}
-            <div className="space-y-6">
-              {diasSemana.map((dia) => {
-                const esHoy = isSameDay(dia, new Date());
-                return (
-                  <div
-                    key={dia.toISOString()}
-                    ref={esHoy ? hoyRef : null}
-                    className={`bg-white rounded-lg shadow ${esHoy ? 'ring-2 ring-blue-500' : ''}`}
+                {/* Botón ir a hoy */}
+                {!isSameDay(diaSeleccionado, new Date()) && (
+                  <button
+                    onClick={() => setDiaSeleccionado(new Date())}
+                    className="mt-3 w-full py-2 bg-white/20 backdrop-blur text-white text-sm font-medium rounded-xl hover:bg-white/30 transition-all"
                   >
-                    {/* Header del día */}
-                    <div className={`p-4 border-b ${esHoy ? 'bg-blue-50' : 'bg-gray-50'}`}>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-lg font-bold ${esHoy ? 'text-blue-600' : ''}`}>
-                          {format(dia, "EEEE d 'de' MMMM", { locale: es })}
-                        </span>
-                        {esHoy && (
-                          <span className="px-2 py-0.5 text-xs bg-blue-600 text-white rounded-full">
-                            Hoy
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    Ir a hoy
+                  </button>
+                )}
+              </div>
 
-                    {/* Grid de tiempos de comida */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 divide-y md:divide-y-0 md:divide-x">
-                      {tiemposComidaConfig.filter(t => t.activo).map(tiempo => {
-                        const menu = getMenu(dia, tiempo.id);
+              {/* Cards de tiempos de comida */}
+              <div className="space-y-4">
+                {tiemposComidaConfig.filter(t => t.activo).map((tiempo, idx) => {
+                  const menu = getMenu(diaSeleccionado, tiempo.id);
+                  const platillosAsignados = tiempo.componentes.filter(c => getPlatillo(menu, c.id)).length;
+                  const totalComponentes = tiempo.componentes.length;
 
-                        return (
-                          <div key={tiempo.id} className="p-4">
-                            {/* Header del tiempo */}
-                            <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-                              <span className="text-xl">{tiempo.icono}</span>
-                              <div>
-                                <div className="font-semibold text-sm">{tiempo.nombre}</div>
-                                <div className="text-xs text-gray-500">{tiempo.horaDefault}</div>
-                              </div>
-                            </div>
-
-                            {/* Componentes */}
-                            <div className="space-y-2">
-                              {tiempo.componentes.map(comp => {
-                                const platillo = getPlatillo(menu, comp.id);
-                                const compInfo = COMPONENTES_DISPONIBLES.find(c => c.id === comp.id);
-                                const esObligatorio = comp.obligatorio;
-
-                                return (
-                                  <div
-                                    key={comp.id}
-                                    className={`rounded-lg border ${
-                                      platillo
-                                        ? 'bg-green-50 border-green-200'
-                                        : esObligatorio && !platillo
-                                        ? 'bg-red-50 border-red-200'
-                                        : 'bg-gray-50 border-gray-200'
-                                    }`}
-                                  >
-                                    {/* Label del componente */}
-                                    <div className="flex items-center gap-1 px-2 py-1 border-b border-inherit">
-                                      <span className="text-sm">{compInfo?.icono}</span>
-                                      <span className="text-xs font-medium text-gray-600">{comp.nombre}</span>
-                                      {esObligatorio && (
-                                        <span className="text-xs text-red-500">*</span>
-                                      )}
-                                    </div>
-
-                                    {/* Contenido */}
-                                    <div className="p-2">
-                                      {platillo ? (
-                                        <div className="flex items-center justify-between gap-2">
-                                          {/* Miniatura de foto si existe */}
-                                          {(() => {
-                                            const recetaInfo = platillo.recetaId
-                                              ? recetas.find(r => r.id === platillo.recetaId)
-                                              : null;
-                                            const fotoUrl = recetaInfo?.foto || platillo.fotoCustom;
-                                            return fotoUrl ? (
-                                              <img
-                                                src={fotoUrl}
-                                                alt=""
-                                                className="w-8 h-8 object-cover rounded-lg flex-shrink-0 ring-1 ring-gray-200"
-                                              />
-                                            ) : null;
-                                          })()}
-                                          <span
-                                            className={`text-sm truncate font-medium flex-1 ${
-                                              platillo.nombreCustom ? 'cursor-pointer hover:text-amber-600' : ''
-                                            }`}
-                                            onClick={() => {
-                                              if (platillo.nombreCustom && menu) {
-                                                abrirEditarPlatilloCustom(menu.id, platillo);
-                                              }
-                                            }}
-                                            title={platillo.nombreCustom ? 'Click para editar' : undefined}
-                                          >
-                                            {platillo.recetaNombre || platillo.nombreCustom}
-                                          </span>
-                                          <button
-                                            onClick={() => menu && quitarPlatillo(menu.id, comp.id)}
-                                            className="text-red-500 hover:text-red-700 text-sm flex-shrink-0"
-                                            title="Quitar"
-                                          >
-                                            ×
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <button
-                                          onClick={() => abrirModalAsignar(dia, tiempo.id, comp.id, menu?.id)}
-                                          className={`w-full text-xs py-1 rounded ${
-                                            esObligatorio
-                                              ? 'text-red-600 hover:bg-red-100'
-                                              : 'text-gray-500 hover:bg-gray-100'
-                                          }`}
-                                        >
-                                          + Agregar
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                  return (
+                    <div
+                      key={tiempo.id}
+                      className="bg-white rounded-2xl shadow-md overflow-hidden"
+                      style={{ animationDelay: `${idx * 50}ms` }}
+                    >
+                      {/* Header del tiempo de comida */}
+                      <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b border-gray-100">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-3xl">{tiempo.icono}</span>
+                            <div>
+                              <div className="font-semibold text-gray-800">{tiempo.nombre}</div>
+                              <div className="text-xs text-gray-500">{tiempo.horaDefault}</div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                              platillosAsignados === totalComponentes
+                                ? 'bg-green-100 text-green-700'
+                                : platillosAsignados > 0
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {platillosAsignados}/{totalComponentes}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-            {/* Leyenda */}
-            <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-green-50 border border-green-200"></div>
-                <span>Asignado</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-red-50 border border-red-200"></div>
-                <span>Obligatorio sin asignar</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-red-500">*</span>
-                <span>Obligatorio</span>
+                      {/* Platillos */}
+                      <div className="p-3 space-y-2">
+                        {tiempo.componentes.map(comp => {
+                          const platillo = getPlatillo(menu, comp.id);
+                          const compInfo = COMPONENTES_DISPONIBLES.find(c => c.id === comp.id);
+                          const esObligatorio = comp.obligatorio;
+                          const recetaInfo = platillo?.recetaId ? recetas.find(r => r.id === platillo.recetaId) : null;
+                          const fotoUrl = recetaInfo?.foto || platillo?.fotoCustom;
+
+                          return (
+                            <div
+                              key={comp.id}
+                              className={`rounded-xl border-2 transition-all ${
+                                platillo
+                                  ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200'
+                                  : esObligatorio
+                                  ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200 border-dashed'
+                                  : 'bg-gray-50 border-gray-200 border-dashed'
+                              }`}
+                            >
+                              {platillo ? (
+                                <div className="flex items-center gap-3 p-3">
+                                  {/* Foto o icono */}
+                                  {fotoUrl ? (
+                                    <img
+                                      src={fotoUrl}
+                                      alt=""
+                                      className="w-14 h-14 object-cover rounded-xl shadow-sm ring-2 ring-white"
+                                    />
+                                  ) : (
+                                    <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-2xl shadow-sm">
+                                      {compInfo?.icono}
+                                    </div>
+                                  )}
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs text-emerald-600 font-medium mb-0.5">
+                                      {comp.nombre}
+                                    </div>
+                                    <div
+                                      className={`font-semibold text-gray-800 truncate ${
+                                        platillo.nombreCustom ? 'cursor-pointer active:text-amber-600' : ''
+                                      }`}
+                                      onClick={() => {
+                                        if (platillo.nombreCustom && menu) {
+                                          abrirEditarPlatilloCustom(menu.id, platillo);
+                                        }
+                                      }}
+                                    >
+                                      {platillo.recetaNombre || platillo.nombreCustom}
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    onClick={() => menu && quitarPlatillo(menu.id, comp.id)}
+                                    className="w-8 h-8 bg-red-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-200 active:scale-95 transition-all"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => abrirModalAsignar(diaSeleccionado, tiempo.id, comp.id, menu?.id)}
+                                  className="w-full flex items-center gap-3 p-3"
+                                >
+                                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl ${
+                                    esObligatorio ? 'bg-red-100' : 'bg-gray-100'
+                                  }`}>
+                                    {compInfo?.icono}
+                                  </div>
+                                  <div className="flex-1 text-left">
+                                    <div className={`text-xs font-medium mb-0.5 ${
+                                      esObligatorio ? 'text-red-500' : 'text-gray-400'
+                                    }`}>
+                                      {comp.nombre} {esObligatorio && '*'}
+                                    </div>
+                                    <div className={`font-medium ${
+                                      esObligatorio ? 'text-red-600' : 'text-gray-500'
+                                    }`}>
+                                      + Agregar platillo
+                                    </div>
+                                  </div>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </>
+          ) : (
+            /* ═══════════════════════════════════════════════════════════════
+               VISTA DESKTOP - SEMANAL (original)
+               ═══════════════════════════════════════════════════════════════ */
+            <>
+              {/* Estadísticas */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-white rounded-lg shadow p-4 text-center">
+                  <div className="text-3xl font-bold text-blue-600">{stats.registradas}</div>
+                  <div className="text-sm text-gray-500">Comidas registradas</div>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4 text-center">
+                  <div className="text-3xl font-bold text-green-600">{stats.promedioConsumo}%</div>
+                  <div className="text-sm text-gray-500">Promedio consumo</div>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4 text-center">
+                  <div className="text-3xl font-bold text-orange-600">{stats.totalCalorias}</div>
+                  <div className="text-sm text-gray-500">Calorías consumidas</div>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="text-sm text-gray-500 mb-1">Por nivel:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.entries(stats.porNivel).map(([nivel, count]) => {
+                      const config = nivelesConsumo.find(n => n.value === nivel);
+                      return (
+                        <span key={nivel} className={`text-xs px-2 py-0.5 rounded text-white ${config?.color}`}>
+                          {config?.label}: {count}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Navegación de semana */}
+              <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow">
+                <button
+                  onClick={() => setSemanaActual(subWeeks(semanaActual, 1))}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  ← Anterior
+                </button>
+                <div className="text-center">
+                  <h2 className="font-semibold">
+                    {format(inicioSemana, "d 'de' MMMM", { locale: es })} - {format(finSemana, "d 'de' MMMM yyyy", { locale: es })}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setSemanaActual(new Date());
+                      setTimeout(() => {
+                        hoyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 100);
+                    }}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    Ir a hoy
+                  </button>
+                </div>
+                <button
+                  onClick={() => setSemanaActual(addWeeks(semanaActual, 1))}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  Siguiente →
+                </button>
+              </div>
+
+              {/* Calendario de menú con componentes */}
+              <div className="space-y-6">
+                {diasSemana.map((dia) => {
+                  const esHoy = isSameDay(dia, new Date());
+                  return (
+                    <div
+                      key={dia.toISOString()}
+                      ref={esHoy ? hoyRef : null}
+                      className={`bg-white rounded-lg shadow ${esHoy ? 'ring-2 ring-blue-500' : ''}`}
+                    >
+                      {/* Header del día */}
+                      <div className={`p-4 border-b ${esHoy ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg font-bold ${esHoy ? 'text-blue-600' : ''}`}>
+                            {format(dia, "EEEE d 'de' MMMM", { locale: es })}
+                          </span>
+                          {esHoy && (
+                            <span className="px-2 py-0.5 text-xs bg-blue-600 text-white rounded-full">
+                              Hoy
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Grid de tiempos de comida */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 divide-y md:divide-y-0 md:divide-x">
+                        {tiemposComidaConfig.filter(t => t.activo).map(tiempo => {
+                          const menu = getMenu(dia, tiempo.id);
+
+                          return (
+                            <div key={tiempo.id} className="p-4">
+                              {/* Header del tiempo */}
+                              <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                                <span className="text-xl">{tiempo.icono}</span>
+                                <div>
+                                  <div className="font-semibold text-sm">{tiempo.nombre}</div>
+                                  <div className="text-xs text-gray-500">{tiempo.horaDefault}</div>
+                                </div>
+                              </div>
+
+                              {/* Componentes */}
+                              <div className="space-y-2">
+                                {tiempo.componentes.map(comp => {
+                                  const platillo = getPlatillo(menu, comp.id);
+                                  const compInfo = COMPONENTES_DISPONIBLES.find(c => c.id === comp.id);
+                                  const esObligatorio = comp.obligatorio;
+
+                                  return (
+                                    <div
+                                      key={comp.id}
+                                      className={`rounded-lg border ${
+                                        platillo
+                                          ? 'bg-green-50 border-green-200'
+                                          : esObligatorio && !platillo
+                                          ? 'bg-red-50 border-red-200'
+                                          : 'bg-gray-50 border-gray-200'
+                                      }`}
+                                    >
+                                      {/* Label del componente */}
+                                      <div className="flex items-center gap-1 px-2 py-1 border-b border-inherit">
+                                        <span className="text-sm">{compInfo?.icono}</span>
+                                        <span className="text-xs font-medium text-gray-600">{comp.nombre}</span>
+                                        {esObligatorio && (
+                                          <span className="text-xs text-red-500">*</span>
+                                        )}
+                                      </div>
+
+                                      {/* Contenido */}
+                                      <div className="p-2">
+                                        {platillo ? (
+                                          <div className="flex items-center justify-between gap-2">
+                                            {/* Miniatura de foto si existe */}
+                                            {(() => {
+                                              const recetaInfo = platillo.recetaId
+                                                ? recetas.find(r => r.id === platillo.recetaId)
+                                                : null;
+                                              const fotoUrl = recetaInfo?.foto || platillo.fotoCustom;
+                                              return fotoUrl ? (
+                                                <img
+                                                  src={fotoUrl}
+                                                  alt=""
+                                                  className="w-8 h-8 object-cover rounded-lg flex-shrink-0 ring-1 ring-gray-200"
+                                                />
+                                              ) : null;
+                                            })()}
+                                            <span
+                                              className={`text-sm truncate font-medium flex-1 ${
+                                                platillo.nombreCustom ? 'cursor-pointer hover:text-amber-600' : ''
+                                              }`}
+                                              onClick={() => {
+                                                if (platillo.nombreCustom && menu) {
+                                                  abrirEditarPlatilloCustom(menu.id, platillo);
+                                                }
+                                              }}
+                                              title={platillo.nombreCustom ? 'Click para editar' : undefined}
+                                            >
+                                              {platillo.recetaNombre || platillo.nombreCustom}
+                                            </span>
+                                            <button
+                                              onClick={() => menu && quitarPlatillo(menu.id, comp.id)}
+                                              className="text-red-500 hover:text-red-700 text-sm flex-shrink-0"
+                                              title="Quitar"
+                                            >
+                                              ×
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => abrirModalAsignar(dia, tiempo.id, comp.id, menu?.id)}
+                                            className={`w-full text-xs py-1 rounded ${
+                                              esObligatorio
+                                                ? 'text-red-600 hover:bg-red-100'
+                                                : 'text-gray-500 hover:bg-gray-100'
+                                            }`}
+                                          >
+                                            + Agregar
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Leyenda */}
+              <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-green-50 border border-green-200"></div>
+                  <span>Asignado</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-red-50 border border-red-200"></div>
+                  <span>Obligatorio sin asignar</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-red-500">*</span>
+                  <span>Obligatorio</span>
+                </div>
+              </div>
+            </>
+          )
         ) : vista === 'configuracion' ? (
           /* Vista de Configuración */
           <div className="bg-white rounded-lg shadow p-6">
