@@ -11,6 +11,7 @@ export interface Usuario {
   rol: Rol;
   foto?: string;
   activo: boolean;
+  favoritos?: string[]; // Paths de menú favoritos del usuario
   creadoEn: Date;
   actualizadoEn: Date;
 }

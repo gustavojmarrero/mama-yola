@@ -2,61 +2,14 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useUnsavedChangesContext } from '../../context/UnsavedChangesContext';
+import { useFavorites } from '../../hooks/useFavorites';
+import { MENU_GROUPS } from '../../config/menuConfig';
+import type { MenuItem } from '../../config/menuConfig';
+import { FavoritesSection, SidebarMenuItem } from './Sidebar';
 
 interface LayoutProps {
   children: ReactNode;
 }
-
-interface MenuItem {
-  name: string;
-  path: string;
-  icon: string;
-  roles: string[];
-}
-
-interface MenuGroup {
-  label: string;
-  items: MenuItem[];
-}
-
-// Menú agrupado por categorías
-const menuGroups: MenuGroup[] = [
-  {
-    label: 'Principal',
-    items: [
-      { name: 'Dashboard', path: '/dashboard', icon: '🏠', roles: ['familiar', 'supervisor', 'cuidador'] },
-      { name: 'Chequeo Diario', path: '/chequeo-diario', icon: '📋', roles: ['familiar', 'supervisor', 'cuidador'] },
-      { name: 'Pastillero', path: '/pastillero-diario', icon: '💊', roles: ['familiar', 'supervisor', 'cuidador'] },
-    ],
-  },
-  {
-    label: 'Salud',
-    items: [
-      { name: 'Signos Vitales', path: '/signos-vitales', icon: '💓', roles: ['familiar', 'supervisor', 'cuidador'] },
-      { name: 'Medicamentos', path: '/medicamentos', icon: '⚕️', roles: ['familiar', 'supervisor'] },
-      { name: 'Adherencia', path: '/adherencia', icon: '📊', roles: ['familiar', 'supervisor'] },
-    ],
-  },
-  {
-    label: 'Gestión',
-    items: [
-      { name: 'Inventarios', path: '/inventarios', icon: '📦', roles: ['familiar', 'supervisor'] },
-      { name: 'Turnos', path: '/turnos', icon: '👥', roles: ['familiar', 'supervisor', 'cuidador'] },
-      { name: 'Actividades', path: '/actividades', icon: '🎯', roles: ['familiar', 'supervisor', 'cuidador'] },
-      { name: 'Menú Comida', path: '/menu-comida', icon: '🍽️', roles: ['familiar', 'supervisor', 'cuidador'] },
-    ],
-  },
-  {
-    label: 'Otros',
-    items: [
-      { name: 'Eventos', path: '/eventos', icon: '📅', roles: ['familiar', 'supervisor'] },
-      { name: 'Contactos', path: '/contactos', icon: '📇', roles: ['familiar', 'supervisor'] },
-      { name: 'Usuarios', path: '/usuarios', icon: '👤', roles: ['familiar'] },
-      { name: 'Paciente', path: '/paciente', icon: '🧓', roles: ['familiar', 'supervisor'] },
-      { name: 'Analytics', path: '/analytics', icon: '📈', roles: ['familiar', 'supervisor'] },
-    ],
-  },
-];
 
 export default function Layout({ children }: LayoutProps) {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
@@ -65,6 +18,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const { currentUser, userProfile, logout } = useAuth();
   const { confirmAndNavigate } = useUnsavedChangesContext();
+  const { favoritos, isFavorite, toggleFavorite } = useFavorites();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -104,8 +58,17 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
+  // Handler para toggle favorito
+  const handleToggleFavorite = async (path: string) => {
+    try {
+      await toggleFavorite(path);
+    } catch (error) {
+      console.error('Error al cambiar favorito:', error);
+    }
+  };
+
   // Filtrar grupos basado en rol
-  const visibleGroups = menuGroups
+  const visibleGroups = MENU_GROUPS
     .map((group) => ({
       ...group,
       items: group.items.filter(
@@ -136,8 +99,21 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Navegación con grupos */}
       <nav className="flex-1 min-h-0 px-3 py-4 overflow-y-auto">
-        {visibleGroups.map((group, groupIndex) => (
-          <div key={group.label} className={groupIndex > 0 ? 'mt-6' : ''}>
+        {/* Sección de Favoritos */}
+        {userProfile?.rol && (
+          <FavoritesSection
+            favoritos={favoritos}
+            currentPath={location.pathname}
+            expanded={expanded}
+            userRol={userProfile.rol}
+            onNavigate={handleNavigation}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        )}
+
+        {/* Grupos del menú */}
+        {visibleGroups.map((group) => (
+          <div key={group.id} className="mt-6">
             {/* Label del grupo */}
             {expanded && (
               <div className="px-3 mb-2">
@@ -149,52 +125,18 @@ export default function Layout({ children }: LayoutProps) {
 
             {/* Items del grupo */}
             <ul className="space-y-1">
-              {group.items.map((item) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <li key={item.path}>
-                    <button
-                      onClick={() => handleNavigation(item.path)}
-                      title={!expanded ? item.name : undefined}
-                      className={`
-                        group relative flex items-center gap-3 w-full rounded-xl
-                        transition-all duration-200
-                        ${expanded ? 'px-3 py-2.5' : 'px-3 py-2.5 justify-center'}
-                        ${
-                          isActive
-                            ? 'bg-lavender-100 text-lavender-700'
-                            : 'text-warm-600 hover:bg-warm-100 hover:text-warm-800'
-                        }
-                      `}
-                    >
-                      {/* Indicador activo */}
-                      {isActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-lavender-500 rounded-r-full" />
-                      )}
-
-                      {/* Icono */}
-                      <span
-                        className={`text-xl flex-shrink-0 transition-transform duration-200 ${
-                          !isActive && 'group-hover:scale-110'
-                        }`}
-                      >
-                        {item.icon}
-                      </span>
-
-                      {/* Nombre */}
-                      {expanded && (
-                        <span
-                          className={`font-medium truncate ${
-                            isActive ? 'text-lavender-700' : ''
-                          }`}
-                        >
-                          {item.name}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
+              {group.items.map((item) => (
+                <SidebarMenuItem
+                  key={item.path}
+                  item={item}
+                  isActive={location.pathname === item.path}
+                  expanded={expanded}
+                  isFavorite={isFavorite(item.path)}
+                  showFavoriteStar={true}
+                  onNavigate={handleNavigation}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+              ))}
             </ul>
           </div>
         ))}
