@@ -516,3 +516,35 @@ input[type="number"] {
     font-size: 16px !important;
   }
 }
+
+/* ========== CAROUSEL ANIMATIONS ========== */
+
+@keyframes carouselSlideLeft {
+  from {
+    transform: translateX(30%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes carouselSlideRight {
+  from {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-carousel-left {
+  animation: carouselSlideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-carousel-right {
+  animation: carouselSlideRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}

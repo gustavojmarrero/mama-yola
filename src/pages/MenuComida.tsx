@@ -4,6 +4,8 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
+import Carousel from '../components/ui/Carousel';
+import { RecetaCarouselCard } from '../components/menu/RecetaCarouselCard';
 import { ComidaProgramada, TipoComida, CategoriaComida, NivelConsumo, Receta, TiempoComidaId, ComponenteId, TiempoComidaConfig, ComponenteConfig, RecetaHabilitacion, MenuTiempoComida, PlatilloAsignado } from '../types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -2137,7 +2139,7 @@ export default function MenuComida() {
         {/* Modal Asignar Platillo */}
         {modalAsignar && asignacionActual && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white rounded-lg max-w-xl w-full my-8 max-h-[80vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-md w-full my-8 max-h-[85vh] overflow-y-auto shadow-2xl">
               {/* Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10">
                 <div className="flex justify-between items-center">
@@ -2192,31 +2194,21 @@ export default function MenuComida() {
                     }
 
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                        {recetasDisponibles.map(receta => (
-                          <button
-                            key={receta.id}
-                            onClick={() => asignarPlatillo(receta)}
-                            className="text-left p-3 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                          >
-                            <div className="flex items-start gap-2">
-                              {receta.foto ? (
-                                <img src={receta.foto} alt="" className="w-10 h-10 object-cover rounded" />
-                              ) : (
-                                <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-lg">
-                                  🍽️
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm truncate">{receta.nombre}</div>
-                                {receta.favorita && (
-                                  <span className="text-xs text-yellow-600">⭐ Favorita</span>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                      <Carousel
+                        items={recetasDisponibles}
+                        renderItem={(receta) => (
+                          <RecetaCarouselCard
+                            receta={receta}
+                            onSelect={asignarPlatillo}
+                          />
+                        )}
+                        loop={true}
+                        showArrows={true}
+                        showDots={recetasDisponibles.length <= 8}
+                        showCounter={true}
+                        enableSwipe={true}
+                        ariaLabel="Carrusel de recetas disponibles"
+                      />
                     );
                   })()}
                 </div>
