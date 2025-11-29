@@ -178,6 +178,7 @@ export default function MenuComida() {
   const [recetaEditando, setRecetaEditando] = useState<Receta | null>(null);
   const [modalVerReceta, setModalVerReceta] = useState(false);
   const [recetaVisualizando, setRecetaVisualizando] = useState<Receta | null>(null);
+  const [imagenExpandida, setImagenExpandida] = useState(false);
   const [busquedaReceta, setBusquedaReceta] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaComida | 'todas'>('todas');
   const [mostrarSoloFavoritas, setMostrarSoloFavoritas] = useState(false);
@@ -669,6 +670,7 @@ export default function MenuComida() {
   function cerrarVistaReceta() {
     setModalVerReceta(false);
     setRecetaVisualizando(null);
+    setImagenExpandida(false);
   }
 
   function abrirModalReceta(receta?: Receta) {
@@ -1729,11 +1731,36 @@ export default function MenuComida() {
                   <img
                     src={recetaVisualizando.foto}
                     alt={recetaVisualizando.nombre}
-                    className="w-full h-48 object-cover rounded-lg"
+                    className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setImagenExpandida(true)}
+                    title="Click para ampliar"
                   />
                 ) : (
                   <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-6xl rounded-lg">
                     🍽️
+                  </div>
+                )}
+
+                {/* Modal imagen expandida */}
+                {imagenExpandida && recetaVisualizando.foto && (
+                  <div
+                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4"
+                    onClick={() => setImagenExpandida(false)}
+                  >
+                    <div className="relative max-w-4xl max-h-[85vh]">
+                      <img
+                        src={recetaVisualizando.foto}
+                        alt={recetaVisualizando.nombre}
+                        className="max-w-full max-h-[85vh] object-contain rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button
+                        onClick={() => setImagenExpandida(false)}
+                        className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full text-gray-700 hover:bg-gray-100 flex items-center justify-center text-xl shadow-lg"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 )}
 
