@@ -205,7 +205,7 @@ export default function MenuComida() {
   const [recetaVisualizando, setRecetaVisualizando] = useState<Receta | null>(null);
   const [imagenExpandida, setImagenExpandida] = useState(false);
   const [busquedaReceta, setBusquedaReceta] = useState('');
-  const [filtroCategoria, setFiltroCategoria] = useState<CategoriaComida | 'todas'>('todas');
+  const [filtroCategoria, setFiltroCategoria] = useState<ComponenteId | 'todas'>('todas');
   const [mostrarSoloFavoritas, setMostrarSoloFavoritas] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [nuevoIngredienteReceta, setNuevoIngredienteReceta] = useState('');
@@ -996,7 +996,7 @@ export default function MenuComida() {
 
   // Filtrado de recetas
   const recetasFiltradas = recetas
-    .filter(r => filtroCategoria === 'todas' || r.categoria === filtroCategoria)
+    .filter(r => filtroCategoria === 'todas' || r.habilitaciones?.some(h => h.componenteId === filtroCategoria))
     .filter(r => !filtroEtiqueta || r.etiquetas?.includes(filtroEtiqueta))
     .filter(r => !mostrarSoloFavoritas || r.favorita)
     .filter(r => !busquedaReceta ||
@@ -1629,12 +1629,12 @@ export default function MenuComida() {
               />
               <select
                 value={filtroCategoria}
-                onChange={(e) => setFiltroCategoria(e.target.value as CategoriaComida | 'todas')}
+                onChange={(e) => setFiltroCategoria(e.target.value as ComponenteId | 'todas')}
                 className="border rounded-lg px-3 py-2 text-sm"
               >
-                <option value="todas">Todas las categorías</option>
-                {categoriasComida.map(cat => (
-                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                <option value="todas">Todos los componentes</option>
+                {COMPONENTES_DISPONIBLES.map(comp => (
+                  <option key={comp.id} value={comp.id}>{comp.icono} {comp.nombre}</option>
                 ))}
               </select>
               <select
@@ -1702,9 +1702,12 @@ export default function MenuComida() {
                         </button>
                       </div>
 
-                      {/* Categoría */}
+                      {/* Componentes habilitados */}
                       <p className="text-sm text-gray-600 mb-2">
-                        {categoriasComida.find(c => c.value === receta.categoria)?.label}
+                        {[...new Set(receta.habilitaciones?.map(h => h.componenteId) || [])].map(compId => {
+                          const comp = COMPONENTES_DISPONIBLES.find(c => c.id === compId);
+                          return comp?.icono;
+                        }).filter(Boolean).join(' ') || 'Sin habilitaciones'}
                       </p>
 
                       {/* Etiquetas */}
@@ -2058,7 +2061,10 @@ export default function MenuComida() {
                   >
                     <div className="font-medium">{receta.nombre}</div>
                     <div className="text-sm text-gray-500">
-                      {categoriasComida.find(c => c.value === receta.categoria)?.label}
+                      {[...new Set(receta.habilitaciones?.map(h => h.componenteId) || [])].map(compId => {
+                        const comp = COMPONENTES_DISPONIBLES.find(c => c.id === compId);
+                        return comp?.icono;
+                      }).filter(Boolean).join(' ') || 'Sin habilitaciones'}
                     </div>
                   </button>
                 ))}
@@ -2127,12 +2133,22 @@ export default function MenuComida() {
                   </div>
                 )}
 
-                {/* Categoría */}
+                {/* Componentes habilitados */}
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Categoría</h3>
-                  <span className="inline-block px-3 py-1 bg-gray-100 rounded-full text-sm">
-                    {categoriasComida.find(c => c.value === recetaVisualizando.categoria)?.label || recetaVisualizando.categoria}
-                  </span>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1">Componentes</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {[...new Set(recetaVisualizando.habilitaciones?.map(h => h.componenteId) || [])].map(compId => {
+                      const comp = COMPONENTES_DISPONIBLES.find(c => c.id === compId);
+                      return comp ? (
+                        <span key={compId} className="inline-block px-3 py-1 bg-gray-100 rounded-full text-sm">
+                          {comp.icono} {comp.nombre}
+                        </span>
+                      ) : null;
+                    })}
+                    {(!recetaVisualizando.habilitaciones || recetaVisualizando.habilitaciones.length === 0) && (
+                      <span className="text-gray-400 text-sm">Sin habilitaciones</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Etiquetas */}
