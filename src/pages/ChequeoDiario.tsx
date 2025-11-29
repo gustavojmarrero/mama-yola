@@ -237,6 +237,7 @@ export default function ChequeoDiarioPage() {
           unidad: data.unidad,
           nivelMinimoMaestro: data.nivelMinimoMaestro || 0,
           nivelMinimoOperativo: data.nivelMinimoOperativo || 0,
+          tieneVidaUtil: data.tieneVidaUtil || false,
           creadoEn: data.creadoEn?.toDate() || new Date(),
           actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
         } as ItemInventario);
@@ -2087,7 +2088,7 @@ export default function ChequeoDiarioPage() {
                       >
                         <option value="">Seleccionar consumible...</option>
                         {consumiblesDisponibles
-                          .filter(c => c.cantidadOperativo > 0)
+                          .filter(c => c.cantidadOperativo > 0 && !c.tieneVidaUtil)
                           .map(c => (
                             <option key={c.id} value={c.id}>
                               {c.nombre} (Disponible: {c.cantidadOperativo} {c.unidad})
@@ -2134,7 +2135,7 @@ export default function ChequeoDiarioPage() {
                   + Agregar consumible
                 </button>
 
-                {consumiblesDisponibles.filter(c => c.cantidadOperativo > 0).length === 0 && (
+                {consumiblesDisponibles.filter(c => c.cantidadOperativo > 0 && !c.tieneVidaUtil).length === 0 && (
                   <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">
                     No hay consumibles disponibles en el inventario operativo.
                   </p>

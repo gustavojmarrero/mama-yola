@@ -139,21 +139,23 @@ export default function SignosVitales() {
       // Calcular si hay valores fuera de rango
       const fueraDeRango = Object.values(alertas).some(alerta => alerta);
 
-      const signoVital: Omit<SignoVital, 'id'> = {
+      const signoVital: Partial<Omit<SignoVital, 'id'>> = {
         pacienteId: PACIENTE_ID,
         fecha: ahora,
         hora,
-        temperatura: formData.temperatura ? parseFloat(formData.temperatura) : undefined,
-        spo2: formData.spo2 ? parseFloat(formData.spo2) : undefined,
-        frecuenciaCardiaca: formData.frecuenciaCardiaca ? parseInt(formData.frecuenciaCardiaca) : undefined,
-        presionArterialSistolica: formData.presionArterialSistolica ? parseInt(formData.presionArterialSistolica) : undefined,
-        presionArterialDiastolica: formData.presionArterialDiastolica ? parseInt(formData.presionArterialDiastolica) : undefined,
-        notas: formData.notas || undefined,
         fueraDeRango,
         alertaGenerada: fueraDeRango,
         registradoPor: userProfile?.id || '',
         creadoEn: ahora
       };
+
+      // Solo agregar campos opcionales si tienen valor (Firebase no permite undefined)
+      if (formData.temperatura) signoVital.temperatura = parseFloat(formData.temperatura);
+      if (formData.spo2) signoVital.spo2 = parseFloat(formData.spo2);
+      if (formData.frecuenciaCardiaca) signoVital.frecuenciaCardiaca = parseInt(formData.frecuenciaCardiaca);
+      if (formData.presionArterialSistolica) signoVital.presionArterialSistolica = parseInt(formData.presionArterialSistolica);
+      if (formData.presionArterialDiastolica) signoVital.presionArterialDiastolica = parseInt(formData.presionArterialDiastolica);
+      if (formData.notas) signoVital.notas = formData.notas;
 
       await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'signosVitales'), signoVital);
 
