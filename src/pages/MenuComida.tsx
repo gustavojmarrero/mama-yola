@@ -148,6 +148,19 @@ export default function MenuComida() {
   } | null>(null);
   const [busquedaRecetaAsignar, setBusquedaRecetaAsignar] = useState('');
   const [platilloCustom, setPlatilloCustom] = useState('');
+  const [fotoCustom, setFotoCustom] = useState('');
+  const [uploadingFotoCustom, setUploadingFotoCustom] = useState(false);
+
+  // Modal de edición de platillo custom
+  const [modalEditarPlatillo, setModalEditarPlatillo] = useState(false);
+  const [platilloEditando, setPlatilloEditando] = useState<{
+    menuId: string;
+    platillo: PlatilloAsignado;
+  } | null>(null);
+  const [editNombreCustom, setEditNombreCustom] = useState('');
+  const [editFotoCustom, setEditFotoCustom] = useState('');
+  const [uploadingEditFoto, setUploadingEditFoto] = useState(false);
+
   const [modalComida, setModalComida] = useState(false);
   const [modalConsumo, setModalConsumo] = useState(false);
   const [modalReceta, setModalReceta] = useState(false);
@@ -402,6 +415,91 @@ export default function MenuComida() {
     setAsignacionActual(null);
     setBusquedaRecetaAsignar('');
     setPlatilloCustom('');
+    setFotoCustom('');
+  }
+
+  // Abrir modal para editar platillo custom
+  function abrirEditarPlatilloCustom(menuId: string, platillo: PlatilloAsignado) {
+    setPlatilloEditando({ menuId, platillo });
+    setEditNombreCustom(platillo.nombreCustom || '');
+    setEditFotoCustom(platillo.fotoCustom || '');
+    setModalEditarPlatillo(true);
+  }
+
+  // Cerrar modal de edición
+  function cerrarModalEditarPlatillo() {
+    setModalEditarPlatillo(false);
+    setPlatilloEditando(null);
+    setEditNombreCustom('');
+    setEditFotoCustom('');
+  }
+
+  // Handler para subir foto en edición
+  async function handleEditFotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingEditFoto(true);
+      const storageRef = ref(storage, `platillos-custom/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setEditFotoCustom(url);
+    } catch (error) {
+      console.error('Error al subir foto:', error);
+      alert('Error al subir la foto');
+    } finally {
+      setUploadingEditFoto(false);
+    }
+  }
+
+  // Guardar cambios en platillo custom
+  async function guardarEditPlatilloCustom() {
+    if (!platilloEditando || !editNombreCustom.trim()) return;
+
+    const { menuId, platillo } = platilloEditando;
+
+    try {
+      const menuRef = doc(db, 'pacientes', PACIENTE_ID, 'menusDiarios', menuId);
+      const menuSnap = await getDoc(menuRef);
+
+      if (menuSnap.exists()) {
+        const menuData = menuSnap.data();
+        const platillosActuales = menuData.platillos || [];
+
+        // Actualizar el platillo
+        const platillosNuevos = platillosActuales.map((p: PlatilloAsignado) => {
+          if (p.componenteId === platillo.componenteId && p.nombreCustom) {
+            return {
+              ...p,
+              nombreCustom: editNombreCustom.trim(),
+              ...(editFotoCustom ? { fotoCustom: editFotoCustom } : {}),
+              ...(!editFotoCustom && p.fotoCustom ? {} : {}), // Mantener o quitar foto
+            };
+          }
+          return p;
+        });
+
+        // Si se quitó la foto, eliminar el campo
+        const platillosFinal = platillosNuevos.map((p: PlatilloAsignado) => {
+          if (p.componenteId === platillo.componenteId && !editFotoCustom) {
+            const { fotoCustom: _, ...rest } = p;
+            return rest;
+          }
+          return p;
+        });
+
+        await updateDoc(menuRef, {
+          platillos: platillosFinal,
+          actualizadoEn: Timestamp.now(),
+        });
+      }
+
+      cerrarModalEditarPlatillo();
+    } catch (error) {
+      console.error('Error al actualizar platillo:', error);
+      alert('Error al guardar los cambios');
+    }
   }
 
   // Asignar platillo a un componente
@@ -416,6 +514,7 @@ export default function MenuComida() {
       ...(receta?.id && { recetaId: receta.id }),
       ...(receta?.nombre && { recetaNombre: receta.nombre }),
       ...(nombreCustom && { nombreCustom }),
+      ...(nombreCustom && fotoCustom && { fotoCustom }),
     };
 
     try {
@@ -866,6 +965,25 @@ export default function MenuComida() {
     }
   }
 
+  // Handler para subir foto de platillo custom
+  async function handleFotoCustomUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingFotoCustom(true);
+      const storageRef = ref(storage, `platillos-custom/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setFotoCustom(url);
+    } catch (error) {
+      console.error('Error al subir foto:', error);
+      alert('Error al subir la foto');
+    } finally {
+      setUploadingFotoCustom(false);
+    }
+  }
+
   // Filtrado de recetas
   const recetasFiltradas = recetas
     .filter(r => filtroCategoria === 'todas' || r.categoria === filtroCategoria)
@@ -1101,7 +1219,31 @@ export default function MenuComida() {
                                     <div className="p-2">
                                       {platillo ? (
                                         <div className="flex items-center justify-between gap-2">
-                                          <span className="text-sm truncate font-medium">
+                                          {/* Miniatura de foto si existe */}
+                                          {(() => {
+                                            const recetaInfo = platillo.recetaId
+                                              ? recetas.find(r => r.id === platillo.recetaId)
+                                              : null;
+                                            const fotoUrl = recetaInfo?.foto || platillo.fotoCustom;
+                                            return fotoUrl ? (
+                                              <img
+                                                src={fotoUrl}
+                                                alt=""
+                                                className="w-8 h-8 object-cover rounded-lg flex-shrink-0 ring-1 ring-gray-200"
+                                              />
+                                            ) : null;
+                                          })()}
+                                          <span
+                                            className={`text-sm truncate font-medium flex-1 ${
+                                              platillo.nombreCustom ? 'cursor-pointer hover:text-amber-600' : ''
+                                            }`}
+                                            onClick={() => {
+                                              if (platillo.nombreCustom && menu) {
+                                                abrirEditarPlatilloCustom(menu.id, platillo);
+                                              }
+                                            }}
+                                            title={platillo.nombreCustom ? 'Click para editar' : undefined}
+                                          >
                                             {platillo.recetaNombre || platillo.nombreCustom}
                                           </span>
                                           <button
@@ -2224,25 +2366,232 @@ export default function MenuComida() {
                 </div>
 
                 {/* Platillo custom */}
-                <div className="flex gap-2">
+                <div className="space-y-4">
+                  {/* Input de nombre */}
                   <input
                     type="text"
                     value={platilloCustom}
                     onChange={(e) => setPlatilloCustom(e.target.value)}
                     placeholder="Nombre del platillo..."
-                    className="flex-1 border rounded-lg px-3 py-2"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && platilloCustom.trim()) {
-                        asignarPlatillo(undefined, platilloCustom.trim());
-                      }
-                    }}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
                   />
+
+                  {/* Sección de foto - solo visible cuando hay nombre */}
+                  {platilloCustom.trim() && (
+                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
+                      <div className="flex items-start gap-4">
+                        {/* Preview de foto o placeholder */}
+                        <div className="relative flex-shrink-0">
+                          {fotoCustom ? (
+                            <div className="relative group">
+                              <img
+                                src={fotoCustom}
+                                alt="Preview del platillo"
+                                className="w-24 h-24 object-cover rounded-xl shadow-md ring-2 ring-white"
+                              />
+                              <button
+                                onClick={() => setFotoCustom('')}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 hover:scale-110 transition-all"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-24 h-24 bg-white/80 backdrop-blur rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-amber-200">
+                              <span className="text-3xl mb-1">📷</span>
+                              <span className="text-[10px] font-medium">Opcional</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Botones de captura */}
+                        <div className="flex-1 space-y-2">
+                          <p className="text-xs text-amber-800 font-medium mb-3">
+                            Agrega una foto del platillo
+                          </p>
+
+                          {uploadingFotoCustom ? (
+                            <div className="flex items-center gap-2 text-amber-700">
+                              <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-sm font-medium">Subiendo foto...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {/* Botón Tomar Foto */}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handleFotoCustomUpload}
+                                className="hidden"
+                                id="foto-camera-input"
+                              />
+                              <label
+                                htmlFor="foto-camera-input"
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium text-sm cursor-pointer hover:from-amber-600 hover:to-orange-600 active:scale-95 transition-all shadow-md shadow-amber-200"
+                              >
+                                <span>📸</span>
+                                <span>Tomar foto</span>
+                              </label>
+
+                              {/* Botón Galería */}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFotoCustomUpload}
+                                className="hidden"
+                                id="foto-gallery-input"
+                              />
+                              <label
+                                htmlFor="foto-gallery-input"
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-amber-700 rounded-xl font-medium text-sm cursor-pointer hover:bg-amber-50 active:scale-95 transition-all border border-amber-200 shadow-sm"
+                              >
+                                <span>🖼️</span>
+                                <span>Galería</span>
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botón agregar */}
                   <button
                     onClick={() => platilloCustom.trim() && asignarPlatillo(undefined, platilloCustom.trim())}
-                    disabled={!platilloCustom.trim()}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                    disabled={!platilloCustom.trim() || uploadingFotoCustom}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-xl font-medium hover:from-gray-800 hover:to-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-gray-200 active:scale-[0.98]"
                   >
-                    Agregar
+                    {fotoCustom ? '✓ Agregar platillo con foto' : 'Agregar platillo'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de edición de platillo custom */}
+        {modalEditarPlatillo && platilloEditando && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">Editar platillo</h3>
+                  <button
+                    onClick={cerrarModalEditarPlatillo}
+                    className="text-white/80 hover:text-white text-2xl font-light"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-5">
+                {/* Input nombre */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del platillo
+                  </label>
+                  <input
+                    type="text"
+                    value={editNombreCustom}
+                    onChange={(e) => setEditNombreCustom(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+                    placeholder="Nombre del platillo..."
+                  />
+                </div>
+
+                {/* Sección de foto */}
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
+                  <label className="block text-sm font-medium text-amber-800 mb-3">
+                    Foto del platillo
+                  </label>
+                  <div className="flex items-start gap-4">
+                    {/* Preview */}
+                    <div className="relative flex-shrink-0">
+                      {editFotoCustom ? (
+                        <div className="relative">
+                          <img
+                            src={editFotoCustom}
+                            alt="Preview"
+                            className="w-24 h-24 object-cover rounded-xl shadow-md ring-2 ring-white"
+                          />
+                          <button
+                            onClick={() => setEditFotoCustom('')}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 hover:scale-110 transition-all"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-24 h-24 bg-white/80 backdrop-blur rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-amber-200">
+                          <span className="text-3xl mb-1">📷</span>
+                          <span className="text-[10px] font-medium">Sin foto</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Botones */}
+                    <div className="flex-1 space-y-2">
+                      {uploadingEditFoto ? (
+                        <div className="flex items-center gap-2 text-amber-700">
+                          <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-sm font-medium">Subiendo...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleEditFotoUpload}
+                            className="hidden"
+                            id="edit-camera-input"
+                          />
+                          <label
+                            htmlFor="edit-camera-input"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-medium text-sm cursor-pointer hover:from-amber-600 hover:to-orange-600 active:scale-95 transition-all shadow-md"
+                          >
+                            <span>📸</span>
+                            <span>Cámara</span>
+                          </label>
+
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleEditFotoUpload}
+                            className="hidden"
+                            id="edit-gallery-input"
+                          />
+                          <label
+                            htmlFor="edit-gallery-input"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-white text-amber-700 rounded-lg font-medium text-sm cursor-pointer hover:bg-amber-50 active:scale-95 transition-all border border-amber-200"
+                          >
+                            <span>🖼️</span>
+                            <span>Galería</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botones de acción */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={cerrarModalEditarPlatillo}
+                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarEditPlatilloCustom}
+                    disabled={!editNombreCustom.trim() || uploadingEditFoto}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg"
+                  >
+                    Guardar
                   </button>
                 </div>
               </div>

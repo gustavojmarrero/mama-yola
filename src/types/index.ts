@@ -550,6 +550,7 @@ export interface PlatilloAsignado {
   recetaId?: string;
   recetaNombre?: string;
   nombreCustom?: string;  // Si no usa receta
+  fotoCustom?: string;    // URL de foto para platillos custom
   notas?: string;
   consumo?: {
     nivel: NivelConsumo;
