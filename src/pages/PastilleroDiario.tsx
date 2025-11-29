@@ -128,7 +128,7 @@ export default function PastilleroDiario() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filtersOpenHoy, setFiltersOpenHoy] = useState(false);
   const [filtersOpenHistorial, setFiltersOpenHistorial] = useState(false);
-  const [sortByHoy, setSortByHoy] = useState('horario_asc');
+  const [sortByHoy, setSortByHoy] = useState('estado');
   const [sortByHistorial, setSortByHistorial] = useState('fecha_desc');
   const [filtroEstadoHoy, setFiltroEstadoHoy] = useState<string>('todos');
   const [visibleCountHoy, setVisibleCountHoy] = useState(ITEMS_PER_PAGE);
@@ -407,13 +407,15 @@ export default function PastilleroDiario() {
           return b.horario.localeCompare(a.horario);
         case 'nombre_asc':
           return a.medicamento.nombre.localeCompare(b.medicamento.nombre);
-        case 'estado':
-          const getEstadoOrder = (d: DosisDelDia) => {
-            if (!d.registro) return d.retrasoMinutos && d.retrasoMinutos > 0 ? 0 : 1;
-            if (d.registro.estado === 'tomado') return 2;
-            return 3;
-          };
-          return getEstadoOrder(a) - getEstadoOrder(b);
+        case 'estado': {
+          // Pendientes primero (sin registro = 0), registrados después (1)
+          const getEstadoOrder = (d: DosisDelDia) => (!d.registro ? 0 : 1);
+          const estadoA = getEstadoOrder(a);
+          const estadoB = getEstadoOrder(b);
+          if (estadoA !== estadoB) return estadoA - estadoB;
+          // Dentro del mismo grupo, ordenar por horario (más antiguo primero)
+          return a.horario.localeCompare(b.horario);
+        }
         default:
           return a.horario.localeCompare(b.horario);
       }
