@@ -298,14 +298,19 @@ export default function MenuComida() {
             // Combinar configuración guardada con defaults para asegurar que todos los componentes existan
             const tiemposActualizados = TIEMPOS_COMIDA_DEFAULT.map(defaultTiempo => {
               const tiempoGuardado = data.tiempos.find((t: TiempoComidaConfig) => t.id === defaultTiempo.id);
-              if (tiempoGuardado) {
-                // Combinar componentes: usar orden y obligatorio del default
-                const componentesActualizados = defaultTiempo.componentes.map(defaultComp => {
-                  const compGuardado = tiempoGuardado.componentes?.find((c: any) => c.id === defaultComp.id);
-                  // Siempre usar orden y obligatorio del default
-                  return { ...defaultComp, ...(compGuardado || {}), orden: defaultComp.orden, obligatorio: defaultComp.obligatorio };
+              if (tiempoGuardado && tiempoGuardado.componentes) {
+                // Usar los componentes guardados directamente (el usuario puede agregar/quitar)
+                // Solo asegurar que los obligatorios del default existan
+                const componentesGuardados = [...tiempoGuardado.componentes];
+
+                // Agregar componentes obligatorios del default si no existen
+                defaultTiempo.componentes.forEach(defaultComp => {
+                  if (defaultComp.obligatorio && !componentesGuardados.some(c => c.id === defaultComp.id)) {
+                    componentesGuardados.push(defaultComp);
+                  }
                 });
-                return { ...defaultTiempo, ...tiempoGuardado, componentes: componentesActualizados };
+
+                return { ...defaultTiempo, ...tiempoGuardado, componentes: componentesGuardados };
               }
               return defaultTiempo;
             });
@@ -314,6 +319,7 @@ export default function MenuComida() {
           }
         } else {
           // No hay configuración guardada, usar defaults como inicial
+          setTiemposComidaConfig(TIEMPOS_COMIDA_DEFAULT);
           setConfigInicial(TIEMPOS_COMIDA_DEFAULT);
         }
       } catch (error) {
