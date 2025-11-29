@@ -44,7 +44,7 @@ const SORT_OPTIONS_HISTORIAL = [
 ];
 
 export default function PastilleroDiario() {
-  const { usuario, userProfile } = useAuth();
+  const { currentUser: usuario, userProfile } = useAuth();
   const [loading, setLoading] = useState(false);
 
   // Hook de tránsito
@@ -297,25 +297,26 @@ export default function PastilleroDiario() {
       const fechaHoraProgramada = new Date();
       fechaHoraProgramada.setHours(hora, minuto, 0, 0);
 
-      // Calcular retraso
-      let retrasoMinutos: number | undefined;
-      if (estadoSeleccionado === 'tomado') {
-        retrasoMinutos = Math.floor((ahora.getTime() - fechaHoraProgramada.getTime()) / 60000);
-      }
-
-      const registroData = {
+      // Construir objeto sin valores undefined (Firebase no los acepta)
+      const registroData: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         medicamentoId: dosisSeleccionada.medicamento.id,
         medicamentoNombre: dosisSeleccionada.medicamento.nombre,
         fechaHoraProgramada,
-        fechaHoraReal: estadoSeleccionado === 'tomado' ? ahora : undefined,
         estado: estadoSeleccionado,
-        retrasoMinutos,
-        notas: notas || undefined,
         administradoPor: usuario.uid,
         horario: dosisSeleccionada.horario,
         creadoEn: ahora,
       };
+
+      // Solo agregar campos opcionales si tienen valor
+      if (estadoSeleccionado === 'tomado') {
+        registroData.fechaHoraReal = ahora;
+        registroData.retrasoMinutos = Math.floor((ahora.getTime() - fechaHoraProgramada.getTime()) / 60000);
+      }
+      if (notas) {
+        registroData.notas = notas;
+      }
 
       if (dosisSeleccionada.registro) {
         // Actualizar registro existente
@@ -751,7 +752,7 @@ export default function PastilleroDiario() {
 
         {/* Modal de Registro */}
         {modalAbierto && dosisSeleccionada && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Registrar Administración</h2>
 

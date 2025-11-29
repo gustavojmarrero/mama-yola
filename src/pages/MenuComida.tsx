@@ -129,6 +129,7 @@ export default function MenuComida() {
 
   // Estado para configuración de tiempos de comida
   const [tiemposComidaConfig, setTiemposComidaConfig] = useState<TiempoComidaConfig[]>(TIEMPOS_COMIDA_DEFAULT);
+  const [configInicial, setConfigInicial] = useState<TiempoComidaConfig[] | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
 
@@ -308,7 +309,11 @@ export default function MenuComida() {
               return defaultTiempo;
             });
             setTiemposComidaConfig(tiemposActualizados);
+            setConfigInicial(tiemposActualizados);
           }
+        } else {
+          // No hay configuración guardada, usar defaults como inicial
+          setConfigInicial(TIEMPOS_COMIDA_DEFAULT);
         }
       } catch (error) {
         console.error('Error al cargar configuración:', error);
@@ -319,6 +324,14 @@ export default function MenuComida() {
 
     cargarConfiguracion();
   }, []);
+
+  // Detectar cambios en la configuración de tiempos de comida
+  useEffect(() => {
+    if (configInicial === null) return; // Aún no se ha cargado
+
+    const hasChanges = JSON.stringify(tiemposComidaConfig) !== JSON.stringify(configInicial);
+    setIsDirty(hasChanges);
+  }, [tiemposComidaConfig, configInicial, setIsDirty]);
 
   // Cargar menús diarios
   useEffect(() => {
@@ -628,6 +641,8 @@ export default function MenuComida() {
         tiempos: tiemposComidaConfig,
         actualizadoEn: Timestamp.now()
       });
+      setConfigInicial(tiemposComidaConfig);
+      markAsSaved();
       alert('Configuración guardada correctamente');
     } catch (error) {
       console.error('Error al guardar configuración:', error);
@@ -1148,7 +1163,7 @@ export default function MenuComida() {
                 </button>
                 <button
                   onClick={guardarConfiguracion}
-                  disabled={guardandoConfig}
+                  disabled={guardandoConfig || !isDirty}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {guardandoConfig ? 'Guardando...' : 'Guardar Cambios'}
