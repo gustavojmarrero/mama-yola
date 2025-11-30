@@ -24,7 +24,6 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: '/chequeo-diario', name: 'Chequeo Diario', path: '/chequeo-diario', icon: '📋', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/pastillero-diario', name: 'Pastillero', path: '/pastillero-diario', icon: '💊', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/medicamentos', name: 'Medicamentos', path: '/medicamentos', icon: '⚕️', roles: ['familiar', 'supervisor'] },
-  { id: '/adherencia', name: 'Adherencia', path: '/adherencia', icon: '📊', roles: ['familiar', 'supervisor'] },
 
   // Gestión
   { id: '/dashboard', name: 'Dashboard', path: '/dashboard', icon: '🏠', roles: ['familiar', 'supervisor', 'cuidador'] },
@@ -52,7 +51,6 @@ export const MENU_GROUPS: MenuGroup[] = [
       MENU_ITEMS.find(i => i.id === '/chequeo-diario')!,
       MENU_ITEMS.find(i => i.id === '/pastillero-diario')!,
       MENU_ITEMS.find(i => i.id === '/medicamentos')!,
-      MENU_ITEMS.find(i => i.id === '/adherencia')!,
     ],
   },
   {

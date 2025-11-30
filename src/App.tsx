@@ -7,7 +7,6 @@ import SignosVitales from './pages/SignosVitales'
 import ChequeoDiario from './pages/ChequeoDiario'
 import Medicamentos from './pages/Medicamentos'
 import PastilleroDiario from './pages/PastilleroDiario'
-import DashboardAdherencia from './pages/DashboardAdherencia'
 import Contactos from './pages/Contactos'
 import Eventos from './pages/Eventos'
 import Inventarios from './pages/Inventarios'
@@ -81,14 +80,6 @@ function App() {
         element={
           <PrivateRoute>
             <PastilleroDiario />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/adherencia"
-        element={
-          <PrivateRoute>
-            <DashboardAdherencia />
           </PrivateRoute>
         }
       />
