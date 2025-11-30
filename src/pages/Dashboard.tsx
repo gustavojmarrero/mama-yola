@@ -8,6 +8,8 @@ import { es } from 'date-fns/locale';
 import Layout from '../components/common/Layout';
 import { DashboardSkeleton } from '../components/common/Skeleton';
 import { useTransito } from '../hooks/useTransito';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Evento,
   Contacto,
@@ -53,6 +55,21 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [procesos, setProcesos] = useState<ProcesoDelDia[]>([]);
   const [horaActual, setHoraActual] = useState(new Date());
+
+  // Datos del día para PDF
+  const [datosDelDia, setDatosDelDia] = useState<{
+    chequeos: ChequeoDiario[];
+    signosVitales: SignoVital[];
+    menus: MenuTiempoComida[];
+    medicamentos: RegistroMedicamento[];
+    actividades: Actividad[];
+  }>({
+    chequeos: [],
+    signosVitales: [],
+    menus: [],
+    medicamentos: [],
+    actividades: [],
+  });
 
   useEffect(() => {
     cargarDatos();
@@ -222,6 +239,15 @@ export default function Dashboard() {
       });
 
       setProcesos(procesosCalculados);
+
+      // Guardar datos del día para PDF
+      setDatosDelDia({
+        chequeos: chequeosDiarios,
+        signosVitales,
+        menus: menusDiarios,
+        medicamentos: registrosMedicamentos,
+        actividades,
+      });
     } catch (error) {
       console.error('Error al cargar procesos del día:', error);
     }
@@ -389,6 +415,275 @@ export default function Dashboard() {
     return iconos[tipo] || '📅';
   }
 
+  // Función para exportar resumen del día a PDF
+  async function exportarResumenDia() {
+    // Obtener medicamentos desde procesos (incluye pendientes y completados)
+    const procesosMedicamentos = procesos.filter(p => p.tipo === 'medicamento');
+
+    // Verificar si hay datos para exportar
+    const hayDatos =
+      datosDelDia.chequeos.length > 0 ||
+      datosDelDia.signosVitales.length > 0 ||
+      datosDelDia.menus.length > 0 ||
+      procesosMedicamentos.length > 0 ||
+      datosDelDia.actividades.length > 0;
+
+    if (!hayDatos) {
+      alert('No hay datos registrados para el día de hoy. Registra algún chequeo, medicamento, menú o actividad primero.');
+      return;
+    }
+
+    const doc = new jsPDF();
+    let yPos = 20;
+    const hoy = new Date();
+
+    // Helper para manejar paginación
+    const checkPageBreak = (neededSpace: number = 40) => {
+      if (yPos > 250 - neededSpace) {
+        doc.addPage();
+        yPos = 20;
+      }
+    };
+
+    // === HEADER ===
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Resumen del Día', 105, yPos, { align: 'center' });
+    yPos += 8;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(format(hoy, "EEEE d 'de' MMMM, yyyy", { locale: es }), 105, yPos, { align: 'center' });
+    yPos += 15;
+
+    // === SECCIÓN 1: SIGNOS VITALES ===
+    if (datosDelDia.signosVitales.length > 0) {
+      checkPageBreak(50);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Signos Vitales', 20, yPos);
+      yPos += 8;
+
+      const signosData = datosDelDia.signosVitales.map(sv => [
+        format(sv.fecha, 'HH:mm'),
+        sv.presionArterialSistolica && sv.presionArterialDiastolica
+          ? `${sv.presionArterialSistolica}/${sv.presionArterialDiastolica}`
+          : '--',
+        sv.frecuenciaCardiaca ? `${sv.frecuenciaCardiaca} bpm` : '--',
+        sv.spo2 ? `${sv.spo2}%` : '--',
+        sv.temperatura ? `${sv.temperatura}°C` : '--',
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Hora', 'Presión Arterial', 'FC', 'SpO2', 'Temp']],
+        body: signosData,
+        theme: 'grid',
+        headStyles: { fillColor: [66, 139, 202] },
+        margin: { left: 20, right: 20 },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // === SECCIÓN 2: CHEQUEO DIARIO ===
+    if (datosDelDia.chequeos.length > 0) {
+      const chequeo = datosDelDia.chequeos[0];
+      checkPageBreak(60);
+
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Chequeo Diario', 20, yPos);
+      yPos += 8;
+
+      const actitudMap: Record<string, string> = {
+        positiva: 'Positiva',
+        neutral: 'Neutral',
+        irritable: 'Irritable',
+        triste: 'Triste',
+        ansiosa: 'Ansiosa',
+      };
+
+      const chequeoData = [
+        ['Estado General', actitudMap[chequeo.actitud || ''] || chequeo.actitud || '--'],
+        ['Nivel Actividad', chequeo.nivelActividad || '--'],
+        ['Cooperación', chequeo.nivelCooperacion || '--'],
+        ['Sueño', chequeo.suenoCalidad || '--'],
+        ['Dolor', chequeo.dolorPresente ? `Sí - Nivel ${chequeo.dolorNivel || 0}/10` : 'No'],
+      ];
+
+      if (chequeo.dolorPresente && chequeo.dolorUbicacion) {
+        chequeoData.push(['Ubicación dolor', chequeo.dolorUbicacion]);
+      }
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Aspecto', 'Estado']],
+        body: chequeoData,
+        theme: 'grid',
+        headStyles: { fillColor: [92, 184, 92] },
+        margin: { left: 20, right: 20 },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+
+      // Funciones corporales
+      if (chequeo.miccionesNumero !== undefined || chequeo.evacuacionesNumero !== undefined) {
+        checkPageBreak(40);
+        const funcionesData = [];
+        if (chequeo.miccionesNumero !== undefined) {
+          funcionesData.push(['Micciones', `${chequeo.miccionesNumero} - ${chequeo.miccionesCaracteristicas || 'Normal'}`]);
+        }
+        if (chequeo.evacuacionesNumero !== undefined) {
+          funcionesData.push(['Evacuaciones', `${chequeo.evacuacionesNumero} - ${chequeo.evacuacionesConsistencia || ''} ${chequeo.evacuacionesColor || ''}`]);
+        }
+        if (chequeo.dificultadEvacuar) {
+          funcionesData.push(['Dificultad', 'Sí']);
+        }
+
+        if (funcionesData.length > 0) {
+          autoTable(doc, {
+            startY: yPos,
+            head: [['Función Corporal', 'Detalle']],
+            body: funcionesData,
+            theme: 'grid',
+            headStyles: { fillColor: [241, 196, 15] },
+            margin: { left: 20, right: 20 },
+          });
+          yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+      }
+    }
+
+    // === SECCIÓN 3: MEDICAMENTOS ===
+    if (procesosMedicamentos.length > 0) {
+      checkPageBreak(50);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Medicamentos', 20, yPos);
+      yPos += 8;
+
+      const estadoLabel: Record<string, string> = {
+        completado: 'Tomado',
+        pendiente: 'Pendiente',
+        vencido: 'Vencido',
+      };
+
+      const medsData = procesosMedicamentos
+        .sort((a, b) => (a.horaProgramada || '').localeCompare(b.horaProgramada || ''))
+        .map(med => [
+          med.horaProgramada,
+          med.nombre,
+          estadoLabel[med.estado] || med.estado,
+          med.detalle || '',
+        ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Hora', 'Medicamento', 'Estado', 'Dosis']],
+        body: medsData,
+        theme: 'grid',
+        headStyles: { fillColor: [217, 83, 79] },
+        margin: { left: 20, right: 20 },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          2: { cellWidth: 25 },
+        },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // === SECCIÓN 4: MENÚ DEL DÍA ===
+    if (datosDelDia.menus.length > 0) {
+      checkPageBreak(50);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Menú del Día', 20, yPos);
+      yPos += 8;
+
+      const tiempoLabel: Record<string, string> = {
+        desayuno: 'Desayuno',
+        colacion_am: 'Colación AM',
+        almuerzo: 'Almuerzo',
+        colacion_pm: 'Colación PM',
+        cena: 'Cena',
+      };
+
+      const menusData = datosDelDia.menus
+        .sort((a, b) => {
+          const orden = ['desayuno', 'colacion_am', 'almuerzo', 'colacion_pm', 'cena'];
+          return orden.indexOf(a.tiempoComidaId) - orden.indexOf(b.tiempoComidaId);
+        })
+        .map(menu => {
+          const platillos = menu.platillos
+            ?.map(p => p.recetaNombre || p.nombreCustom)
+            .filter(Boolean)
+            .join(', ') || '--';
+          return [
+            tiempoLabel[menu.tiempoComidaId] || menu.tiempoComidaId,
+            platillos,
+          ];
+        });
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Tiempo', 'Platillos']],
+        body: menusData,
+        theme: 'grid',
+        headStyles: { fillColor: [240, 173, 78] },
+        margin: { left: 20, right: 20 },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // === SECCIÓN 5: ACTIVIDADES ===
+    if (datosDelDia.actividades.length > 0) {
+      checkPageBreak(50);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Actividades', 20, yPos);
+      yPos += 8;
+
+      const estadoAct: Record<string, string> = {
+        programada: 'Programada',
+        en_progreso: 'En progreso',
+        completada: 'Completada',
+        cancelada: 'Cancelada',
+      };
+
+      const actsData = datosDelDia.actividades
+        .sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
+        .map(act => [
+          format(act.fechaInicio, 'HH:mm'),
+          act.nombre || '--',
+          act.tipo || '--',
+          estadoAct[act.estado] || act.estado,
+        ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Hora', 'Actividad', 'Tipo', 'Estado']],
+        body: actsData,
+        theme: 'grid',
+        headStyles: { fillColor: [155, 89, 182] },
+        margin: { left: 20, right: 20 },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // === FOOTER ===
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Página ${i} de ${pageCount}`, 105, 285, { align: 'center' });
+      doc.text('Generado con Mamá Yola - Sistema de Gestión de Cuidado', 105, 290, { align: 'center' });
+    }
+
+    // Guardar
+    const fechaArchivo = format(hoy, 'dd-MM-yyyy');
+    doc.save(`resumen-dia-${fechaArchivo}.pdf`);
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -401,18 +696,30 @@ export default function Dashboard() {
     <Layout>
       {/* Header con saludo */}
       <div className="mb-8 animate-slide-up">
-        <div className="flex items-center gap-4 mb-1">
-          <div className="hidden sm:flex w-14 h-14 bg-gradient-to-br from-lavender-400 to-lavender-600 rounded-2xl items-center justify-center shadow-lg shadow-lavender-500/20">
-            <span className="text-2xl">👋</span>
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex w-14 h-14 bg-gradient-to-br from-lavender-400 to-lavender-600 rounded-2xl items-center justify-center shadow-lg shadow-lavender-500/20">
+              <span className="text-2xl">👋</span>
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-warm-800 font-display tracking-tight">
+                ¡Hola, {userProfile?.nombre?.split(' ')[0] || 'Usuario'}!
+              </h1>
+              <p className="text-warm-500 capitalize">
+                {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-warm-800 font-display tracking-tight">
-              ¡Hola, {userProfile?.nombre?.split(' ')[0] || 'Usuario'}!
-            </h1>
-            <p className="text-warm-500 capitalize">
-              {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
-            </p>
-          </div>
+          <button
+            onClick={exportarResumenDia}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
+            title="Exportar resumen del día en PDF"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="hidden sm:inline">Resumen PDF</span>
+          </button>
         </div>
       </div>
 

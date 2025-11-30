@@ -159,30 +159,8 @@ export default function SignosVitales() {
 
       await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'signosVitales'), signoVital);
 
-      // Si está fuera de rango, crear notificación
-      if (fueraDeRango) {
-        const mensajeAlerta = [];
-        if (alertas.temperatura) mensajeAlerta.push('temperatura');
-        if (alertas.spo2) mensajeAlerta.push('saturación O2');
-        if (alertas.frecuenciaCardiaca) mensajeAlerta.push('frecuencia cardíaca');
-        if (alertas.presionArterialSistolica || alertas.presionArterialDiastolica) mensajeAlerta.push('presión arterial');
-
-        await addDoc(collection(db, 'notificaciones'), {
-          pacienteId: PACIENTE_ID,
-          tipo: 'alerta_signos_vitales',
-          titulo: '⚠️ Signos vitales fuera de rango',
-          mensaje: `Los siguientes signos están fuera del rango normal: ${mensajeAlerta.join(', ')}`,
-          severidad: 'alta',
-          leida: false,
-          fecha: ahora,
-          creadoEn: ahora
-        });
-      }
-
+      // Éxito al guardar signos vitales - limpiar formulario y mostrar éxito
       markAsSaved();
-      alert('Signos vitales registrados exitosamente');
-
-      // Limpiar formulario
       setFormData({
         temperatura: '',
         spo2: '',
@@ -193,9 +171,34 @@ export default function SignosVitales() {
       });
       setAlertas({});
       isInitialLoad.current = true; // Resetear flag para evitar marcar como dirty
-
-      // Recargar historial
       cargarDatos();
+
+      // Si está fuera de rango, crear notificación (operación secundaria)
+      if (fueraDeRango) {
+        const mensajeAlerta = [];
+        if (alertas.temperatura) mensajeAlerta.push('temperatura');
+        if (alertas.spo2) mensajeAlerta.push('saturación O2');
+        if (alertas.frecuenciaCardiaca) mensajeAlerta.push('frecuencia cardíaca');
+        if (alertas.presionArterialSistolica || alertas.presionArterialDiastolica) mensajeAlerta.push('presión arterial');
+
+        try {
+          await addDoc(collection(db, 'notificaciones'), {
+            pacienteId: PACIENTE_ID,
+            tipo: 'alerta_signos_vitales',
+            titulo: '⚠️ Signos vitales fuera de rango',
+            mensaje: `Los siguientes signos están fuera del rango normal: ${mensajeAlerta.join(', ')}`,
+            severidad: 'alta',
+            leida: false,
+            fecha: ahora,
+            creadoEn: ahora
+          });
+        } catch (notifError) {
+          console.warn('No se pudo crear la notificación:', notifError);
+          // No mostrar error al usuario - el dato principal ya se guardó
+        }
+      }
+
+      alert('Signos vitales registrados exitosamente');
     } catch (error) {
       console.error('Error guardando signos vitales:', error);
       alert('Error al guardar signos vitales');

@@ -38,5 +38,14 @@ service cloud.firestore {
         allow write: if isAuthenticated();
       }
     }
+
+    // Colección de notificaciones
+    match /notificaciones/{notificacionId} {
+      // Permitir lectura a usuarios autenticados
+      allow read: if isAuthenticated();
+
+      // Permitir escritura a usuarios autenticados
+      allow write: if isAuthenticated();
+    }
   }
 }
