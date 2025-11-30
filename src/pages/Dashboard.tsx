@@ -417,31 +417,7 @@ export default function Dashboard() {
       </div>
 
       {/* Métricas Resumen - Cards Premium */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {/* Adherencia */}
-        <Link
-          to="/adherencia"
-          className="group bg-gradient-to-br from-white via-white to-lavender-50/50 border-l-4 border-lavender-400 rounded-xl p-4 md:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
-        >
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-10 h-10 bg-lavender-100 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-              💊
-            </div>
-            {metrics.alertasActivas > 0 && (
-              <span className="px-2 py-0.5 bg-error-light text-error text-xs font-semibold rounded-full animate-pulse-soft">
-                {metrics.alertasActivas} alertas
-              </span>
-            )}
-          </div>
-          <div className={`text-2xl md:text-3xl font-bold font-display ${
-            metrics.adherenciaMedicamentos >= 90 ? 'text-success' :
-            metrics.adherenciaMedicamentos >= 70 ? 'text-warning' : 'text-error'
-          }`}>
-            {metrics.adherenciaMedicamentos}%
-          </div>
-          <div className="text-sm text-warm-500 font-medium">Adherencia 7 días</div>
-        </Link>
-
+      <div className="grid grid-cols-3 gap-4 mb-8">
         {/* Medicamentos pendientes */}
         <Link
           to="/pastillero-diario"

@@ -24,6 +24,7 @@ import {
   TipoMovimiento,
 } from '../types';
 import { useAuth } from '../context/AuthContext';
+import InventarioItemCard from '../components/inventarios/InventarioItemCard';
 
 const PACIENTE_ID = 'paciente-principal';
 const DIAS_ALERTA_VENCIMIENTO = 3;
@@ -766,8 +767,40 @@ export default function Inventarios() {
             </div>
           )}
 
-          {/* Lista de items */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          {/* Vista móvil - Cards */}
+          <div className="md:hidden space-y-4">
+            {itemsVisibles.map((item) => (
+              <InventarioItemCard
+                key={item.id}
+                item={item}
+                puedeEditar={puedeEditar}
+                categorias={categorias}
+                onMovimiento={abrirMovimientoModal}
+                onEditar={abrirModal}
+                getEstadoItem={getEstadoItem}
+                getEstadoColor={getEstadoColor}
+                getEstadoLabel={getEstadoLabel}
+                calcularDiasRestantes={calcularDiasRestantes}
+                itemPorAgotarse={itemPorAgotarse}
+              />
+            ))}
+            {itemsFiltrados.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                <p className="text-gray-500 text-lg">No hay items en el inventario</p>
+                {puedeEditar && (
+                  <button
+                    onClick={() => abrirModal()}
+                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    + Agregar primer item
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Vista desktop - Tabla */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
