@@ -8,17 +8,30 @@ function horaAMinutos(hora: string): number {
   return h * 60 + m;
 }
 
+// Valores por defecto para horarios
+const HORARIOS_DEFAULT = {
+  matutino: '07:00',
+  vespertino: '14:00',
+  nocturno: '21:00',
+};
+
 /**
  * Calcula el turno de una actividad basado en su hora y la configuración de horarios
  * @param hora - Hora en formato "HH:mm"
- * @param config - Configuración de horarios con los inicios de cada turno
+ * @param config - Configuración de horarios con los inicios de cada turno (opcional)
  * @returns El turno correspondiente
  */
-export function calcularTurno(hora: string, config: ConfiguracionHorarios): TurnoActividad {
+export function calcularTurno(hora: string, config?: { matutino: string; vespertino: string; nocturno: string } | ConfiguracionHorarios): TurnoActividad {
   const minutos = horaAMinutos(hora);
-  const matutino = horaAMinutos(config.chequeoDiario.matutino);
-  const vespertino = horaAMinutos(config.chequeoDiario.vespertino);
-  const nocturno = horaAMinutos(config.chequeoDiario.nocturno);
+
+  // Extraer los horarios del chequeo diario o usar el objeto directamente
+  const horarios = config
+    ? ('chequeoDiario' in config ? config.chequeoDiario : config)
+    : HORARIOS_DEFAULT;
+
+  const matutino = horaAMinutos(horarios.matutino);
+  const vespertino = horaAMinutos(horarios.vespertino);
+  const nocturno = horaAMinutos(horarios.nocturno);
 
   // Si nocturno es después de vespertino (ej: 21:00)
   if (nocturno > vespertino) {

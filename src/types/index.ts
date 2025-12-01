@@ -760,3 +760,6 @@ export interface ReporteDiferencia {
   creadoEn: Date;
   actualizadoEn: Date;
 }
+
+// ===== RE-EXPORTAR TIPOS DE ACTIVIDADES V2 =====
+export * from './actividades';

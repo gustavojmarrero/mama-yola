@@ -12,6 +12,7 @@ import Eventos from './pages/Eventos'
 import Inventarios from './pages/Inventarios'
 import Turnos from './pages/Turnos'
 import Actividades from './pages/Actividades'
+import ActividadesV2 from './pages/ActividadesV2'
 import MenuComida from './pages/MenuComida'
 import Analytics from './pages/Analytics'
 import ConfiguracionHorarios from './pages/ConfiguracionHorarios'
@@ -120,6 +121,14 @@ function App() {
         element={
           <PrivateRoute>
             <Actividades />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/actividades-v2"
+        element={
+          <PrivateRoute>
+            <ActividadesV2 />
           </PrivateRoute>
         }
       />

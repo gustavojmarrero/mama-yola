@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.descontarVidaUtilDiaria = void 0;
+exports.generarInstanciasActividadesDiarias = exports.descontarVidaUtilDiaria = void 0;
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
@@ -99,6 +99,89 @@ exports.descontarVidaUtilDiaria = (0, scheduler_1.onSchedule)({
     }
     catch (error) {
         console.error('Error en descuento de vida útil:', error);
+        throw error;
+    }
+});
+/**
+ * Cloud Function que genera instancias de actividades diariamente
+ * basándose en las programaciones activas.
+ *
+ * Se ejecuta todos los días a las 5:00 AM (America/Mexico_City)
+ * para tener las instancias listas antes de que comience el día.
+ */
+exports.generarInstanciasActividadesDiarias = (0, scheduler_1.onSchedule)({
+    schedule: '0 5 * * *',
+    timeZone: 'America/Mexico_City',
+    timeoutSeconds: 300,
+    memory: '256MiB',
+}, async (_event) => {
+    var _a, _b;
+    console.log('Iniciando generación de instancias de actividades...');
+    // Fecha de hoy normalizada a medianoche
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const diaSemana = hoy.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+    try {
+        // Obtener todos los pacientes
+        const pacientesSnapshot = await db.collection('pacientes').get();
+        for (const pacienteDoc of pacientesSnapshot.docs) {
+            const pacienteId = pacienteDoc.id;
+            console.log(`Procesando paciente: ${pacienteId}`);
+            // Obtener programaciones activas para este día de la semana
+            const programacionesSnapshot = await db
+                .collection('pacientes')
+                .doc(pacienteId)
+                .collection('programacionesActividades')
+                .where('activo', '==', true)
+                .where('diasSemana', 'array-contains', diaSemana)
+                .get();
+            console.log(`Programaciones activas para ${pacienteId}: ${programacionesSnapshot.size}`);
+            for (const progDoc of programacionesSnapshot.docs) {
+                const prog = Object.assign({ id: progDoc.id }, progDoc.data());
+                // Generar ID de instancia: programacionId_YYYY-MM-DD
+                const fechaStr = hoy.toISOString().split('T')[0];
+                const instanciaId = `${prog.id}_${fechaStr}`;
+                // Verificar si ya existe la instancia
+                const instanciaRef = db
+                    .collection('pacientes')
+                    .doc(pacienteId)
+                    .collection('instanciasActividades')
+                    .doc(instanciaId);
+                const instanciaExistente = await instanciaRef.get();
+                if (instanciaExistente.exists) {
+                    console.log(`Instancia ${instanciaId} ya existe, omitiendo...`);
+                    continue;
+                }
+                // Determinar el tipo según la modalidad
+                const tipo = prog.modalidad === 'definida'
+                    ? (_a = prog.actividadDefinida) === null || _a === void 0 ? void 0 : _a.tipo
+                    : (_b = prog.slotAbierto) === null || _b === void 0 ? void 0 : _b.tipo;
+                // Crear la instancia
+                const ahora = firestore_1.Timestamp.now();
+                const fechaTimestamp = firestore_1.Timestamp.fromDate(hoy);
+                const instanciaData = {
+                    pacienteId,
+                    programacionId: prog.id,
+                    modalidad: prog.modalidad,
+                    tipo,
+                    turno: prog.turno,
+                    fecha: fechaTimestamp,
+                    horaPreferida: prog.horaPreferida,
+                    actividadDefinida: prog.modalidad === 'definida' ? prog.actividadDefinida : null,
+                    slotAbierto: prog.modalidad === 'slot_abierto' ? prog.slotAbierto : null,
+                    estado: 'pendiente',
+                    generadaAutomaticamente: true,
+                    creadoEn: ahora,
+                    actualizadoEn: ahora,
+                };
+                await instanciaRef.set(instanciaData);
+                console.log(`Instancia creada: ${instanciaId}`);
+            }
+        }
+        console.log('Generación de instancias completada exitosamente');
+    }
+    catch (error) {
+        console.error('Error generando instancias de actividades:', error);
         throw error;
     }
 });
