@@ -1146,15 +1146,7 @@ export default function Inventarios() {
 
       {/* Modal crear/editar item */}
       {showModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowModal(false);
-              resetForm();
-            }
-          }}
-        >
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white w-full sm:max-w-2xl sm:rounded-lg rounded-t-2xl shadow-xl max-h-[92vh] sm:max-h-[85vh] flex flex-col animate-slide-up sm:animate-scale-in">
             {/* Handle móvil */}
             <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -1468,7 +1460,7 @@ export default function Inventarios() {
           : '';
 
         return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Registrar Movimiento</h2>
@@ -1528,7 +1520,7 @@ export default function Inventarios() {
                   type="number"
                   required
                   min="0"
-                  value={movimientoForm.cantidad}
+                  value={movimientoForm.cantidad || ''}
                   onChange={(e) => setMovimientoForm({ ...movimientoForm, cantidad: parseInt(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
