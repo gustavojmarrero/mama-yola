@@ -732,3 +732,31 @@ export interface SolicitudReposicion {
   atendidoEn?: Date;
   creadoEn: Date;
 }
+
+// ===== TIPOS DE REPORTES DE DIFERENCIAS DE INVENTARIO =====
+
+export type EstadoReporteDiferencia = 'pendiente' | 'aprobado' | 'rechazado';
+export type TipoInventarioAfectado = 'maestro' | 'transito' | 'operativo';
+
+export interface ReporteDiferencia {
+  id: string;
+  pacienteId: string;
+  itemId: string;
+  itemNombre: string;
+  tipoInventario: TipoInventarioAfectado;
+  cantidadRegistrada: number;
+  cantidadReal: number;
+  diferencia: number;
+  reportadoPor: string;
+  reportadoPorNombre: string;
+  reportadoPorRol: Rol;
+  estado: EstadoReporteDiferencia;
+  motivo: string;
+  resueltoPor?: string;
+  resueltoPorNombre?: string;
+  resueltoEn?: Date;
+  notasResolucion?: string;
+  ajusteRealizado?: boolean;
+  creadoEn: Date;
+  actualizadoEn: Date;
+}

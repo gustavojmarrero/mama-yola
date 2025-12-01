@@ -12,6 +12,7 @@ interface InventarioItemCardProps {
     origen?: 'maestro' | 'transito'
   ) => void;
   onEditar: (item: ItemInventario) => void;
+  onReportarDiferencia?: (item: ItemInventario) => void;
   getEstadoItem: (item: ItemInventario) => 'critico' | 'bajo' | 'ok';
   getEstadoColor: (estado: string) => string;
   getEstadoLabel: (estado: string) => string;
@@ -26,6 +27,7 @@ export default function InventarioItemCard({
   categorias,
   onMovimiento,
   onEditar,
+  onReportarDiferencia,
   getEstadoItem,
   getEstadoColor,
   getEstadoLabel,
@@ -229,8 +231,30 @@ export default function InventarioItemCard({
 
       {/* Solo lectura */}
       {!puedeEditar && (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 flex items-center justify-between">
           <span className="text-gray-400 text-xs italic">Solo lectura</span>
+          {onReportarDiferencia && (
+            <button
+              onClick={() => onReportarDiferencia(item)}
+              className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-medium rounded-lg transition-colors"
+              title="Reportar diferencia de inventario"
+            >
+              Reportar diferencia
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Botón reportar diferencia para usuarios con permisos de edición */}
+      {puedeEditar && onReportarDiferencia && (
+        <div className="px-4 pb-4 pt-0">
+          <button
+            onClick={() => onReportarDiferencia(item)}
+            className="w-full px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-medium rounded-lg transition-colors border border-amber-200"
+            title="Reportar diferencia de inventario"
+          >
+            Reportar diferencia
+          </button>
         </div>
       )}
     </div>

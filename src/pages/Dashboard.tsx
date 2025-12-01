@@ -8,6 +8,7 @@ import { es } from 'date-fns/locale';
 import Layout from '../components/common/Layout';
 import { DashboardSkeleton } from '../components/common/Skeleton';
 import { useTransito } from '../hooks/useTransito';
+import { useReportesDiferencia } from '../hooks/useReportesDiferencia';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -44,6 +45,10 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const { currentUser, userProfile } = useAuth();
   const { itemsTransito, itemsConStockBajo, loading: loadingTransito } = useTransito();
+  const { reportesPendientes, contadorPendientes } = useReportesDiferencia();
+
+  // Control de permisos
+  const puedeResolverReportes = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
   const [proximasCitas, setProximasCitas] = useState<Evento[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -846,6 +851,52 @@ export default function Dashboard() {
               className="flex-shrink-0 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md transition-all"
             >
               Ver Tránsito
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Alertas de Reportes de Diferencias - Solo para Familiar/Supervisor */}
+      {puedeResolverReportes && contadorPendientes > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 md:p-6 mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-amber-200 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
+                📋
+              </div>
+              <div>
+                <h3 className="font-bold text-amber-900 font-display">
+                  Reportes de Diferencias Pendientes
+                </h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  {contadorPendientes} reporte{contadorPendientes > 1 ? 's' : ''} requiere{contadorPendientes === 1 ? '' : 'n'} revisión
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {reportesPendientes.slice(0, 3).map((reporte) => (
+                    <span
+                      key={reporte.id}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
+                        reporte.diferencia < 0
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}
+                    >
+                      {reporte.diferencia < 0 ? '🔻' : '🔺'} {reporte.itemNombre}
+                    </span>
+                  ))}
+                  {contadorPendientes > 3 && (
+                    <span className="inline-flex items-center px-2.5 py-1 bg-amber-200/50 text-amber-700 rounded-lg text-xs font-medium">
+                      +{contadorPendientes - 3} más
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <Link
+              to="/inventarios"
+              className="flex-shrink-0 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md transition-all"
+            >
+              Revisar
             </Link>
           </div>
         </div>

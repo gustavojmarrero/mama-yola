@@ -22,9 +22,13 @@ import {
   MovimientoInventario,
   CategoriaInventario,
   TipoMovimiento,
+  TipoInventarioAfectado,
 } from '../types';
 import { useAuth } from '../context/AuthContext';
 import InventarioItemCard from '../components/inventarios/InventarioItemCard';
+import ReporteDiferenciaModal from '../components/inventarios/ReporteDiferenciaModal';
+import ReportesPendientesList from '../components/inventarios/ReportesPendientesList';
+import { useReportesDiferencia } from '../hooks/useReportesDiferencia';
 
 const PACIENTE_ID = 'paciente-principal';
 const DIAS_ALERTA_VENCIMIENTO = 3;
@@ -79,6 +83,26 @@ export default function Inventarios() {
   const puedeEditar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
   const esCuidador = userProfile?.rol === 'cuidador';
   const puedeVerMaestro = !esCuidador; // Cuidadores NO pueden ver el inventario maestro
+  const puedeResolverReportes = puedeEditar; // Solo familiar/supervisor pueden resolver
+
+  // Hook de reportes de diferencias
+  const {
+    reportesPendientes,
+    contadorPendientes,
+    crearReporte,
+    aprobarReporte,
+    rechazarReporte,
+  } = useReportesDiferencia();
+
+  // Estados para reportes de diferencias
+  const [showReporteDiferenciaModal, setShowReporteDiferenciaModal] = useState(false);
+  const [showReportesPendientes, setShowReportesPendientes] = useState(false);
+  const [itemParaReporte, setItemParaReporte] = useState<ItemInventario | null>(null);
+
+  // Tipos de inventario permitidos según rol
+  const tiposInventarioPermitidos: TipoInventarioAfectado[] = esCuidador
+    ? ['transito', 'operativo']
+    : ['maestro', 'transito', 'operativo'];
 
   // Función para mostrar toast
   const showToast = (message: string, type: ToastType = 'success') => {
@@ -302,6 +326,70 @@ export default function Inventarios() {
       notas: '',
     });
     setShowMovimientoModal(true);
+  }
+
+  // Funciones para reportes de diferencias
+  function abrirReporteDiferencia(item: ItemInventario) {
+    setItemParaReporte(item);
+    setShowReporteDiferenciaModal(true);
+  }
+
+  async function handleEnviarReporte(
+    tipoInventario: TipoInventarioAfectado,
+    cantidadReal: number,
+    motivo: string
+  ) {
+    if (!itemParaReporte || !currentUser || !userProfile) return;
+
+    await crearReporte(
+      itemParaReporte,
+      tipoInventario,
+      cantidadReal,
+      motivo,
+      currentUser.uid,
+      userProfile.nombre || currentUser.email || 'Usuario',
+      userProfile.rol
+    );
+
+    showToast('Reporte de diferencia enviado correctamente', 'success');
+    setShowReporteDiferenciaModal(false);
+    setItemParaReporte(null);
+  }
+
+  async function handleAprobarReporte(
+    reporteId: string,
+    notas: string,
+    ajustarInventario: boolean
+  ) {
+    if (!currentUser || !userProfile) return;
+
+    await aprobarReporte(
+      reporteId,
+      notas,
+      ajustarInventario,
+      currentUser.uid,
+      userProfile.nombre || currentUser.email || 'Usuario'
+    );
+
+    showToast(
+      ajustarInventario
+        ? 'Reporte aprobado y el inventario ha sido ajustado'
+        : 'Reporte aprobado sin ajuste de inventario',
+      'success'
+    );
+  }
+
+  async function handleRechazarReporte(reporteId: string, notas: string) {
+    if (!currentUser || !userProfile) return;
+
+    await rechazarReporte(
+      reporteId,
+      notas,
+      currentUser.uid,
+      userProfile.nombre || currentUser.email || 'Usuario'
+    );
+
+    showToast('Reporte rechazado', 'info');
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -749,6 +837,17 @@ export default function Inventarios() {
               >
                 Movimientos
               </button>
+              <button
+                onClick={() => setShowReportesPendientes(true)}
+                className="relative px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 text-sm font-medium rounded-lg transition-colors"
+              >
+                Reportes
+                {contadorPendientes > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {contadorPendientes}
+                  </span>
+                )}
+              </button>
               {puedeEditar && (
                 <button
                   onClick={() => abrirModal()}
@@ -789,6 +888,7 @@ export default function Inventarios() {
                 categorias={categorias}
                 onMovimiento={abrirMovimientoModal}
                 onEditar={abrirModal}
+                onReportarDiferencia={abrirReporteDiferencia}
                 getEstadoItem={getEstadoItem}
                 getEstadoColor={getEstadoColor}
                 getEstadoLabel={getEstadoLabel}
@@ -929,9 +1029,9 @@ export default function Inventarios() {
                           {getEstadoLabel(estado)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium group">
                         {puedeEditar ? (
-                          <div className="flex justify-end gap-1 flex-wrap">
+                          <div className="flex justify-end gap-1 flex-wrap items-center">
                             {/* Entrada - Solo si puede ver maestro */}
                             {puedeVerMaestro && (
                               <button
@@ -989,9 +1089,25 @@ export default function Inventarios() {
                             >
                               ✏️
                             </button>
+                            <button
+                              onClick={() => abrirReporteDiferencia(item)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs rounded"
+                              title="Reportar diferencia de inventario"
+                            >
+                              Diferencia
+                            </button>
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-xs italic">Solo lectura</span>
+                          <div className="flex justify-end gap-2 items-center">
+                            <span className="text-gray-400 text-xs italic">Solo lectura</span>
+                            <button
+                              onClick={() => abrirReporteDiferencia(item)}
+                              className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs rounded transition-colors"
+                              title="Reportar diferencia de inventario"
+                            >
+                              Diferencia
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -1556,6 +1672,54 @@ export default function Inventarios() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reporte de Diferencia */}
+      {showReporteDiferenciaModal && itemParaReporte && (
+        <ReporteDiferenciaModal
+          isOpen={showReporteDiferenciaModal}
+          onClose={() => {
+            setShowReporteDiferenciaModal(false);
+            setItemParaReporte(null);
+          }}
+          item={itemParaReporte}
+          tiposPermitidos={tiposInventarioPermitidos}
+          onEnviar={handleEnviarReporte}
+        />
+      )}
+
+      {/* Modal de Reportes Pendientes */}
+      {showReportesPendientes && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Reportes de Diferencias Pendientes
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {contadorPendientes} reporte(s) requieren revisión
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowReportesPendientes(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <ReportesPendientesList
+                reportes={reportesPendientes}
+                puedeResolver={puedeResolverReportes}
+                onAprobar={handleAprobarReporte}
+                onRechazar={handleRechazarReporte}
+              />
             </div>
           </div>
         </div>
