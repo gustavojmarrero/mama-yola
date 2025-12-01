@@ -130,7 +130,8 @@ export interface ChequeoDiario {
     miccionesNumero: number;
     miccionesCaracteristicas?: string;
     evacuacionesNumero: number;
-    evacuacionesConsistencia?: string;
+    evacuacionesConsistencia?: string; // DEPRECADO: usar evacuacionesBristol
+    evacuacionesBristol?: string[]; // Array de tipos Bristol (uno por cada evacuación)
     evacuacionesColor?: string;
     dificultadEvacuar?: boolean;
     laxantesUsados?: Array<{ nombre: string; cantidad: string }>;

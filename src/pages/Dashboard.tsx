@@ -24,6 +24,7 @@ import {
   ProcesoDelDia,
 } from '../types';
 import ProcesoCard, { ProcesoGrupo } from '../components/dashboard/ProcesoCard';
+import { getBristolNombre } from '../constants/bristol';
 import {
   calcularProcesosDelDia,
   agruparProcesosPorEstado,
@@ -533,7 +534,12 @@ export default function Dashboard() {
           funcionesData.push(['Micciones', `${chequeo.miccionesNumero} - ${chequeo.miccionesCaracteristicas || 'Normal'}`]);
         }
         if (chequeo.evacuacionesNumero !== undefined) {
-          funcionesData.push(['Evacuaciones', `${chequeo.evacuacionesNumero} - ${chequeo.evacuacionesConsistencia || ''} ${chequeo.evacuacionesColor || ''}`]);
+          const bristolTexto = chequeo.evacuacionesBristol?.length
+            ? chequeo.evacuacionesBristol.map((b, i) =>
+                b ? `${chequeo.evacuacionesBristol!.length > 1 ? `#${i+1}: ` : ''}${getBristolNombre(b)}` : ''
+              ).filter(Boolean).join(', ')
+            : '';
+          funcionesData.push(['Evacuaciones', `${chequeo.evacuacionesNumero} - ${bristolTexto} ${chequeo.evacuacionesColor || ''}`.trim()]);
         }
         if (chequeo.dificultadEvacuar) {
           funcionesData.push(['Dificultad', 'Sí']);

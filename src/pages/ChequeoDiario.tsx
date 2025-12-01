@@ -7,6 +7,8 @@ import Layout from '../components/common/Layout';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import BristolScaleSelector from '../components/chequeo/BristolScaleSelector';
+import { getBristolNombre, migrarABristolArray } from '../constants/bristol';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -48,7 +50,8 @@ export default function ChequeoDiarioPage() {
     miccionesNumero: '' as string | number,
     miccionesCaracteristicas: '',
     evacuacionesNumero: '' as string | number,
-    evacuacionesConsistencia: '',
+    evacuacionesConsistencia: '', // DEPRECADO: usar evacuacionesBristol
+    evacuacionesBristol: [] as string[],
     evacuacionesColor: '',
     dificultadEvacuar: false,
     laxantes: [] as Array<{ nombre: string; cantidad: string }>,
@@ -142,6 +145,11 @@ export default function ChequeoDiarioPage() {
           miccionesCaracteristicas: chequeoData.funcionesCorporales?.miccionesCaracteristicas || '',
           evacuacionesNumero: chequeoData.funcionesCorporales?.evacuacionesNumero ?? '',
           evacuacionesConsistencia: chequeoData.funcionesCorporales?.evacuacionesConsistencia || '',
+          evacuacionesBristol: migrarABristolArray(
+            chequeoData.funcionesCorporales?.evacuacionesConsistencia,
+            chequeoData.funcionesCorporales?.evacuacionesBristol,
+            chequeoData.funcionesCorporales?.evacuacionesNumero || 0
+          ),
           evacuacionesColor: chequeoData.funcionesCorporales?.evacuacionesColor || '',
           dificultadEvacuar: chequeoData.funcionesCorporales?.dificultadEvacuar || false,
           laxantes: chequeoData.funcionesCorporales?.laxantesUsados || [],
@@ -449,7 +457,11 @@ export default function ChequeoDiarioPage() {
         ['Número de micciones', `${chequeo.funcionesCorporales?.miccionesNumero ?? 0}`],
         ['Características micciones', chequeo.funcionesCorporales?.miccionesCaracteristicas || 'Normal'],
         ['Número de evacuaciones', `${chequeo.funcionesCorporales?.evacuacionesNumero ?? 0}`],
-        ['Consistencia evacuaciones', chequeo.funcionesCorporales?.evacuacionesConsistencia || 'No registrada'],
+        ['Consistencia (Bristol)', chequeo.funcionesCorporales?.evacuacionesBristol?.length
+          ? chequeo.funcionesCorporales.evacuacionesBristol.map((b, i) =>
+              `${chequeo.funcionesCorporales!.evacuacionesBristol!.length > 1 ? `#${i+1}: ` : ''}${getBristolNombre(b)}`
+            ).filter(Boolean).join(', ') || 'No registrada'
+          : 'No registrada'],
         ['Color evacuaciones', chequeo.funcionesCorporales?.evacuacionesColor || 'No registrado'],
         ['Dificultad para evacuar', chequeo.funcionesCorporales?.dificultadEvacuar ? 'Sí' : 'No'],
         ['Laxantes utilizados', laxantes]
@@ -672,7 +684,7 @@ export default function ChequeoDiarioPage() {
         miccionesNumero: formData.miccionesNumero,
         miccionesCaracteristicas: formData.miccionesCaracteristicas,
         evacuacionesNumero: formData.evacuacionesNumero,
-        evacuacionesConsistencia: formData.evacuacionesConsistencia,
+        evacuacionesBristol: formData.evacuacionesBristol,
         evacuacionesColor: formData.evacuacionesColor,
         dificultadEvacuar: formData.dificultadEvacuar,
         laxantesUsados: formData.laxantes
@@ -1243,8 +1255,15 @@ export default function ChequeoDiarioPage() {
             <div>
               <span className="text-sm font-medium text-gray-700">Evacuaciones:</span>{' '}
               <span className="text-gray-900">{chequeo.funcionesCorporales?.evacuacionesNumero ?? 0}</span>
-              {chequeo.funcionesCorporales?.evacuacionesConsistencia && (
-                <p className="text-sm text-gray-600">Consistencia: {chequeo.funcionesCorporales.evacuacionesConsistencia}</p>
+              {chequeo.funcionesCorporales?.evacuacionesBristol && chequeo.funcionesCorporales.evacuacionesBristol.length > 0 && (
+                <div className="text-sm text-gray-600 mt-1">
+                  {chequeo.funcionesCorporales.evacuacionesBristol.map((bristol, idx) => (
+                    <span key={idx} className="inline-block mr-2">
+                      {chequeo.funcionesCorporales.evacuacionesBristol!.length > 1 && `#${idx + 1}: `}
+                      {getBristolNombre(bristol)}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -1484,8 +1503,15 @@ export default function ChequeoDiarioPage() {
             <div>
               <p className="text-sm font-medium text-gray-700">Evacuaciones</p>
               <p className="text-2xl font-bold text-gray-900">{formData.evacuacionesNumero}</p>
-              {formData.evacuacionesConsistencia && (
-                <p className="text-xs text-gray-600 mt-1">Consistencia: {formData.evacuacionesConsistencia}</p>
+              {formData.evacuacionesBristol.length > 0 && formData.evacuacionesBristol.some(b => b) && (
+                <div className="text-xs text-gray-600 mt-1">
+                  {formData.evacuacionesBristol.map((bristol, idx) => bristol && (
+                    <span key={idx} className="block">
+                      {formData.evacuacionesBristol.length > 1 && `#${idx + 1}: `}
+                      {getBristolNombre(bristol)}
+                    </span>
+                  ))}
+                </div>
               )}
               {formData.evacuacionesColor && (
                 <p className="text-xs text-gray-600">Color: {formData.evacuacionesColor}</p>
@@ -1965,7 +1991,7 @@ export default function ChequeoDiarioPage() {
                 </div>
 
                 {/* Evacuaciones */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Número de evacuaciones
@@ -1981,22 +2007,6 @@ export default function ChequeoDiarioPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Consistencia
-                    </label>
-                    <select
-                      value={formData.evacuacionesConsistencia}
-                      onChange={(e) => setFormData({ ...formData, evacuacionesConsistencia: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    >
-                      <option value="">Seleccionar...</option>
-                      <option value="normal">Normal</option>
-                      <option value="blanda">Blanda</option>
-                      <option value="dura">Dura</option>
-                      <option value="liquida">Líquida</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Color
                     </label>
                     <input
@@ -2008,6 +2018,14 @@ export default function ChequeoDiarioPage() {
                     />
                   </div>
                 </div>
+
+                {/* Escala de Bristol - Dinámica según número de evacuaciones */}
+                <BristolScaleSelector
+                  values={formData.evacuacionesBristol}
+                  onChange={(values) => setFormData({ ...formData, evacuacionesBristol: values })}
+                  numEvacuaciones={typeof formData.evacuacionesNumero === 'number' ? formData.evacuacionesNumero : parseInt(formData.evacuacionesNumero as string) || 0}
+                  disabled={false}
+                />
 
                 {/* Dificultad para evacuar */}
                 <div className="flex items-center">
@@ -2439,23 +2457,15 @@ export default function ChequeoDiarioPage() {
               </div>
             </div>
 
-            {/* Botones de acción */}
+            {/* Botón de acción */}
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={guardarBorrador}
                 disabled={saving}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                {saving ? 'Guardando...' : 'Guardar Borrador'}
-              </button>
-              <button
-                type="button"
-                onClick={handleCompletarChequeo}
-                disabled={saving}
-                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
-              >
-                {yaCompletado ? 'Actualizar Chequeo' : 'Completar Chequeo'}
+                {saving ? 'Guardando...' : 'Actualizar Chequeo'}
               </button>
             </div>
           </div>
