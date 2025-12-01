@@ -3,6 +3,7 @@ import { ItemInventario, CategoriaInventario, TipoMovimiento } from '../../types
 interface InventarioItemCardProps {
   item: ItemInventario;
   puedeEditar: boolean;
+  puedeVerMaestro: boolean;
   categorias: { value: CategoriaInventario; label: string; icon: string }[];
   onMovimiento: (
     item: ItemInventario,
@@ -21,6 +22,7 @@ interface InventarioItemCardProps {
 export default function InventarioItemCard({
   item,
   puedeEditar,
+  puedeVerMaestro,
   categorias,
   onMovimiento,
   onEditar,
@@ -71,17 +73,23 @@ export default function InventarioItemCard({
 
       {/* Cantidades */}
       <div className="p-4">
-        <div className={`grid ${item.vinculadoPastillero ? 'grid-cols-3' : 'grid-cols-2'} gap-3 text-center`}>
-          {/* Maestro */}
-          <div className="bg-gray-50 rounded-lg p-2">
-            <div className="text-xs text-gray-500 mb-1">🏪 Maestro</div>
-            <div className="text-lg font-bold text-gray-900">
-              {item.cantidadMaestro}
+        <div className={`grid ${
+          puedeVerMaestro
+            ? (item.vinculadoPastillero ? 'grid-cols-3' : 'grid-cols-2')
+            : (item.vinculadoPastillero ? 'grid-cols-2' : 'grid-cols-1')
+        } gap-3 text-center`}>
+          {/* Maestro - Solo visible para no-cuidadores */}
+          {puedeVerMaestro && (
+            <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-xs text-gray-500 mb-1">🏪 Maestro</div>
+              <div className="text-lg font-bold text-gray-900">
+                {item.cantidadMaestro}
+              </div>
+              <div className="text-[10px] text-gray-400">
+                mín: {item.nivelMinimoMaestro}
+              </div>
             </div>
-            <div className="text-[10px] text-gray-400">
-              mín: {item.nivelMinimoMaestro}
-            </div>
-          </div>
+          )}
 
           {/* Tránsito (solo si vinculado a pastillero) */}
           {item.vinculadoPastillero && (
@@ -155,23 +163,30 @@ export default function InventarioItemCard({
       {puedeEditar && (
         <div className="px-4 pb-4">
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => onMovimiento(item, 'entrada')}
-              className="flex-1 min-w-[60px] px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium rounded-lg transition-colors"
-              title="Entrada (Compra al Maestro)"
-            >
-              ➕ Entrada
-            </button>
+            {/* Entrada - Solo si puede ver maestro */}
+            {puedeVerMaestro && (
+              <button
+                onClick={() => onMovimiento(item, 'entrada')}
+                className="flex-1 min-w-[60px] px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium rounded-lg transition-colors"
+                title="Entrada (Compra al Maestro)"
+              >
+                ➕ Entrada
+              </button>
+            )}
 
             {item.vinculadoPastillero ? (
               <>
-                <button
-                  onClick={() => onMovimiento(item, 'transferencia', 'transito', 'maestro')}
-                  className="flex-1 min-w-[60px] px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg transition-colors"
-                  title="Maestro → Tránsito"
-                >
-                  M→T
-                </button>
+                {/* M→T - Solo si puede ver maestro */}
+                {puedeVerMaestro && (
+                  <button
+                    onClick={() => onMovimiento(item, 'transferencia', 'transito', 'maestro')}
+                    className="flex-1 min-w-[60px] px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg transition-colors"
+                    title="Maestro → Tránsito"
+                  >
+                    M→T
+                  </button>
+                )}
+                {/* T→O - Visible para todos */}
                 <button
                   onClick={() => onMovimiento(item, 'transferencia', 'operativo', 'transito')}
                   className="flex-1 min-w-[60px] px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-sm font-medium rounded-lg transition-colors"
@@ -181,13 +196,16 @@ export default function InventarioItemCard({
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => onMovimiento(item, 'transferencia', 'operativo', 'maestro')}
-                className="flex-1 min-w-[60px] px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg transition-colors"
-                title="Maestro → Operativo"
-              >
-                ↔️ Transferir
-              </button>
+              /* Transferir M→O - Solo si puede ver maestro */
+              puedeVerMaestro && (
+                <button
+                  onClick={() => onMovimiento(item, 'transferencia', 'operativo', 'maestro')}
+                  className="flex-1 min-w-[60px] px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg transition-colors"
+                  title="Maestro → Operativo"
+                >
+                  ↔️ Transferir
+                </button>
+              )
             )}
 
             <button

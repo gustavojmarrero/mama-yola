@@ -27,7 +27,7 @@ export const MENU_ITEMS: MenuItem[] = [
 
   // Gestión
   { id: '/dashboard', name: 'Dashboard', path: '/dashboard', icon: '🏠', roles: ['familiar', 'supervisor', 'cuidador'] },
-  { id: '/inventarios', name: 'Inventarios', path: '/inventarios', icon: '📦', roles: ['familiar', 'supervisor'] },
+  { id: '/inventarios', name: 'Inventarios', path: '/inventarios', icon: '📦', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/turnos', name: 'Turnos', path: '/turnos', icon: '👥', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/actividades', name: 'Actividades', path: '/actividades', icon: '🎯', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/menu-comida', name: 'Menú Comida', path: '/menu-comida', icon: '🍽️', roles: ['familiar', 'supervisor', 'cuidador'] },

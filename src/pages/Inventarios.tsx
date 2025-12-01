@@ -77,6 +77,8 @@ export default function Inventarios() {
 
   // Control de permisos por rol
   const puedeEditar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
+  const esCuidador = userProfile?.rol === 'cuidador';
+  const puedeVerMaestro = !esCuidador; // Cuidadores NO pueden ver el inventario maestro
 
   // Función para mostrar toast
   const showToast = (message: string, type: ToastType = 'success') => {
@@ -679,7 +681,7 @@ export default function Inventarios() {
                         key={item.id}
                         className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm"
                       >
-                        {item.nombre}: M:{item.cantidadMaestro} O:{item.tieneVidaUtil ? `${Math.round(item.cantidadOperativo)}%` : `${item.cantidadOperativo} ${item.unidad}`}
+                        {item.nombre}: {puedeVerMaestro && `M:${item.cantidadMaestro} `}O:{item.tieneVidaUtil ? `${Math.round(item.cantidadOperativo)}%` : `${item.cantidadOperativo} ${item.unidad}`}
                       </span>
                     ))}
                     {itemsBajos.length > 5 && (
@@ -783,6 +785,7 @@ export default function Inventarios() {
                 key={item.id}
                 item={item}
                 puedeEditar={puedeEditar}
+                puedeVerMaestro={puedeVerMaestro}
                 categorias={categorias}
                 onMovimiento={abrirMovimientoModal}
                 onEditar={abrirModal}
@@ -816,9 +819,11 @@ export default function Inventarios() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Item
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    🏪 Maestro
-                  </th>
+                  {puedeVerMaestro && (
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      🏪 Maestro
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     📦 Tránsito
                   </th>
@@ -858,14 +863,16 @@ export default function Inventarios() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-sm text-gray-900 font-semibold">
-                          {item.cantidadMaestro} {item.unidad}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Mín: {item.nivelMinimoMaestro}
-                        </div>
-                      </td>
+                      {puedeVerMaestro && (
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="text-sm text-gray-900 font-semibold">
+                            {item.cantidadMaestro} {item.unidad}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Mín: {item.nivelMinimoMaestro}
+                          </div>
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         {item.vinculadoPastillero ? (
                           <div>
@@ -925,22 +932,29 @@ export default function Inventarios() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {puedeEditar ? (
                           <div className="flex justify-end gap-1 flex-wrap">
-                            <button
-                              onClick={() => abrirMovimientoModal(item, 'entrada')}
-                              className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs rounded transition-colors"
-                              title="Entrada (Compra al Maestro)"
-                            >
-                              ➕
-                            </button>
+                            {/* Entrada - Solo si puede ver maestro */}
+                            {puedeVerMaestro && (
+                              <button
+                                onClick={() => abrirMovimientoModal(item, 'entrada')}
+                                className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs rounded transition-colors"
+                                title="Entrada (Compra al Maestro)"
+                              >
+                                ➕
+                              </button>
+                            )}
                             {item.vinculadoPastillero ? (
                               <>
-                                <button
-                                  onClick={() => abrirMovimientoModal(item, 'transferencia', 'transito', 'maestro')}
-                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
-                                  title="Maestro → Tránsito"
-                                >
-                                  M→T
-                                </button>
+                                {/* M→T - Solo si puede ver maestro */}
+                                {puedeVerMaestro && (
+                                  <button
+                                    onClick={() => abrirMovimientoModal(item, 'transferencia', 'transito', 'maestro')}
+                                    className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
+                                    title="Maestro → Tránsito"
+                                  >
+                                    M→T
+                                  </button>
+                                )}
+                                {/* T→O - Visible para todos */}
                                 <button
                                   onClick={() => abrirMovimientoModal(item, 'transferencia', 'operativo', 'transito')}
                                   className="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs rounded transition-colors"
@@ -950,13 +964,16 @@ export default function Inventarios() {
                                 </button>
                               </>
                             ) : (
-                              <button
-                                onClick={() => abrirMovimientoModal(item, 'transferencia', 'operativo', 'maestro')}
-                                className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
-                                title="Transferir de Maestro a Operativo"
-                              >
-                                ↔️
-                              </button>
+                              /* Transferir M→O - Solo si puede ver maestro */
+                              puedeVerMaestro && (
+                                <button
+                                  onClick={() => abrirMovimientoModal(item, 'transferencia', 'operativo', 'maestro')}
+                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs rounded transition-colors"
+                                  title="Transferir de Maestro a Operativo"
+                                >
+                                  ↔️
+                                </button>
+                              )
                             )}
                             <button
                               onClick={() => abrirMovimientoModal(item, 'salida')}
@@ -1351,11 +1368,13 @@ export default function Inventarios() {
                 </label>
                 {itemActual && esTransferencia && (
                   <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm">
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <div className="text-xs text-gray-500">🏪 Maestro</div>
-                        <div className="font-semibold">{itemActual.cantidadMaestro}</div>
-                      </div>
+                    <div className={`grid ${puedeVerMaestro ? 'grid-cols-3' : (itemActual.vinculadoPastillero ? 'grid-cols-2' : 'grid-cols-1')} gap-2 text-center`}>
+                      {puedeVerMaestro && (
+                        <div>
+                          <div className="text-xs text-gray-500">🏪 Maestro</div>
+                          <div className="font-semibold">{itemActual.cantidadMaestro}</div>
+                        </div>
+                      )}
                       {itemActual.vinculadoPastillero && (
                         <div>
                           <div className="text-xs text-gray-500">📦 Tránsito</div>

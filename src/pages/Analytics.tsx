@@ -271,17 +271,7 @@ export default function Analytics() {
         </div>
 
         {/* Resumen principal */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500 mb-1">Adherencia Medicamentos</div>
-            <div className={`text-3xl font-bold ${adherencia.porcentaje >= 90 ? 'text-green-600' : adherencia.porcentaje >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
-              {adherencia.porcentaje}%
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              {adherencia.tomados} de {adherencia.tomados + adherencia.rechazados + adherencia.omitidos} dosis
-            </div>
-          </div>
-
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="text-sm text-gray-500 mb-1">Chequeos Completados</div>
             <div className="text-3xl font-bold text-blue-600">{chequeosData.completados}</div>
