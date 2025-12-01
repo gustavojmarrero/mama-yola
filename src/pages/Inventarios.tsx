@@ -1520,8 +1520,9 @@ export default function Inventarios() {
                   type="number"
                   required
                   min="0"
+                  step="0.01"
                   value={movimientoForm.cantidad || ''}
-                  onChange={(e) => setMovimientoForm({ ...movimientoForm, cantidad: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setMovimientoForm({ ...movimientoForm, cantidad: parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
