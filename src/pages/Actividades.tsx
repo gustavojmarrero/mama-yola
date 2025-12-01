@@ -208,12 +208,16 @@ export default function Actividades() {
   useEffect(() => {
     async function cargarConfigHorarios() {
       try {
-        const configDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'configuraciones', 'horarios'));
+        const configDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'configuracion', 'horarios'));
         if (configDoc.exists()) {
           setConfigHorarios(configDoc.data() as ConfiguracionHorarios);
+        } else {
+          // Si no existe config en Firestore, usar el default
+          setConfigHorarios(CONFIG_HORARIOS_DEFAULT);
         }
       } catch (error) {
         console.error('Error cargando configuración de horarios:', error);
+        setConfigHorarios(CONFIG_HORARIOS_DEFAULT);
       }
     }
     cargarConfigHorarios();
@@ -300,12 +304,11 @@ export default function Actividades() {
 
   // Calcular turno basado en hora seleccionada
   function actualizarTurnoDesdeHora(hora: string) {
-    if (!hora) {
+    if (!hora || !configHorarios) {
       setTurnoCalculado(null);
       return;
     }
-    const config = configHorarios || CONFIG_HORARIOS_DEFAULT;
-    const turno = calcularTurno(hora, config);
+    const turno = calcularTurno(hora, configHorarios);
     setTurnoCalculado(turno);
     setFiltroTurnoPlantilla(turno);
   }
