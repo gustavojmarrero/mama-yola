@@ -4,12 +4,14 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
-import { CalendarioActividades } from '../components/actividades';
+import { CalendarioActividades, PlantillaCarouselCard } from '../components/actividades';
+import Carousel from '../components/ui/Carousel';
 import { Actividad, TipoActividad, EstadoActividad, NivelEnergia, ParticipacionActividad, Usuario, PlantillaActividad, TurnoActividad, ConfiguracionHorarios } from '../types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
-import { TURNOS_ACTIVIDAD, getTurnoInfo } from '../utils/turnos';
+import { TURNOS_ACTIVIDAD, getTurnoInfo, calcularTurno } from '../utils/turnos';
+import { CONFIG_HORARIOS_DEFAULT } from '../utils/procesosDelDia';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -96,6 +98,7 @@ export default function Actividades() {
   const [filtroTurnoPlantilla, setFiltroTurnoPlantilla] = useState<TurnoActividad | 'todos'>('todos');
   const [mostrarSoloFavoritas, setMostrarSoloFavoritas] = useState(false);
   const [configHorarios, setConfigHorarios] = useState<ConfiguracionHorarios | null>(null);
+  const [turnoCalculado, setTurnoCalculado] = useState<TurnoActividad | null>(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [nuevoMaterialPlantilla, setNuevoMaterialPlantilla] = useState('');
   const [nuevaEtiquetaPlantilla, setNuevaEtiquetaPlantilla] = useState('');
@@ -293,6 +296,18 @@ export default function Actividades() {
       responsable: plantilla.responsableDefault || ''
     });
     setModalPlantillas(false);
+  }
+
+  // Calcular turno basado en hora seleccionada
+  function actualizarTurnoDesdeHora(hora: string) {
+    if (!hora) {
+      setTurnoCalculado(null);
+      return;
+    }
+    const config = configHorarios || CONFIG_HORARIOS_DEFAULT;
+    const turno = calcularTurno(hora, config);
+    setTurnoCalculado(turno);
+    setFiltroTurnoPlantilla(turno);
   }
 
   // ========== FUNCIONES CRUD DE PLANTILLAS ==========
@@ -578,11 +593,13 @@ export default function Actividades() {
     setModoEdicion(false);
     setActividadSeleccionada(null);
     setFechaSeleccionada(null);
+    setTurnoCalculado(null);
+    setFiltroTurnoPlantilla('todos');
     setFormActividad({
       nombre: '',
       tipo: 'recreativa',
       fechaInicio: '',
-      horaInicio: '10:00',
+      horaInicio: '',
       duracion: 30,
       ubicacion: '',
       descripcion: '',
@@ -664,7 +681,8 @@ export default function Actividades() {
               <button
                 onClick={() => {
                   setFechaSeleccionada(new Date());
-                  setFormActividad({ ...formActividad, fechaInicio: format(new Date(), 'yyyy-MM-dd') });
+                  setFormActividad({ ...formActividad, fechaInicio: format(new Date(), 'yyyy-MM-dd'), horaInicio: '' });
+                  setTurnoCalculado(null);
                   setModalAbierto(true);
                 }}
                 className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 min-h-[44px]
@@ -798,7 +816,8 @@ export default function Actividades() {
             onActividadClick={abrirEditar}
             onAgregarClick={(fecha) => {
               setFechaSeleccionada(fecha);
-              setFormActividad({ ...formActividad, fechaInicio: format(fecha, 'yyyy-MM-dd') });
+              setFormActividad({ ...formActividad, fechaInicio: format(fecha, 'yyyy-MM-dd'), horaInicio: '' });
+              setTurnoCalculado(null);
               setModalAbierto(true);
             }}
             puedeAgregar={userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor'}
@@ -914,14 +933,77 @@ export default function Actividades() {
               {/* Contenido scrolleable */}
               <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
 
-              {/* Botón para ver plantillas */}
+              {/* PASO 1: Hora de la actividad (LO PRIMERO) */}
+              {!modoEdicion && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hora de la actividad *
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1 border rounded-lg px-3 py-2 bg-white">
+                      <select
+                        value={formActividad.horaInicio ? formActividad.horaInicio.split(':')[0] : ''}
+                        onChange={(e) => {
+                          const minutos = formActividad.horaInicio ? formActividad.horaInicio.split(':')[1] || '00' : '00';
+                          const nuevaHora = e.target.value ? `${e.target.value}:${minutos}` : '';
+                          setFormActividad({ ...formActividad, horaInicio: nuevaHora });
+                          actualizarTurnoDesdeHora(nuevaHora);
+                        }}
+                        className="text-lg font-medium bg-transparent border-none focus:outline-none cursor-pointer"
+                      >
+                        <option value="">--</option>
+                        {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span className="text-lg font-medium">:</span>
+                      <select
+                        value={formActividad.horaInicio ? formActividad.horaInicio.split(':')[1] : ''}
+                        onChange={(e) => {
+                          const horas = formActividad.horaInicio ? formActividad.horaInicio.split(':')[0] || '00' : '00';
+                          const nuevaHora = `${horas}:${e.target.value}`;
+                          setFormActividad({ ...formActividad, horaInicio: nuevaHora });
+                          actualizarTurnoDesdeHora(nuevaHora);
+                        }}
+                        className="text-lg font-medium bg-transparent border-none focus:outline-none cursor-pointer"
+                        disabled={!formActividad.horaInicio?.split(':')[0]}
+                      >
+                        <option value="">--</option>
+                        {['00', '15', '30', '45'].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Indicador visual del turno */}
+                    {turnoCalculado ? (
+                      <div className={`px-4 py-2 rounded-lg font-medium ${getTurnoInfo(turnoCalculado).color}`}>
+                        {getTurnoInfo(turnoCalculado).icon} {getTurnoInfo(turnoCalculado).label}
+                      </div>
+                    ) : (
+                      <div className="px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-500">
+                        Selecciona hora
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    📅 Hoy: {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
+                  </p>
+                </div>
+              )}
+
+              {/* Botón para ver plantillas - solo si hay hora seleccionada */}
               {!modoEdicion && (
                 <div className="mb-4">
                   <button
                     onClick={() => setModalPlantillas(true)}
-                    className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                    disabled={!turnoCalculado}
+                    className={`w-full py-3 border-2 border-dashed rounded-lg transition-colors ${
+                      turnoCalculado
+                        ? 'border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50'
+                        : 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                    }`}
                   >
-                    📋 Usar Plantilla de Actividad
+                    📋 Usar Plantilla {turnoCalculado && `(${getTurnoInfo(turnoCalculado).icon} ${getTurnoInfo(turnoCalculado).label})`}
                   </button>
                 </div>
               )}
@@ -953,27 +1035,44 @@ export default function Actividades() {
                   </div>
                 </div>
 
-                {/* Fecha, Hora, Duración - Stack en mobile, grid en desktop */}
-                <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
-                    <input
-                      type="date"
-                      value={formActividad.fechaInicio}
-                      onChange={(e) => setFormActividad({ ...formActividad, fechaInicio: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
-                    />
+                {/* En modo edición: mostrar fecha, hora y duración */}
+                {modoEdicion && (
+                  <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
+                      <input
+                        type="date"
+                        value={formActividad.fechaInicio}
+                        onChange={(e) => setFormActividad({ ...formActividad, fechaInicio: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                      <input
+                        type="time"
+                        value={formActividad.horaInicio}
+                        onChange={(e) => setFormActividad({ ...formActividad, horaInicio: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Duración (min)</label>
+                      <input
+                        type="number"
+                        value={formActividad.duracion}
+                        onChange={(e) => setFormActividad({ ...formActividad, duracion: parseInt(e.target.value) || 30 })}
+                        className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
+                        min="5"
+                        step="5"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
-                    <input
-                      type="time"
-                      value={formActividad.horaInicio}
-                      onChange={(e) => setFormActividad({ ...formActividad, horaInicio: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-3 sm:py-2 text-base"
-                    />
-                  </div>
-                  <div>
+                )}
+
+                {/* En modo crear: solo duración (la hora ya se seleccionó arriba) */}
+                {!modoEdicion && (
+                  <div className="w-full sm:w-1/3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Duración (min)</label>
                     <input
                       type="number"
@@ -984,7 +1083,7 @@ export default function Actividades() {
                       step="5"
                     />
                   </div>
-                </div>
+                )}
 
                 {/* Ubicación y Responsable - Stack en mobile, grid en desktop */}
                 <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
@@ -1249,7 +1348,7 @@ export default function Actividades() {
         {/* Modal de Selección de Plantillas - Bottom Sheet en móvil */}
         {modalPlantillas && (
           <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-            <div className="bg-white w-full sm:max-w-4xl sm:mx-4
+            <div className="bg-white w-full sm:max-w-lg sm:mx-4
                             rounded-t-2xl sm:rounded-lg
                             max-h-[95vh] sm:max-h-[90vh]
                             overflow-hidden flex flex-col
@@ -1263,7 +1362,14 @@ export default function Actividades() {
               {/* Header sticky */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-lg sm:text-xl font-bold text-warm-800">Plantillas</h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-warm-800 flex items-center gap-2">
+                    Plantillas
+                    {turnoCalculado && (
+                      <span className={`text-sm px-2 py-1 rounded ${getTurnoInfo(turnoCalculado).color}`}>
+                        {getTurnoInfo(turnoCalculado).icon} {getTurnoInfo(turnoCalculado).label}
+                      </span>
+                    )}
+                  </h2>
                   <button
                     onClick={() => setModalPlantillas(false)}
                     className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center
@@ -1274,55 +1380,53 @@ export default function Actividades() {
                 </div>
               </div>
 
-              {/* Filtros - Responsive */}
-              <div className="px-4 sm:px-6 py-3 border-b flex-shrink-0">
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              {/* Filtros - Compactos */}
+              <div className="px-4 py-2 border-b flex-shrink-0">
+                <div className="flex flex-wrap gap-2 items-center">
                   <input
                     type="text"
                     value={busquedaPlantilla}
                     onChange={(e) => setBusquedaPlantilla(e.target.value)}
-                    placeholder="Buscar plantillas..."
-                    className="w-full sm:flex-1 sm:min-w-[200px] border rounded-lg px-3 py-3 sm:py-2 text-base"
+                    placeholder="Buscar..."
+                    className="flex-1 min-w-[100px] border rounded-lg px-2 py-1.5 text-sm"
                   />
-                  <div className="flex gap-2 flex-wrap">
-                    <select
-                      value={filtroTipoPlantilla}
-                      onChange={(e) => setFiltroTipoPlantilla(e.target.value as TipoActividad | 'todas')}
-                      className="flex-1 sm:flex-none border rounded-lg px-3 py-3 sm:py-2 text-base min-w-[100px]"
-                    >
+                  <select
+                    value={filtroTipoPlantilla}
+                    onChange={(e) => setFiltroTipoPlantilla(e.target.value as TipoActividad | 'todas')}
+                    className="border rounded-lg px-2 py-1.5 text-sm"
+                  >
                       <option value="todas">Tipo: Todos</option>
                       {tiposActividad.map(t => (
                         <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
                       ))}
                     </select>
+                  {/* Solo mostrar selector de turno si no viene pre-filtrado */}
+                  {!turnoCalculado && (
                     <select
                       value={filtroTurnoPlantilla}
                       onChange={(e) => setFiltroTurnoPlantilla(e.target.value as TurnoActividad | 'todos')}
-                      className="flex-1 sm:flex-none border rounded-lg px-3 py-3 sm:py-2 text-base min-w-[100px]"
+                      className="border rounded-lg px-2 py-1.5 text-sm"
                     >
                       <option value="todos">Turno: Todos</option>
                       {TURNOS_ACTIVIDAD.map(t => (
                         <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
                       ))}
                     </select>
-                    <button
-                      onClick={() => setMostrarSoloFavoritas(!mostrarSoloFavoritas)}
-                      className={`p-3 sm:px-4 sm:py-2 min-h-[44px] rounded-lg touch-feedback ${
-                        mostrarSoloFavoritas ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      <span className="sm:hidden">⭐</span>
-                      <span className="hidden sm:inline">⭐ Favoritas</span>
-                    </button>
-                    <button
-                      onClick={() => abrirModalPlantilla()}
-                      className="p-3 sm:px-4 sm:py-2 min-h-[44px] bg-lavender-600 text-white rounded-lg
-                                 hover:bg-lavender-700 touch-feedback"
-                    >
-                      <span className="sm:hidden">+</span>
-                      <span className="hidden sm:inline">+ Nueva</span>
-                    </button>
-                  </div>
+                  )}
+                  <button
+                    onClick={() => setMostrarSoloFavoritas(!mostrarSoloFavoritas)}
+                    className={`px-2 py-1.5 text-sm rounded-lg ${
+                      mostrarSoloFavoritas ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    ⭐
+                  </button>
+                  <button
+                    onClick={() => abrirModalPlantilla()}
+                    className="px-2 py-1.5 text-sm bg-lavender-600 text-white rounded-lg hover:bg-lavender-700"
+                  >
+                    + Nueva
+                  </button>
                 </div>
               </div>
 
@@ -1331,130 +1435,43 @@ export default function Actividades() {
                 {plantillasFiltradas.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <p className="text-4xl mb-2">📋</p>
-                    <p>No se encontraron plantillas</p>
-                    {plantillas.length === 0 && (
-                      <p className="text-sm mt-2">Crea tu primera plantilla para comenzar</p>
+                    {turnoCalculado ? (
+                      <>
+                        <p>No hay plantillas para el turno {getTurnoInfo(turnoCalculado).label}</p>
+                        <p className="text-sm mt-2">Crea una plantilla y asígnale este turno</p>
+                      </>
+                    ) : (
+                      <>
+                        <p>No se encontraron plantillas</p>
+                        {plantillas.length === 0 && (
+                          <p className="text-sm mt-2">Crea tu primera plantilla para comenzar</p>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {plantillasFiltradas.map(plantilla => (
-                      <div
-                        key={plantilla.id}
-                        className={`border rounded-lg overflow-hidden hover:shadow-lg transition-shadow ${coloresTipo[plantilla.tipo]}`}
-                      >
-                        {/* Foto de la plantilla */}
-                        {plantilla.foto && (
-                          <div className="h-32 overflow-hidden">
-                            <img
-                              src={plantilla.foto}
-                              alt={plantilla.nombre}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-
-                        <div className="p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl">{tiposActividad.find(t => t.value === plantilla.tipo)?.icon}</span>
-                              <h3 className="font-semibold">{plantilla.nombre}</h3>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFavoritaPlantilla(plantilla);
-                              }}
-                              className="text-xl hover:scale-110 transition-transform"
-                            >
-                              {plantilla.favorita ? '⭐' : '☆'}
-                            </button>
-                          </div>
-
-                          <p className="text-sm opacity-80 mb-2 line-clamp-2">{plantilla.descripcion}</p>
-
-                          <div className="flex flex-wrap gap-2 text-xs mb-3">
-                            <span className="bg-white/50 px-2 py-0.5 rounded">
-                              ⏱️ {plantilla.duracion} min
-                            </span>
-                            <span className="bg-white/50 px-2 py-0.5 rounded">
-                              {plantilla.nivelEnergia === 'bajo' ? '🔋' : plantilla.nivelEnergia === 'medio' ? '🔋🔋' : '🔋🔋🔋'}
-                            </span>
-                            {plantilla.ubicacion && (
-                              <span className="bg-white/50 px-2 py-0.5 rounded">
-                                📍 {plantilla.ubicacion}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Materiales */}
-                          {plantilla.materialesNecesarios && plantilla.materialesNecesarios.length > 0 && (
-                            <div className="text-xs mb-2">
-                              <span className="opacity-70">Materiales: </span>
-                              {plantilla.materialesNecesarios.slice(0, 3).join(', ')}
-                              {plantilla.materialesNecesarios.length > 3 && ` +${plantilla.materialesNecesarios.length - 3}`}
-                            </div>
-                          )}
-
-                          {/* Etiquetas */}
-                          {plantilla.etiquetas && plantilla.etiquetas.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {plantilla.etiquetas.map((etiqueta, idx) => (
-                                <span key={idx} className="text-xs bg-white/30 px-2 py-0.5 rounded">
-                                  #{etiqueta}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Turnos */}
-                          {plantilla.turnos && plantilla.turnos.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-3">
-                              {plantilla.turnos.map((turno) => {
-                                const info = getTurnoInfo(turno);
-                                return (
-                                  <span key={turno} className={`text-xs px-2 py-0.5 rounded ${info.color}`}>
-                                    {info.icon} {info.label}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {/* Acciones */}
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => usarPlantilla(plantilla)}
-                              className="flex-1 py-2 bg-white/80 rounded-lg text-sm font-medium hover:bg-white transition-colors"
-                            >
-                              ✓ Usar
-                            </button>
-                            <button
-                              onClick={() => abrirModalPlantilla(plantilla)}
-                              className="p-2 bg-white/50 rounded-lg hover:bg-white/80"
-                              title="Editar"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => duplicarPlantilla(plantilla)}
-                              className="p-2 bg-white/50 rounded-lg hover:bg-white/80"
-                              title="Duplicar"
-                            >
-                              📄
-                            </button>
-                            <button
-                              onClick={() => eliminarPlantilla(plantilla)}
-                              className="p-2 bg-white/50 rounded-lg hover:bg-red-100 text-red-600"
-                              title="Eliminar"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <Carousel
+                    items={plantillasFiltradas}
+                    renderItem={(plantilla) => (
+                      <PlantillaCarouselCard
+                        plantilla={plantilla}
+                        onUsar={() => usarPlantilla(plantilla)}
+                        onEditar={() => abrirModalPlantilla(plantilla)}
+                        onDuplicar={() => duplicarPlantilla(plantilla)}
+                        onEliminar={() => eliminarPlantilla(plantilla)}
+                        onToggleFavorita={() => toggleFavoritaPlantilla(plantilla)}
+                        tiposActividad={tiposActividad}
+                        getTurnoInfo={getTurnoInfo}
+                        coloresTipo={coloresTipo}
+                      />
+                    )}
+                    loop={true}
+                    showArrows={true}
+                    showDots={plantillasFiltradas.length <= 8}
+                    showCounter={true}
+                    enableSwipe={true}
+                    ariaLabel="Carrusel de plantillas de actividades"
+                  />
                 )}
               </div>
 

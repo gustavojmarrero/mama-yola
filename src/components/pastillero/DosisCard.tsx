@@ -36,16 +36,11 @@ function getEstadoLabel(estado?: EstadoMedicamento) {
 
 export default function DosisCard({ dosis, viewMode, onRegistrar }: DosisCardProps) {
   const estado = dosis.registro?.estado || 'pendiente';
-  const tieneRetraso = dosis.retrasoMinutos && dosis.retrasoMinutos > 30;
   const esPendiente = !dosis.registro;
 
   if (viewMode === 'grid') {
     return (
-      <div
-        className={`bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-shadow ${
-          tieneRetraso ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'
-        }`}
-      >
+      <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow">
         {/* Foto o placeholder con badge */}
         <div className="relative aspect-[4/3] mb-2 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
           {dosis.medicamento.foto ? (
@@ -98,13 +93,6 @@ export default function DosisCard({ dosis, viewMode, onRegistrar }: DosisCardPro
             <span className="text-lg font-bold text-blue-600">{dosis.horario}</span>
           </div>
 
-          {/* Indicador de retraso */}
-          {tieneRetraso && (
-            <span className="inline-block px-2 py-0.5 bg-yellow-200 text-yellow-800 text-xs font-medium rounded">
-              Retraso: {dosis.retrasoMinutos} min
-            </span>
-          )}
-
           {/* Botón registrar */}
           {esPendiente && (
             <button
@@ -121,11 +109,7 @@ export default function DosisCard({ dosis, viewMode, onRegistrar }: DosisCardPro
 
   // Vista lista
   return (
-    <div
-      className={`bg-white rounded-lg border p-4 shadow-sm hover:shadow-md transition-shadow ${
-        tieneRetraso ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'
-      }`}
-    >
+    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex gap-3 items-start">
         {/* Foto */}
         {dosis.medicamento.foto && (
@@ -166,11 +150,6 @@ export default function DosisCard({ dosis, viewMode, onRegistrar }: DosisCardPro
               </svg>
               <span className="text-xl font-bold text-blue-600">{dosis.horario}</span>
             </div>
-            {tieneRetraso && (
-              <span className="px-2 py-0.5 bg-yellow-200 text-yellow-800 text-xs font-medium rounded">
-                Retraso: {dosis.retrasoMinutos} min
-              </span>
-            )}
           </div>
 
           {/* Instrucciones */}
@@ -190,11 +169,6 @@ export default function DosisCard({ dosis, viewMode, onRegistrar }: DosisCardPro
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
-                </p>
-              )}
-              {dosis.registro.retrasoMinutos !== undefined && dosis.registro.retrasoMinutos > 0 && (
-                <p className="text-gray-600">
-                  <span className="font-medium">Retraso registrado:</span> {dosis.registro.retrasoMinutos} min
                 </p>
               )}
               {dosis.registro.notas && (

@@ -13,7 +13,7 @@ const tiposTurno: { value: TipoTurno; label: string; horas: string }[] = [
   { value: 'matutino', label: 'Matutino', horas: '07:00 - 15:00' },
   { value: 'vespertino', label: 'Vespertino', horas: '15:00 - 23:00' },
   { value: 'nocturno', label: 'Nocturno', horas: '23:00 - 07:00' },
-  { value: '24hrs', label: '24 Horas', horas: '07:00 - 07:00' },
+  { value: '24hrs', label: '24 Horas', horas: '09:00 - 08:59' },
   { value: 'especial', label: 'Especial', horas: 'Personalizado' }
 ];
 
@@ -89,10 +89,10 @@ export default function Turnos() {
     return () => unsubscribe();
   }, []);
 
-  // Cargar cuidadores
+  // Cargar cuidadores desde la colección principal de usuarios
   useEffect(() => {
     const q = query(
-      collection(db, 'pacientes', PACIENTE_ID, 'usuarios'),
+      collection(db, 'usuarios'),
       where('rol', '==', 'cuidador'),
       where('activo', '==', true)
     );
@@ -111,6 +111,68 @@ export default function Turnos() {
   // Obtener turnos de un día específico
   function turnosDelDia(fecha: Date): TurnoDetalle[] {
     return turnos.filter(t => t.fecha && isSameDay(t.fecha, fecha));
+  }
+
+  // Verificar si hay un turno de 24 horas en un día específico
+  function tieneTurno24Horas(fecha: Date): TurnoDetalle | undefined {
+    return turnos.find(t =>
+      t.fecha &&
+      isSameDay(t.fecha, fecha) &&
+      t.tipoTurno === '24hrs' &&
+      t.estado !== 'cancelado'
+    );
+  }
+
+  // Obtener turno de 24 horas del día anterior que afecta a este día
+  function turno24HorasDiaAnterior(fecha: Date): TurnoDetalle | undefined {
+    const ayer = new Date(fecha);
+    ayer.setDate(ayer.getDate() - 1);
+    return turnos.find(t =>
+      t.fecha &&
+      isSameDay(t.fecha, ayer) &&
+      t.tipoTurno === '24hrs' &&
+      t.estado !== 'cancelado'
+    );
+  }
+
+  // Verificar si un día ya está completamente ocupado
+  function diaOcupado(fecha: Date): boolean {
+    // Solo ocupado si hay turno de 24hrs hoy (el día siguiente puede tener turnos después de las 08:59)
+    return !!tieneTurno24Horas(fecha);
+  }
+
+  // Horas del timeline (de 00:00 a 23:00)
+  const horasTimeline = Array.from({ length: 24 }, (_, i) => i);
+
+  // Calcular posición y altura del turno en el timeline
+  function calcularPosicionTurno(turno: TurnoDetalle): { top: number; height: number; continua: boolean } {
+    const [horaEntrada, minEntrada] = turno.horaEntradaProgramada.split(':').map(Number);
+    const [horaSalida, minSalida] = turno.horaSalidaProgramada.split(':').map(Number);
+
+    const minutosEntrada = horaEntrada * 60 + minEntrada;
+    let minutosSalida = horaSalida * 60 + minSalida;
+
+    // Si la hora de salida es menor que la de entrada, el turno cruza medianoche
+    const cruzaMedianoche = minutosSalida <= minutosEntrada;
+    if (cruzaMedianoche) {
+      minutosSalida = 24 * 60; // Mostrar hasta el final del día
+    }
+
+    const top = (minutosEntrada / (24 * 60)) * 100;
+    const height = ((minutosSalida - minutosEntrada) / (24 * 60)) * 100;
+
+    return { top, height, continua: cruzaMedianoche };
+  }
+
+  // Calcular posición para continuación del día anterior
+  function calcularPosicionContinuacion(turno: TurnoDetalle): { top: number; height: number } {
+    const [horaSalida, minSalida] = turno.horaSalidaProgramada.split(':').map(Number);
+    const minutosSalida = horaSalida * 60 + minSalida;
+
+    const top = 0; // Empieza a las 00:00
+    const height = (minutosSalida / (24 * 60)) * 100;
+
+    return { top, height };
   }
 
   // Crear turno
@@ -367,82 +429,151 @@ export default function Turnos() {
         ) : (
           /* Calendario semanal */
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="grid grid-cols-7 border-b">
-              {diasSemana.map((dia, idx) => {
-                const esHoy = isSameDay(dia, new Date());
-                return (
-                  <div
-                    key={idx}
-                    className={`p-3 text-center border-r last:border-r-0 ${
-                      esHoy ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <div className="text-sm text-gray-500">
-                      {format(dia, 'EEE', { locale: es })}
+            {/* Header de días - con espacio para columna de horas */}
+            <div className="flex border-b">
+              {/* Espacio para alinear con columna de horas */}
+              <div className="w-12 flex-shrink-0 border-r bg-gray-50" />
+              {/* Días de la semana */}
+              <div className="flex-1 grid grid-cols-7">
+                {diasSemana.map((dia, idx) => {
+                  const esHoy = isSameDay(dia, new Date());
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 text-center border-r last:border-r-0 ${
+                        esHoy ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <div className="text-sm text-gray-500">
+                        {format(dia, 'EEE', { locale: es })}
+                      </div>
+                      <div className={`text-lg font-semibold ${esHoy ? 'text-blue-600' : ''}`}>
+                        {format(dia, 'd')}
+                      </div>
                     </div>
-                    <div className={`text-lg font-semibold ${esHoy ? 'text-blue-600' : ''}`}>
-                      {format(dia, 'd')}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="grid grid-cols-7 min-h-[400px]">
-              {diasSemana.map((dia, idx) => {
-                const turnosDia = turnosDelDia(dia);
-                const esHoy = isSameDay(dia, new Date());
-
-                return (
+            {/* Timeline con horas */}
+            <div className="flex">
+              {/* Columna de horas */}
+              <div className="w-12 flex-shrink-0 border-r bg-gray-50">
+                {horasTimeline.filter(h => h % 3 === 0).map(hora => (
                   <div
-                    key={idx}
-                    className={`border-r last:border-r-0 p-2 ${esHoy ? 'bg-blue-50/30' : ''}`}
+                    key={hora}
+                    className="h-[50px] text-xs text-gray-400 text-right pr-2 border-b border-gray-100"
+                    style={{ marginTop: hora === 0 ? 0 : undefined }}
                   >
-                    {turnosDia.map(turno => (
-                      <div
-                        key={turno.id}
-                        onClick={() => {
-                          setTurnoSeleccionado(turno);
-                          if (turno.estado === 'activo') {
-                            setModalEntrega(true);
-                          } else if (puedeHacerCheckIn(turno)) {
-                            setModalCheckIn(true);
-                          }
-                        }}
-                        className={`mb-2 p-2 rounded border-l-4 cursor-pointer hover:shadow-md transition-shadow ${coloresTurno[turno.tipoTurno]}`}
-                      >
-                        <div className="font-medium text-sm truncate">
-                          {turno.cuidadorNombre}
-                        </div>
-                        <div className="text-xs opacity-75">
-                          {turno.horaEntradaProgramada} - {turno.horaSalidaProgramada}
-                        </div>
-                        <span className={`inline-block mt-1 px-1.5 py-0.5 text-xs rounded ${coloresEstado[turno.estado]}`}>
-                          {turno.estado === 'activo' ? '🟢 Activo' : turno.estado}
-                        </span>
-                        {turno.retrasoMinutos && turno.retrasoMinutos > 0 && (
-                          <span className="ml-1 text-xs text-red-600">
-                            +{turno.retrasoMinutos}min
-                          </span>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* Botón agregar turno */}
-                    {(userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor') && (
-                      <button
-                        onClick={() => {
-                          setFechaSeleccionada(dia);
-                          setModalAbierto(true);
-                        }}
-                        className="w-full p-2 text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded border border-dashed border-gray-300"
-                      >
-                        + Agregar
-                      </button>
-                    )}
+                    {hora.toString().padStart(2, '0')}:00
                   </div>
-                );
-              })}
+                ))}
+              </div>
+
+              {/* Columnas de días con timeline */}
+              <div className="flex-1 grid grid-cols-7">
+                {diasSemana.map((dia, idx) => {
+                  const turnosDia = turnosDelDia(dia);
+                  const esHoy = isSameDay(dia, new Date());
+                  const turnoAnterior = turno24HorasDiaAnterior(dia);
+                  const estaOcupado = diaOcupado(dia);
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`border-r last:border-r-0 relative ${esHoy ? 'bg-blue-50/30' : ''}`}
+                      style={{ height: `${8 * 50}px` }} // 8 slots de 3 horas = 24 horas
+                    >
+                      {/* Líneas de hora */}
+                      {horasTimeline.filter(h => h % 3 === 0).map(hora => (
+                        <div
+                          key={hora}
+                          className="absolute w-full border-b border-gray-100"
+                          style={{ top: `${(hora / 24) * 100}%` }}
+                        />
+                      ))}
+
+                      {/* Continuación del día anterior */}
+                      {turnoAnterior && (() => {
+                        const pos = calcularPosicionContinuacion(turnoAnterior);
+                        return (
+                          <div
+                            className="absolute left-1 right-1 rounded bg-purple-100/80 border-l-4 border-purple-400 p-1 cursor-pointer hover:bg-purple-200/80 transition-colors overflow-hidden"
+                            style={{
+                              top: `${pos.top}%`,
+                              height: `${pos.height}%`,
+                              minHeight: '24px'
+                            }}
+                            onClick={() => {
+                              setTurnoSeleccionado(turnoAnterior);
+                              setModalCheckIn(true);
+                            }}
+                          >
+                            <div className="text-xs text-purple-600 font-medium">← Continúa</div>
+                            <div className="text-xs text-purple-800 truncate">{turnoAnterior.cuidadorNombre}</div>
+                            <div className="text-xs text-purple-500">hasta {turnoAnterior.horaSalidaProgramada}</div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Turnos del día */}
+                      {turnosDia.map(turno => {
+                        const pos = calcularPosicionTurno(turno);
+                        const bgColor = turno.tipoTurno === 'matutino' ? 'bg-yellow-100/90 border-yellow-400'
+                          : turno.tipoTurno === 'vespertino' ? 'bg-orange-100/90 border-orange-400'
+                          : turno.tipoTurno === 'nocturno' ? 'bg-indigo-100/90 border-indigo-400'
+                          : turno.tipoTurno === '24hrs' ? 'bg-purple-100/90 border-purple-400'
+                          : 'bg-gray-100/90 border-gray-400';
+
+                        return (
+                          <div
+                            key={turno.id}
+                            className={`absolute left-1 right-1 rounded border-l-4 p-1 cursor-pointer hover:shadow-lg transition-shadow overflow-hidden ${bgColor}`}
+                            style={{
+                              top: `${pos.top}%`,
+                              height: `${pos.height}%`,
+                              minHeight: '40px'
+                            }}
+                            onClick={() => {
+                              setTurnoSeleccionado(turno);
+                              if (turno.estado === 'activo') {
+                                setModalEntrega(true);
+                              } else if (puedeHacerCheckIn(turno)) {
+                                setModalCheckIn(true);
+                              }
+                            }}
+                          >
+                            <div className="text-xs font-medium truncate">{turno.cuidadorNombre}</div>
+                            <div className="text-xs opacity-75">
+                              {turno.horaEntradaProgramada} - {turno.horaSalidaProgramada}
+                            </div>
+                            <span className={`inline-block mt-0.5 px-1 py-0.5 text-xs rounded ${coloresEstado[turno.estado]}`}>
+                              {turno.estado === 'activo' ? '🟢' : turno.estado.slice(0, 4)}
+                            </span>
+                            {pos.continua && (
+                              <div className="text-xs text-purple-600 font-medium">→ sigue</div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Botón agregar - posicionado en zona sin turnos */}
+                      {(userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor') && !estaOcupado && (
+                        <button
+                          onClick={() => {
+                            setFechaSeleccionada(dia);
+                            setModalAbierto(true);
+                          }}
+                          className="absolute bottom-2 left-1 right-1 p-1 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded border border-dashed border-gray-300 bg-white/80"
+                        >
+                          + Agregar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
