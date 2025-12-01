@@ -516,7 +516,9 @@ export default function Actividades() {
       descripcion: formActividad.descripcion || null,
       materialesNecesarios: formActividad.materialesNecesarios.length > 0 ? formActividad.materialesNecesarios : null,
       responsable: formActividad.responsable || null,
-      estado: 'programada' as EstadoActividad,
+      estado: 'completada' as EstadoActividad,
+      completadaPor: userProfile?.id || null,
+      horaFinReal: Timestamp.now(),
       nivelEnergia: formActividad.nivelEnergia,
       frecuencia: formActividad.frecuencia.tipo !== 'unica' ? formActividad.frecuencia : null,
       actualizadoEn: Timestamp.now()
@@ -677,7 +679,7 @@ export default function Actividades() {
             >
               {vista === 'calendario' ? '📋 Lista' : '📅 Calendario'}
             </button>
-            {(userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor') && (
+            {(userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor' || userProfile?.rol === 'cuidador') && (
               <button
                 onClick={() => {
                   setFechaSeleccionada(new Date());
@@ -820,7 +822,7 @@ export default function Actividades() {
               setTurnoCalculado(null);
               setModalAbierto(true);
             }}
-            puedeAgregar={userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor'}
+            puedeAgregar={userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor' || userProfile?.rol === 'cuidador'}
             coloresTipo={coloresTipo}
             coloresEstado={coloresEstado}
             tiposActividad={tiposActividad}

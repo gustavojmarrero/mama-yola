@@ -12,6 +12,19 @@ import {
   TiempoComidaConfig,
 } from '../types';
 
+// ===== UTILIDAD TIMEZONE =====
+
+/**
+ * Obtiene la fecha en formato YYYY-MM-DD usando la zona horaria local
+ * (en lugar de toISOString que convierte a UTC)
+ */
+function fechaLocalString(fecha: Date): string {
+  const year = fecha.getFullYear();
+  const month = String(fecha.getMonth() + 1).padStart(2, '0');
+  const day = String(fecha.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // ===== CONFIGURACIÓN DEFAULT =====
 
 export const CONFIG_HORARIOS_DEFAULT: ConfiguracionHorarios = {
@@ -131,7 +144,7 @@ function signosVitalesCompletado(
   horaProgramada: string,
   fecha: Date
 ): { completado: boolean; horaCompletado?: Date } {
-  const hoy = fecha.toISOString().split('T')[0];
+  const hoy = fechaLocalString(fecha);
   const horaProg = horaStringADate(horaProgramada, fecha);
 
   // Buscar un registro de signos vitales que sea:
@@ -139,7 +152,7 @@ function signosVitalesCompletado(
   // 2. Registrado desde 30 min antes de la hora programada en adelante
   const signo = signos.find(s => {
     const fechaSigno = s.fecha instanceof Date ? s.fecha : new Date(s.fecha);
-    if (fechaSigno.toISOString().split('T')[0] !== hoy) return false;
+    if (fechaLocalString(fechaSigno) !== hoy) return false;
 
     const horaSigno = horaStringADate(s.hora, fecha);
     const diffConProgramada = diferenciaMinutos(horaSigno, horaProg);
@@ -164,7 +177,7 @@ function medicamentoCompletado(
   horaProgramada: string,
   fecha: Date
 ): { completado: boolean; horaCompletado?: Date } {
-  const hoy = fecha.toISOString().split('T')[0];
+  const hoy = fechaLocalString(fecha);
   const horaProg = horaStringADate(horaProgramada, fecha);
 
   const registro = registros.find(r => {
@@ -172,7 +185,7 @@ function medicamentoCompletado(
     const fechaProg = r.fechaHoraProgramada instanceof Date
       ? r.fechaHoraProgramada
       : new Date(r.fechaHoraProgramada);
-    if (fechaProg.toISOString().split('T')[0] !== hoy) return false;
+    if (fechaLocalString(fechaProg) !== hoy) return false;
 
     // Verificar que sea cercano a la hora programada
     const diff = Math.abs(diferenciaMinutos(fechaProg, horaProg));
@@ -199,13 +212,15 @@ function comidaCompletada(
   tiempoComidaId: string,
   fecha: Date
 ): { completado: boolean; horaCompletado?: Date } {
-  const hoy = fecha.toISOString().split('T')[0];
+  const hoy = fechaLocalString(fecha);
 
   const menu = menus.find(m => {
     const fechaMenu = m.fecha instanceof Date ? m.fecha : new Date(m.fecha);
-    return fechaMenu.toISOString().split('T')[0] === hoy &&
+    // Considerar completada si tiene platillos asignados O si el estado es servido/completado
+    const tienePlatillos = m.platillos && m.platillos.length > 0;
+    return fechaLocalString(fechaMenu) === hoy &&
            m.tiempoComidaId === tiempoComidaId &&
-           (m.estado === 'servido' || m.estado === 'completado');
+           (tienePlatillos || m.estado === 'servido' || m.estado === 'completado');
   });
 
   if (menu) {
@@ -349,7 +364,7 @@ export function calcularProcesosDelDia(
   // 5. ACTIVIDADES (solo las del día)
   const actividadesHoy = actividades.filter(a => {
     const fechaInicio = a.fechaInicio instanceof Date ? a.fechaInicio : new Date(a.fechaInicio);
-    return fechaInicio.toISOString().split('T')[0] === fechaHoy.toISOString().split('T')[0] &&
+    return fechaLocalString(fechaInicio) === fechaLocalString(fechaHoy) &&
            a.estado !== 'cancelada';
   });
 
