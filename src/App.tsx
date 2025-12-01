@@ -13,6 +13,7 @@ import Inventarios from './pages/Inventarios'
 import Turnos from './pages/Turnos'
 import Actividades from './pages/Actividades'
 import ActividadesV2 from './pages/ActividadesV2'
+import PlantillasActividades from './pages/PlantillasActividades'
 import MenuComida from './pages/MenuComida'
 import Analytics from './pages/Analytics'
 import ConfiguracionHorarios from './pages/ConfiguracionHorarios'
@@ -120,7 +121,7 @@ function App() {
         path="/actividades"
         element={
           <PrivateRoute>
-            <Actividades />
+            <ActividadesV2 />
           </PrivateRoute>
         }
       />
@@ -129,6 +130,14 @@ function App() {
         element={
           <PrivateRoute>
             <ActividadesV2 />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/plantillas"
+        element={
+          <PrivateRoute>
+            <PlantillasActividades />
           </PrivateRoute>
         }
       />
