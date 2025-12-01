@@ -66,7 +66,7 @@ export default function Inventarios() {
   const [editando, setEditando] = useState<ItemInventario | null>(null);
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaInventario | 'todos'>('todos');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'critico' | 'bajo' | 'ok'>('todos');
-  const [filtroVidaUtil, setFiltroVidaUtil] = useState(false);
+  const [filtroTipoConsumible, setFiltroTipoConsumible] = useState<'todos' | 'existencias' | 'duracion'>('todos');
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Estados de búsqueda, filtros colapsables, ordenamiento y paginación
@@ -556,11 +556,13 @@ export default function Inventarios() {
       resultado = resultado.filter((item) => getEstadoItem(item) === filtroEstado);
     }
 
-    // Filtro por vida útil
-    if (filtroVidaUtil) {
-      resultado = resultado.filter(
-        (item) => item.tieneVidaUtil && item.fechaInicioConsumo && item.cantidadOperativo > 0
-      );
+    // Filtro por tipo de consumible (solo cuando categoría = consumible)
+    if (filtroCategoria === 'consumible' && filtroTipoConsumible !== 'todos') {
+      if (filtroTipoConsumible === 'existencias') {
+        resultado = resultado.filter((item) => !item.tieneVidaUtil);
+      } else if (filtroTipoConsumible === 'duracion') {
+        resultado = resultado.filter((item) => item.tieneVidaUtil);
+      }
     }
 
     // Ordenamiento
@@ -583,7 +585,7 @@ export default function Inventarios() {
     });
 
     return resultado;
-  }, [items, searchTerm, filtroCategoria, filtroEstado, filtroVidaUtil, sortBy]);
+  }, [items, searchTerm, filtroCategoria, filtroEstado, filtroTipoConsumible, sortBy]);
 
   // Items visibles con paginación
   const itemsVisibles = itemsFiltrados.slice(0, visibleCount);
@@ -593,13 +595,13 @@ export default function Inventarios() {
   const activeFiltersCount = [
     filtroCategoria !== 'todos',
     filtroEstado !== 'todos',
-    filtroVidaUtil,
+    filtroTipoConsumible !== 'todos',
   ].filter(Boolean).length;
 
   // Resetear paginación cuando cambian filtros
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [searchTerm, filtroCategoria, filtroEstado, filtroVidaUtil, sortBy]);
+  }, [searchTerm, filtroCategoria, filtroEstado, filtroTipoConsumible, sortBy]);
 
   function handleLoadMore() {
     setVisibleCount((prev) => prev + ITEMS_PER_PAGE);
@@ -608,7 +610,7 @@ export default function Inventarios() {
   function handleClearFilters() {
     setFiltroCategoria('todos');
     setFiltroEstado('todos');
-    setFiltroVidaUtil(false);
+    setFiltroTipoConsumible('todos');
   }
 
   // Alertas
@@ -725,11 +727,18 @@ export default function Inventarios() {
                     { value: 'ok', label: 'OK' },
                   ]}
                 />
-                <FilterCheckbox
-                  label="Solo vida útil activa"
-                  checked={filtroVidaUtil}
-                  onChange={setFiltroVidaUtil}
-                />
+                {filtroCategoria === 'consumible' && (
+                  <FilterSelect
+                    label="Tipo"
+                    value={filtroTipoConsumible}
+                    onChange={(v) => setFiltroTipoConsumible(v as 'todos' | 'existencias' | 'duracion')}
+                    options={[
+                      { value: 'todos', label: 'Todos' },
+                      { value: 'existencias', label: 'Por existencias' },
+                      { value: 'duracion', label: 'Por duración' },
+                    ]}
+                  />
+                )}
               </FilterPanel>
               <SortDropdown value={sortBy} options={SORT_OPTIONS} onChange={setSortBy} />
               <button

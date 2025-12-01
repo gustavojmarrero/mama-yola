@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { db, auth } from '../config/firebase';
+import { collection, getDocs, setDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db, createUserWithoutSignIn } from '../config/firebase';
 import { Usuario } from '../types';
 import Layout from '../components/common/Layout';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
@@ -124,16 +123,13 @@ export default function Usuarios() {
           return;
         }
 
-        // Crear usuario en Firebase Auth
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          formData.email,
-          formData.password
-        );
+        // Crear usuario en Firebase Auth (sin cambiar la sesión actual)
+        const uid = await createUserWithoutSignIn(formData.email, formData.password);
 
-        // Crear perfil en Firestore
-        await addDoc(collection(db, 'usuarios'), {
-          uid: userCredential.user.uid,
+        // Crear perfil en Firestore usando el UID como ID del documento
+        const userDocRef = doc(db, 'usuarios', uid);
+        await setDoc(userDocRef, {
+          uid: uid,
           nombre: formData.nombre,
           email: formData.email,
           rol: formData.rol,

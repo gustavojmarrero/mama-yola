@@ -16,11 +16,8 @@ service cloud.firestore {
       // Permitir lectura si está autenticado
       allow read: if isAuthenticated();
 
-      // Permitir crear/actualizar solo su propio documento
-      allow create, update: if isAuthenticated() && isOwner(userId);
-
-      // Solo el usuario puede eliminar su propio perfil
-      allow delete: if isAuthenticated() && isOwner(userId);
+      // Permitir crear, actualizar y eliminar usuarios (para admins)
+      allow create, update, delete: if isAuthenticated();
     }
 
     // Colección de pacientes

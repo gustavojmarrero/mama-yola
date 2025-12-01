@@ -485,6 +485,8 @@ export interface Actividad {
 
 // ===== TIPOS DE PLANTILLAS DE ACTIVIDADES =====
 
+export type TurnoActividad = 'matutino' | 'vespertino' | 'nocturno';
+
 export interface PlantillaActividad {
   id: string;
   pacienteId: string;
@@ -497,6 +499,7 @@ export interface PlantillaActividad {
   nivelEnergia: NivelEnergia;
   responsableDefault?: string;
   etiquetas: string[];
+  turnos: TurnoActividad[]; // Turnos a los que pertenece la plantilla
   favorita: boolean;
   foto?: string;
   activo: boolean;

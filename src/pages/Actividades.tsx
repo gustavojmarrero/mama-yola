@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where, getDocs, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
 import { CalendarioActividades } from '../components/actividades';
-import { Actividad, TipoActividad, EstadoActividad, NivelEnergia, ParticipacionActividad, Usuario, PlantillaActividad } from '../types';
+import { Actividad, TipoActividad, EstadoActividad, NivelEnergia, ParticipacionActividad, Usuario, PlantillaActividad, TurnoActividad, ConfiguracionHorarios } from '../types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import { TURNOS_ACTIVIDAD, getTurnoInfo } from '../utils/turnos';
 
 const PACIENTE_ID = 'paciente-principal';
 
@@ -92,7 +93,9 @@ export default function Actividades() {
   const [plantillaEditando, setPlantillaEditando] = useState<PlantillaActividad | null>(null);
   const [busquedaPlantilla, setBusquedaPlantilla] = useState('');
   const [filtroTipoPlantilla, setFiltroTipoPlantilla] = useState<TipoActividad | 'todas'>('todas');
+  const [filtroTurnoPlantilla, setFiltroTurnoPlantilla] = useState<TurnoActividad | 'todos'>('todos');
   const [mostrarSoloFavoritas, setMostrarSoloFavoritas] = useState(false);
+  const [configHorarios, setConfigHorarios] = useState<ConfiguracionHorarios | null>(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [nuevoMaterialPlantilla, setNuevoMaterialPlantilla] = useState('');
   const [nuevaEtiquetaPlantilla, setNuevaEtiquetaPlantilla] = useState('');
@@ -108,7 +111,8 @@ export default function Actividades() {
     responsableDefault: '',
     etiquetas: [] as string[],
     favorita: false,
-    foto: ''
+    foto: '',
+    turnos: [] as TurnoActividad[]
   });
 
   // Hook para detectar cambios sin guardar
@@ -195,6 +199,21 @@ export default function Actividades() {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  // Cargar configuración de horarios
+  useEffect(() => {
+    async function cargarConfigHorarios() {
+      try {
+        const configDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'configuraciones', 'horarios'));
+        if (configDoc.exists()) {
+          setConfigHorarios(configDoc.data() as ConfiguracionHorarios);
+        }
+      } catch (error) {
+        console.error('Error cargando configuración de horarios:', error);
+      }
+    }
+    cargarConfigHorarios();
   }, []);
 
   // Cargar plantillas de actividades
@@ -292,7 +311,8 @@ export default function Actividades() {
         responsableDefault: plantilla.responsableDefault || '',
         etiquetas: plantilla.etiquetas || [],
         favorita: plantilla.favorita,
-        foto: plantilla.foto || ''
+        foto: plantilla.foto || '',
+        turnos: plantilla.turnos || []
       });
     } else {
       setPlantillaEditando(null);
@@ -307,7 +327,8 @@ export default function Actividades() {
         responsableDefault: '',
         etiquetas: [],
         favorita: false,
-        foto: ''
+        foto: '',
+        turnos: []
       });
     }
     setModalPlantillaCRUD(true);
@@ -337,6 +358,7 @@ export default function Actividades() {
         nivelEnergia: formPlantilla.nivelEnergia,
         etiquetas: formPlantilla.etiquetas,
         favorita: formPlantilla.favorita,
+        turnos: formPlantilla.turnos,
         activo: true,
         actualizadoEn: Timestamp.now()
       };
@@ -408,6 +430,9 @@ export default function Actividades() {
         nuevaPlantilla.etiquetas = plantilla.etiquetas;
       }
       if (plantilla.foto) nuevaPlantilla.foto = plantilla.foto;
+      if (plantilla.turnos && plantilla.turnos.length > 0) {
+        nuevaPlantilla.turnos = plantilla.turnos;
+      }
 
       await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'plantillasActividades'), nuevaPlantilla);
     } catch (error) {
@@ -448,6 +473,7 @@ export default function Actividades() {
   // Filtrado de plantillas
   const plantillasFiltradas = plantillas
     .filter(p => filtroTipoPlantilla === 'todas' || p.tipo === filtroTipoPlantilla)
+    .filter(p => filtroTurnoPlantilla === 'todos' || (p.turnos && p.turnos.includes(filtroTurnoPlantilla)))
     .filter(p => !mostrarSoloFavoritas || p.favorita)
     .filter(p => !busquedaPlantilla ||
       p.nombre.toLowerCase().includes(busquedaPlantilla.toLowerCase()) ||
@@ -1258,14 +1284,24 @@ export default function Actividades() {
                     placeholder="Buscar plantillas..."
                     className="w-full sm:flex-1 sm:min-w-[200px] border rounded-lg px-3 py-3 sm:py-2 text-base"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <select
                       value={filtroTipoPlantilla}
                       onChange={(e) => setFiltroTipoPlantilla(e.target.value as TipoActividad | 'todas')}
-                      className="flex-1 sm:flex-none border rounded-lg px-3 py-3 sm:py-2 text-base"
+                      className="flex-1 sm:flex-none border rounded-lg px-3 py-3 sm:py-2 text-base min-w-[100px]"
                     >
-                      <option value="todas">Todos</option>
+                      <option value="todas">Tipo: Todos</option>
                       {tiposActividad.map(t => (
+                        <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={filtroTurnoPlantilla}
+                      onChange={(e) => setFiltroTurnoPlantilla(e.target.value as TurnoActividad | 'todos')}
+                      className="flex-1 sm:flex-none border rounded-lg px-3 py-3 sm:py-2 text-base min-w-[100px]"
+                    >
+                      <option value="todos">Turno: Todos</option>
+                      {TURNOS_ACTIVIDAD.map(t => (
                         <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
                       ))}
                     </select>
@@ -1362,12 +1398,26 @@ export default function Actividades() {
 
                           {/* Etiquetas */}
                           {plantilla.etiquetas && plantilla.etiquetas.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-3">
+                            <div className="flex flex-wrap gap-1 mb-2">
                               {plantilla.etiquetas.map((etiqueta, idx) => (
                                 <span key={idx} className="text-xs bg-white/30 px-2 py-0.5 rounded">
                                   #{etiqueta}
                                 </span>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Turnos */}
+                          {plantilla.turnos && plantilla.turnos.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {plantilla.turnos.map((turno) => {
+                                const info = getTurnoInfo(turno);
+                                return (
+                                  <span key={turno} className={`text-xs px-2 py-0.5 rounded ${info.color}`}>
+                                    {info.icon} {info.label}
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
 
@@ -1709,6 +1759,46 @@ export default function Actividades() {
                       </label>
                     </div>
                   </div>
+                </div>
+
+                {/* Turnos */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Turnos disponibles</label>
+                  <div className="flex flex-wrap gap-2">
+                    {TURNOS_ACTIVIDAD.map((turno) => {
+                      const isSelected = formPlantilla.turnos.includes(turno.value);
+                      const info = getTurnoInfo(turno.value);
+                      return (
+                        <button
+                          key={turno.value}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setFormPlantilla({
+                                ...formPlantilla,
+                                turnos: formPlantilla.turnos.filter(t => t !== turno.value)
+                              });
+                            } else {
+                              setFormPlantilla({
+                                ...formPlantilla,
+                                turnos: [...formPlantilla.turnos, turno.value]
+                              });
+                            }
+                          }}
+                          className={`px-3 py-2 rounded-lg text-sm transition-all ${
+                            isSelected
+                              ? `${info.color} border-2 border-current`
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {turno.icon} {turno.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Selecciona los turnos en los que esta actividad está disponible
+                  </p>
                 </div>
 
                 {/* Favorita */}
