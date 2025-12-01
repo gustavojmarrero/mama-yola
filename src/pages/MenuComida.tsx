@@ -211,6 +211,19 @@ export default function MenuComida() {
   const [nuevoIngredienteReceta, setNuevoIngredienteReceta] = useState('');
   const [nuevaEtiquetaReceta, setNuevaEtiquetaReceta] = useState('');
 
+  // Estados para modal de platillo custom (ver/convertir)
+  const [modalPlatilloCustom, setModalPlatilloCustom] = useState(false);
+  const [platilloCustomSeleccionado, setPlatilloCustomSeleccionado] = useState<{
+    menuId: string;
+    platillo: PlatilloAsignado;
+  } | null>(null);
+  const [platilloConvirtiendose, setPlatilloConvirtiendose] = useState<{
+    menuId: string;
+    platillo: PlatilloAsignado;
+  } | null>(null);
+  const [rotacionActual, setRotacionActual] = useState(0);
+  const [guardandoRotacion, setGuardandoRotacion] = useState(false);
+
   const [formReceta, setFormReceta] = useState({
     nombre: '',
     categoria: 'plato_fuerte' as CategoriaComida,
@@ -444,6 +457,35 @@ export default function MenuComida() {
     setEditFotoCustom('');
   }
 
+  // Abrir modal para ver platillo custom
+  function abrirVerPlatilloCustom(menuId: string, platillo: PlatilloAsignado) {
+    setPlatilloCustomSeleccionado({ menuId, platillo });
+    setModalPlatilloCustom(true);
+  }
+
+  // Convertir platillo custom a receta del banco
+  function convertirAReceta(data: { menuId: string; platillo: PlatilloAsignado }) {
+    // Pre-llenar el formulario de nueva receta
+    setFormReceta({
+      nombre: data.platillo.nombreCustom || '',
+      categoria: 'plato_fuerte' as CategoriaComida,
+      ingredientes: [],
+      instrucciones: '',
+      etiquetas: [],
+      favorita: false,
+      foto: data.platillo.fotoCustom || '',
+      habilitaciones: []
+    });
+
+    // Guardar referencia para actualizar el menú después
+    setPlatilloConvirtiendose(data);
+
+    // Cerrar modal actual y abrir modal de crear receta
+    setModalPlatilloCustom(false);
+    setModalRecetaCRUD(true);
+    setRecetaEditando(null);
+  }
+
   // Handler para subir foto en edición
   async function handleEditFotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -460,6 +502,83 @@ export default function MenuComida() {
       alert('Error al subir la foto');
     } finally {
       setUploadingEditFoto(false);
+    }
+  }
+
+  // Rotar imagen y guardar automáticamente
+  async function rotarYGuardarImagen(grados: number) {
+    if (!platilloCustomSeleccionado || !platilloCustomSeleccionado.platillo.fotoCustom || guardandoRotacion) return;
+
+    try {
+      setGuardandoRotacion(true);
+
+      // Crear imagen y canvas
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = platilloCustomSeleccionado.platillo.fotoCustom!;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+
+      // Calcular dimensiones del canvas rotado
+      const radians = (grados * Math.PI) / 180;
+
+      if (grados === 90 || grados === -90 || grados === 270 || grados === -270) {
+        canvas.width = img.height;
+        canvas.height = img.width;
+      } else {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
+
+      // Rotar y dibujar
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(radians);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+      // Convertir a blob
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9);
+      });
+
+      // Subir a Firebase Storage
+      const storageRef = ref(storage, `platillos-custom/${Date.now()}_rotated.jpg`);
+      await uploadBytes(storageRef, blob);
+      const nuevaUrl = await getDownloadURL(storageRef);
+
+      // Actualizar en Firestore
+      const menuRef = doc(db, 'pacientes', PACIENTE_ID, 'menusDiarios', platilloCustomSeleccionado.menuId);
+      const menuSnap = await getDoc(menuRef);
+
+      if (menuSnap.exists()) {
+        const menuData = menuSnap.data();
+        const platillosActualizados = (menuData.platillos || []).map((p: PlatilloAsignado) => {
+          if (p.componenteId === platilloCustomSeleccionado.platillo.componenteId &&
+              p.nombreCustom === platilloCustomSeleccionado.platillo.nombreCustom) {
+            return { ...p, fotoCustom: nuevaUrl };
+          }
+          return p;
+        });
+
+        await updateDoc(menuRef, { platillos: platillosActualizados });
+      }
+
+      // Actualizar estado local
+      setPlatilloCustomSeleccionado({
+        ...platilloCustomSeleccionado,
+        platillo: { ...platilloCustomSeleccionado.platillo, fotoCustom: nuevaUrl }
+      });
+
+    } catch (error) {
+      console.error('Error al rotar imagen:', error);
+      alert('Error al guardar la imagen rotada');
+    } finally {
+      setGuardandoRotacion(false);
     }
   }
 
@@ -894,13 +1013,42 @@ export default function MenuComida() {
         recetaData.foto = formReceta.foto;
       }
 
+      let nuevaRecetaId: string | null = null;
+
       if (recetaEditando) {
         await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'recetas', recetaEditando.id), recetaData);
       } else {
-        await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'recetas'), {
+        const docRef = await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'recetas'), {
           ...recetaData,
           creadoEn: Timestamp.now(),
         });
+        nuevaRecetaId = docRef.id;
+      }
+
+      // Si estamos convirtiendo un platillo custom a receta
+      if (platilloConvirtiendose && nuevaRecetaId) {
+        const menuRef = doc(db, 'pacientes', PACIENTE_ID, 'menusDiarios', platilloConvirtiendose.menuId);
+        const menuSnap = await getDoc(menuRef);
+
+        if (menuSnap.exists()) {
+          const menuData = menuSnap.data();
+          const platillosActualizados = (menuData.platillos || []).map((p: PlatilloAsignado) => {
+            if (p.componenteId === platilloConvirtiendose.platillo.componenteId &&
+                p.nombreCustom === platilloConvirtiendose.platillo.nombreCustom) {
+              // Reemplazar platillo custom por referencia a la nueva receta
+              return {
+                componenteId: p.componenteId,
+                recetaId: nuevaRecetaId,
+                recetaNombre: formReceta.nombre.trim(),
+              };
+            }
+            return p;
+          });
+
+          await updateDoc(menuRef, { platillos: platillosActualizados });
+        }
+
+        setPlatilloConvirtiendose(null);
       }
 
       markAsSaved();
@@ -1237,16 +1385,26 @@ export default function MenuComida() {
                                   )}
 
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-xs text-emerald-600 font-medium mb-0.5">
+                                    <div className="text-xs text-emerald-600 font-medium mb-0.5 flex items-center gap-1">
                                       {comp.nombre}
+                                      {platillo.recetaId && (
+                                        <span className="text-lavender-600" title="Del banco de recetas">📖</span>
+                                      )}
+                                      {platillo.nombreCustom && !platillo.recetaId && (
+                                        <span className="text-amber-600" title="Platillo manual">✏️</span>
+                                      )}
                                     </div>
                                     <div
-                                      className={`font-semibold text-gray-800 truncate ${
-                                        platillo.nombreCustom ? 'cursor-pointer active:text-amber-600' : ''
-                                      }`}
+                                      className="font-semibold text-gray-800 truncate cursor-pointer hover:text-lavender-600 active:text-lavender-700 transition-colors"
                                       onClick={() => {
-                                        if (platillo.nombreCustom && menu) {
-                                          abrirEditarPlatilloCustom(menu.id, platillo);
+                                        if (platillo.recetaId) {
+                                          const receta = recetas.find(r => r.id === platillo.recetaId);
+                                          if (receta) {
+                                            setRecetaVisualizando(receta);
+                                            setModalVerReceta(true);
+                                          }
+                                        } else if (platillo.nombreCustom && menu) {
+                                          abrirVerPlatilloCustom(menu.id, platillo);
                                         }
                                       }}
                                     >
@@ -1445,19 +1603,31 @@ export default function MenuComida() {
                                                 />
                                               ) : null;
                                             })()}
-                                            <span
-                                              className={`text-sm truncate font-medium flex-1 ${
-                                                platillo.nombreCustom ? 'cursor-pointer hover:text-amber-600' : ''
-                                              }`}
+                                            <div
+                                              className="flex-1 min-w-0 flex items-center gap-1 cursor-pointer hover:text-lavender-600 transition-colors"
                                               onClick={() => {
-                                                if (platillo.nombreCustom && menu) {
-                                                  abrirEditarPlatilloCustom(menu.id, platillo);
+                                                if (platillo.recetaId) {
+                                                  const receta = recetas.find(r => r.id === platillo.recetaId);
+                                                  if (receta) {
+                                                    setRecetaVisualizando(receta);
+                                                    setModalVerReceta(true);
+                                                  }
+                                                } else if (platillo.nombreCustom && menu) {
+                                                  abrirVerPlatilloCustom(menu.id, platillo);
                                                 }
                                               }}
-                                              title={platillo.nombreCustom ? 'Click para editar' : undefined}
+                                              title="Click para ver detalles"
                                             >
-                                              {platillo.recetaNombre || platillo.nombreCustom}
-                                            </span>
+                                              <span className="text-sm truncate font-medium">
+                                                {platillo.recetaNombre || platillo.nombreCustom}
+                                              </span>
+                                              {platillo.recetaId && (
+                                                <span className="text-lavender-600 text-xs flex-shrink-0" title="Del banco">📖</span>
+                                              )}
+                                              {platillo.nombreCustom && !platillo.recetaId && (
+                                                <span className="text-amber-600 text-xs flex-shrink-0" title="Manual">✏️</span>
+                                              )}
+                                            </div>
                                             <button
                                               onClick={() => menu && quitarPlatillo(menu.id, comp.id)}
                                               className="text-red-500 hover:text-red-700 text-sm flex-shrink-0"
@@ -2222,6 +2392,111 @@ export default function MenuComida() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   Editar receta
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Ver/Convertir Platillo Custom */}
+        {modalPlatilloCustom && platilloCustomSeleccionado && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Platillo</h3>
+                <button
+                  onClick={() => setModalPlatilloCustom(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Foto si existe */}
+              {platilloCustomSeleccionado.platillo.fotoCustom && (
+                <img
+                  src={platilloCustomSeleccionado.platillo.fotoCustom}
+                  alt={platilloCustomSeleccionado.platillo.nombreCustom}
+                  className="w-full h-48 object-cover rounded-lg mb-4 cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setImagenExpandida(true)}
+                  title="Click para ampliar"
+                />
+              )}
+
+              {/* Modal imagen expandida con rotación */}
+              {imagenExpandida && platilloCustomSeleccionado.platillo.fotoCustom && (
+                <div
+                  className="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-[60] p-4"
+                  onClick={() => setImagenExpandida(false)}
+                >
+                  <div className="relative max-w-4xl max-h-[70vh]" onClick={(e) => e.stopPropagation()}>
+                    <img
+                      src={platilloCustomSeleccionado.platillo.fotoCustom}
+                      alt={platilloCustomSeleccionado.platillo.nombreCustom}
+                      className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                    />
+                    <button
+                      onClick={() => setImagenExpandida(false)}
+                      className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full text-gray-700 hover:bg-gray-100 flex items-center justify-center text-xl shadow-lg"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Controles de rotación */}
+                  <div className="mt-4 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => rotarYGuardarImagen(-90)}
+                      disabled={guardandoRotacion}
+                      className="w-12 h-12 bg-white rounded-full text-gray-700 hover:bg-gray-100 flex items-center justify-center text-xl shadow-lg disabled:opacity-50"
+                      title="Rotar izquierda"
+                    >
+                      {guardandoRotacion ? <span className="animate-spin text-sm">⏳</span> : '↺'}
+                    </button>
+                    <button
+                      onClick={() => rotarYGuardarImagen(90)}
+                      disabled={guardandoRotacion}
+                      className="w-12 h-12 bg-white rounded-full text-gray-700 hover:bg-gray-100 flex items-center justify-center text-xl shadow-lg disabled:opacity-50"
+                      title="Rotar derecha"
+                    >
+                      {guardandoRotacion ? <span className="animate-spin text-sm">⏳</span> : '↻'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Nombre */}
+              <p className="text-xl font-semibold mb-4">
+                {platilloCustomSeleccionado.platillo.nombreCustom}
+              </p>
+
+              {/* Badge indicando que es manual */}
+              <div className="bg-amber-50 text-amber-700 px-3 py-2 rounded-lg mb-6 text-sm flex items-center gap-2">
+                <span>✏️</span>
+                <span>Este platillo fue creado manualmente sin receta</span>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => convertirAReceta(platilloCustomSeleccionado)}
+                  className="flex-1 bg-lavender-600 text-white py-2.5 rounded-lg hover:bg-lavender-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>📖</span>
+                  <span>Convertir a receta</span>
+                </button>
+                <button
+                  onClick={() => {
+                    abrirEditarPlatilloCustom(
+                      platilloCustomSeleccionado.menuId,
+                      platilloCustomSeleccionado.platillo
+                    );
+                    setModalPlatilloCustom(false);
+                  }}
+                  className="flex-1 bg-warm-100 text-warm-700 py-2.5 rounded-lg hover:bg-warm-200 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>✏️</span>
+                  <span>Editar</span>
                 </button>
               </div>
             </div>

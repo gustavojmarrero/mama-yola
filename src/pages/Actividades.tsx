@@ -537,15 +537,6 @@ export default function Actividades() {
     cerrarModal();
   }
 
-  // Iniciar actividad
-  async function iniciarActividad(actividad: Actividad) {
-    await updateDoc(doc(db, 'pacientes', PACIENTE_ID, 'actividades', actividad.id), {
-      estado: 'en_progreso',
-      horaInicioReal: Timestamp.now(),
-      actualizadoEn: Timestamp.now()
-    });
-  }
-
   // Completar actividad
   async function completarActividad() {
     if (!actividadSeleccionada) return;
@@ -718,28 +709,6 @@ export default function Actividades() {
                       {act.fechaInicio && format(act.fechaInicio, 'HH:mm')} - {act.duracion}min
                     </p>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded ${coloresEstado[act.estado]}`}>
-                    {act.estado === 'en_progreso' ? '▶ En curso' : act.estado}
-                  </span>
-                  {act.estado === 'programada' && (
-                    <button
-                      onClick={() => iniciarActividad(act)}
-                      className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                    >
-                      Iniciar
-                    </button>
-                  )}
-                  {act.estado === 'en_progreso' && (
-                    <button
-                      onClick={() => {
-                        setActividadSeleccionada(act);
-                        setModalCompletar(true);
-                      }}
-                      className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-                    >
-                      Completar
-                    </button>
-                  )}
                 </div>
               ))
             )}
@@ -861,28 +830,6 @@ export default function Actividades() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`px-2 py-1 text-xs rounded ${coloresEstado[act.estado]}`}>
-                                {act.estado}
-                              </span>
-                              {act.estado === 'programada' && (
-                                <button
-                                  onClick={() => iniciarActividad(act)}
-                                  className="text-sm bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                                >
-                                  ▶ Iniciar
-                                </button>
-                              )}
-                              {act.estado === 'en_progreso' && (
-                                <button
-                                  onClick={() => {
-                                    setActividadSeleccionada(act);
-                                    setModalCompletar(true);
-                                  }}
-                                  className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                                >
-                                  ✓ Completar
-                                </button>
-                              )}
                               <button
                                 onClick={() => abrirEditar(act)}
                                 className="text-gray-500 hover:text-gray-700"

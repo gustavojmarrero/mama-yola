@@ -44,15 +44,6 @@ export function CalendarioActividadCard({
       <div className={`opacity-75 mt-0.5 ${compacto ? 'text-sm' : 'text-xs'}`}>
         {actividad.fechaInicio && format(actividad.fechaInicio, 'HH:mm')} ({actividad.duracion}min)
       </div>
-      <span
-        className={`
-          inline-block mt-1.5 px-1.5 py-0.5 rounded
-          ${compacto ? 'text-sm' : 'text-xs'}
-          ${coloresEstado[actividad.estado]}
-        `}
-      >
-        {actividad.estado}
-      </span>
     </div>
   );
 }
