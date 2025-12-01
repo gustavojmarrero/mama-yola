@@ -62,6 +62,13 @@ export default function Dashboard() {
   const [procesos, setProcesos] = useState<ProcesoDelDia[]>([]);
   const [horaActual, setHoraActual] = useState(new Date());
 
+  // Estado de cambio de sábanas
+  const [estadoSabanas, setEstadoSabanas] = useState<{
+    diasRestantes: number;
+    vencido: boolean;
+    ultimoCambio: Date | null;
+  } | null>(null);
+
   // Datos del día para PDF
   const [datosDelDia, setDatosDelDia] = useState<{
     chequeos: ChequeoDiario[];
@@ -95,7 +102,8 @@ export default function Dashboard() {
         cargarProximasCitas(),
         cargarContactos(),
         cargarMetricas(),
-        cargarProcesosDelDia()
+        cargarProcesosDelDia(),
+        calcularEstadoSabanas()
       ]);
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -319,6 +327,41 @@ export default function Dashboard() {
       });
     } catch (error) {
       console.error('Error al cargar métricas:', error);
+    }
+  }
+
+  async function calcularEstadoSabanas() {
+    try {
+      const DIAS_CICLO = 7;
+      const hoy = new Date();
+
+      // Buscar último chequeo con cambio de sábanas
+      const q = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios'),
+        where('cambioSabanas', '==', true),
+        orderBy('fecha', 'desc'),
+        limit(1)
+      );
+
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        setEstadoSabanas({ diasRestantes: 0, vencido: true, ultimoCambio: null });
+        return;
+      }
+
+      const ultimoDoc = snap.docs[0].data();
+      const fechaUltimo = ultimoDoc.fecha?.toDate() || new Date();
+      const diasDesde = Math.floor((hoy.getTime() - fechaUltimo.getTime()) / (1000 * 60 * 60 * 24));
+      const diasRestantes = Math.max(0, DIAS_CICLO - diasDesde);
+
+      setEstadoSabanas({
+        diasRestantes,
+        vencido: diasRestantes === 0,
+        ultimoCambio: fechaUltimo,
+      });
+    } catch (error) {
+      console.error('Error calculando estado de sábanas:', error);
     }
   }
 
@@ -735,7 +778,7 @@ export default function Dashboard() {
       </div>
 
       {/* Métricas Resumen - Cards Premium */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {/* Medicamentos pendientes */}
         <Link
           to="/pastillero-diario"
@@ -807,6 +850,49 @@ export default function Dashboard() {
               <div className="text-sm text-warm-500 font-medium">Chequeo diario</div>
             </>
           )}
+        </Link>
+
+        {/* Cambio de Sábanas */}
+        <Link
+          to="/chequeo-diario"
+          className={`group bg-gradient-to-br from-white via-white ${
+            estadoSabanas?.vencido
+              ? 'to-red-100/50 border-l-4 border-red-500'
+              : estadoSabanas && estadoSabanas.diasRestantes <= 2
+                ? 'to-amber-100/50 border-l-4 border-amber-500'
+                : 'to-green-100/50 border-l-4 border-green-500'
+          } rounded-xl p-4 md:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5`}
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform ${
+              estadoSabanas?.vencido
+                ? 'bg-red-100'
+                : estadoSabanas && estadoSabanas.diasRestantes <= 2
+                  ? 'bg-amber-100'
+                  : 'bg-green-100'
+            }`}>
+              🛏️
+            </div>
+            {estadoSabanas?.vencido && (
+              <span className="text-red-600 text-xs font-semibold bg-red-100 px-2 py-0.5 rounded">
+                VENCIDO
+              </span>
+            )}
+          </div>
+          <div className={`text-2xl md:text-3xl font-bold font-display ${
+            estadoSabanas?.vencido
+              ? 'text-red-600'
+              : estadoSabanas && estadoSabanas.diasRestantes <= 2
+                ? 'text-amber-600'
+                : 'text-green-600'
+          }`}>
+            {estadoSabanas ? (estadoSabanas.vencido ? '!' : estadoSabanas.diasRestantes) : '-'}
+          </div>
+          <div className="text-sm text-warm-500 font-medium">
+            {estadoSabanas?.vencido
+              ? 'Cambiar sábanas'
+              : `día${estadoSabanas?.diasRestantes !== 1 ? 's' : ''} para cambio`}
+          </div>
         </Link>
       </div>
 

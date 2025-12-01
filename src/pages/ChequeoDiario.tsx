@@ -82,6 +82,9 @@ export default function ChequeoDiarioPage() {
 
     // Consumibles usados
     consumiblesUsados: [] as Array<{ itemId: string; itemNombre: string; cantidad: number; comentario: string }>,
+
+    // Cambio de sábanas
+    cambioSabanas: false,
   });
 
   useEffect(() => {
@@ -168,7 +171,9 @@ export default function ChequeoDiarioPage() {
           observacionesImportantes: chequeoData.resumen?.observacionesImportantes || '',
           recomendacionesSiguienteTurno: chequeoData.resumen?.recomendacionesSiguienteTurno || '',
 
-          consumiblesUsados: chequeoData.consumiblesUsados || []
+          consumiblesUsados: chequeoData.consumiblesUsados || [],
+
+          cambioSabanas: chequeoData.cambioSabanas || false
         });
       }
     } catch (error) {
@@ -720,6 +725,9 @@ export default function ChequeoDiarioPage() {
       ...(formData.consumiblesUsados.length > 0 && {
         consumiblesUsados: formData.consumiblesUsados.filter(c => c.itemId && c.cantidad > 0)
       }),
+
+      // Cambio de sábanas
+      ...(formData.cambioSabanas && { cambioSabanas: true }),
 
       completado,
       creadoEn: chequeoActual?.creadoEn || new Date(),
@@ -2082,6 +2090,24 @@ export default function ChequeoDiarioPage() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* Cambio de Sábanas */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.cambioSabanas}
+                  onChange={(e) => setFormData({ ...formData, cambioSabanas: e.target.checked })}
+                  className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="font-semibold text-gray-800 flex items-center gap-2">
+                    <span className="text-xl">🛏️</span> Se cambiaron las sábanas
+                  </span>
+                  <p className="text-sm text-gray-500">Marcar si se realizó el cambio de sábanas hoy</p>
+                </div>
+              </label>
             </div>
 
             {/* Sección 3: Consumibles Utilizados */}

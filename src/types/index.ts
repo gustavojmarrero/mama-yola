@@ -184,6 +184,9 @@ export interface ChequeoDiario {
     comentario?: string;
   }>;
 
+  // Cambio de sábanas
+  cambioSabanas?: boolean;
+
   completado: boolean;
   creadoEn: Date;
   actualizadoEn: Date;
