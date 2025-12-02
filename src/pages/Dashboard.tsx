@@ -23,6 +23,7 @@ import {
   ConfiguracionHorarios,
   TiempoComidaConfig,
   ProcesoDelDia,
+  Receta,
 } from '../types';
 import ProcesoCard, { ProcesoGrupo } from '../components/dashboard/ProcesoCard';
 import { getBristolNombre } from '../constants/bristol';
@@ -59,6 +60,7 @@ export default function Dashboard() {
     alertasActivas: 0
   });
   const [loading, setLoading] = useState(true);
+  const [exportandoPDF, setExportandoPDF] = useState(false);
   const [procesos, setProcesos] = useState<ProcesoDelDia[]>([]);
   const [horaActual, setHoraActual] = useState(new Date());
 
@@ -464,7 +466,28 @@ export default function Dashboard() {
     return iconos[tipo] || '📅';
   }
 
-  // Función para exportar resumen del día a PDF
+  // Helper para convertir URL de imagen a base64
+  async function imageUrlToBase64(url: string, timeoutMs: number = 5000): Promise<string | null> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  // Función para exportar resumen del día a PDF con imágenes y diseño premium
   async function exportarResumenDia() {
     // Obtener medicamentos desde procesos (incluye pendientes y completados)
     const procesosMedicamentos = procesos.filter(p => p.tipo === 'medicamento');
@@ -482,183 +505,79 @@ export default function Dashboard() {
       return;
     }
 
-    const doc = new jsPDF();
-    let yPos = 20;
-    const hoy = new Date();
+    setExportandoPDF(true);
 
-    // Helper para manejar paginación
-    const checkPageBreak = (neededSpace: number = 40) => {
-      if (yPos > 250 - neededSpace) {
-        doc.addPage();
-        yPos = 20;
-      }
-    };
+    try {
+      // === PASO 1: Cargar recetas para obtener fotos ===
+      const recetasMap = new Map<string, Receta>();
+      const recetaIds = new Set<string>();
 
-    // === HEADER ===
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Resumen del Día', 105, yPos, { align: 'center' });
-    yPos += 8;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(format(hoy, "EEEE d 'de' MMMM, yyyy", { locale: es }), 105, yPos, { align: 'center' });
-    yPos += 15;
-
-    // === SECCIÓN 1: SIGNOS VITALES ===
-    if (datosDelDia.signosVitales.length > 0) {
-      checkPageBreak(50);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Signos Vitales', 20, yPos);
-      yPos += 8;
-
-      const signosData = datosDelDia.signosVitales.map(sv => [
-        format(sv.fecha, 'HH:mm'),
-        sv.presionArterialSistolica && sv.presionArterialDiastolica
-          ? `${sv.presionArterialSistolica}/${sv.presionArterialDiastolica}`
-          : '--',
-        sv.frecuenciaCardiaca ? `${sv.frecuenciaCardiaca} bpm` : '--',
-        sv.spo2 ? `${sv.spo2}%` : '--',
-        sv.temperatura ? `${sv.temperatura}°C` : '--',
-      ]);
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Hora', 'Presión Arterial', 'FC', 'SpO2', 'Temp']],
-        body: signosData,
-        theme: 'grid',
-        headStyles: { fillColor: [66, 139, 202] },
-        margin: { left: 20, right: 20 },
+      datosDelDia.menus.forEach(menu => {
+        menu.platillos?.forEach(p => {
+          if (p.recetaId) recetaIds.add(p.recetaId);
+        });
       });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-    }
 
-    // === SECCIÓN 2: CHEQUEO DIARIO ===
-    if (datosDelDia.chequeos.length > 0) {
-      const chequeo = datosDelDia.chequeos[0];
-      checkPageBreak(60);
+      // Cargar recetas en paralelo
+      await Promise.all(
+        Array.from(recetaIds).map(async (recetaId) => {
+          try {
+            const recetaDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'recetas', recetaId));
+            if (recetaDoc.exists()) {
+              recetasMap.set(recetaId, { id: recetaDoc.id, ...recetaDoc.data() } as Receta);
+            }
+          } catch {
+            // Ignorar errores de carga de recetas individuales
+          }
+        })
+      );
 
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Chequeo Diario', 20, yPos);
-      yPos += 8;
+      // === PASO 2: Recolectar y pre-cargar imágenes ===
+      const fotoUrls: string[] = [];
 
-      const actitudMap: Record<string, string> = {
-        positiva: 'Positiva',
-        neutral: 'Neutral',
-        irritable: 'Irritable',
-        triste: 'Triste',
-        ansiosa: 'Ansiosa',
-      };
-
-      const chequeoData = [
-        ['Estado General',
-          chequeo.estadoGeneral?.actitud?.map(a => actitudMap[a] || a).join(', ') || '--'
-        ],
-        ['Nivel Actividad', chequeo.estadoGeneral?.nivelActividad || '--'],
-        ['Cooperación', chequeo.estadoGeneral?.nivelCooperacion || '--'],
-        ['Sueño', chequeo.estadoGeneral?.estadoSueno || '--'],
-        ['Dolor',
-          chequeo.estadoGeneral?.dolor?.nivel && chequeo.estadoGeneral.dolor.nivel !== 'sin_dolor'
-            ? `Sí - ${chequeo.estadoGeneral.dolor.nivel}`
-            : 'No'
-        ],
-      ];
-
-      if (chequeo.estadoGeneral?.dolor?.ubicacion) {
-        chequeoData.push(['Ubicación dolor', chequeo.estadoGeneral.dolor.ubicacion]);
-      }
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Aspecto', 'Estado']],
-        body: chequeoData,
-        theme: 'grid',
-        headStyles: { fillColor: [92, 184, 92] },
-        margin: { left: 20, right: 20 },
+      // Fotos de platillos
+      datosDelDia.menus.forEach(menu => {
+        menu.platillos?.forEach(p => {
+          if (p.fotoCustom) {
+            fotoUrls.push(p.fotoCustom);
+          } else if (p.recetaId) {
+            const receta = recetasMap.get(p.recetaId);
+            if (receta?.foto) fotoUrls.push(receta.foto);
+          }
+        });
       });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
 
-      // Funciones corporales
-      if (chequeo.miccionesNumero !== undefined || chequeo.evacuacionesNumero !== undefined) {
-        checkPageBreak(40);
-        const funcionesData = [];
-        if (chequeo.miccionesNumero !== undefined) {
-          funcionesData.push(['Micciones', `${chequeo.miccionesNumero} - ${chequeo.miccionesCaracteristicas || 'Normal'}`]);
+      // Fotos de actividades
+      datosDelDia.actividades.forEach(act => {
+        if (act.fotos?.length) {
+          fotoUrls.push(...act.fotos.slice(0, 3)); // Max 3 fotos por actividad
         }
-        if (chequeo.evacuacionesNumero !== undefined) {
-          const bristolTexto = chequeo.evacuacionesBristol?.length
-            ? chequeo.evacuacionesBristol.map((b, i) =>
-                b ? `${chequeo.evacuacionesBristol!.length > 1 ? `#${i+1}: ` : ''}${getBristolNombre(b)}` : ''
-              ).filter(Boolean).join(', ')
-            : '';
-          funcionesData.push(['Evacuaciones', `${chequeo.evacuacionesNumero} - ${bristolTexto} ${chequeo.evacuacionesColor || ''}`.trim()]);
-        }
-        if (chequeo.dificultadEvacuar) {
-          funcionesData.push(['Dificultad', 'Sí']);
-        }
-
-        if (funcionesData.length > 0) {
-          autoTable(doc, {
-            startY: yPos,
-            head: [['Función Corporal', 'Detalle']],
-            body: funcionesData,
-            theme: 'grid',
-            headStyles: { fillColor: [241, 196, 15] },
-            margin: { left: 20, right: 20 },
-          });
-          yPos = (doc as any).lastAutoTable.finalY + 10;
-        }
-      }
-    }
-
-    // === SECCIÓN 3: MEDICAMENTOS ===
-    if (procesosMedicamentos.length > 0) {
-      checkPageBreak(50);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Medicamentos', 20, yPos);
-      yPos += 8;
-
-      const estadoLabel: Record<string, string> = {
-        completado: 'Tomado',
-        pendiente: 'Pendiente',
-        vencido: 'Vencido',
-      };
-
-      const medsData = procesosMedicamentos
-        .sort((a, b) => (a.horaProgramada || '').localeCompare(b.horaProgramada || ''))
-        .map(med => [
-          med.horaProgramada,
-          med.nombre,
-          estadoLabel[med.estado] || med.estado,
-          med.detalle || '',
-        ]);
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Hora', 'Medicamento', 'Estado', 'Dosis']],
-        body: medsData,
-        theme: 'grid',
-        headStyles: { fillColor: [217, 83, 79] },
-        margin: { left: 20, right: 20 },
-        columnStyles: {
-          0: { cellWidth: 20 },
-          2: { cellWidth: 25 },
-        },
       });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-    }
 
-    // === SECCIÓN 4: MENÚ DEL DÍA ===
-    if (datosDelDia.menus.length > 0) {
-      checkPageBreak(50);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Menú del Día', 20, yPos);
-      yPos += 8;
+      // Cargar imágenes en paralelo
+      const imageCache = new Map<string, string>();
+      await Promise.all(
+        fotoUrls.map(async (url) => {
+          const base64 = await imageUrlToBase64(url);
+          if (base64) imageCache.set(url, base64);
+        })
+      );
 
+      // === PASO 3: Generar PDF ===
+      const pdfDoc = new jsPDF();
+      let yPos = 15;
+      const hoy = new Date();
+      const pageWidth = 210; // A4 width in mm
+      const marginLeft = 15;
+      const marginRight = 15;
+      const contentWidth = pageWidth - marginLeft - marginRight;
+
+      // Tamaño de imágenes medianas
+      const IMG_WIDTH = 50;
+      const IMG_HEIGHT = 40;
+      const IMG_GAP = 8;
+
+      // Labels y emojis
       const tiempoLabel: Record<string, string> = {
         desayuno: 'Desayuno',
         colacion_am: 'Colación AM',
@@ -667,40 +586,14 @@ export default function Dashboard() {
         cena: 'Cena',
       };
 
-      const menusData = datosDelDia.menus
-        .sort((a, b) => {
-          const orden = ['desayuno', 'colacion_am', 'almuerzo', 'colacion_pm', 'cena'];
-          return orden.indexOf(a.tiempoComidaId) - orden.indexOf(b.tiempoComidaId);
-        })
-        .map(menu => {
-          const platillos = menu.platillos
-            ?.map(p => p.recetaNombre || p.nombreCustom)
-            .filter(Boolean)
-            .join(', ') || '--';
-          return [
-            tiempoLabel[menu.tiempoComidaId] || menu.tiempoComidaId,
-            platillos,
-          ];
-        });
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Tiempo', 'Platillos']],
-        body: menusData,
-        theme: 'grid',
-        headStyles: { fillColor: [240, 173, 78] },
-        margin: { left: 20, right: 20 },
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // === SECCIÓN 5: ACTIVIDADES ===
-    if (datosDelDia.actividades.length > 0) {
-      checkPageBreak(50);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Actividades', 20, yPos);
-      yPos += 8;
+      // Labels para tiempos de comida (sin emojis para compatibilidad PDF)
+      const tiempoLabelCorto: Record<string, string> = {
+        desayuno: 'Desayuno',
+        colacion_am: 'Colacion AM',
+        almuerzo: 'Almuerzo',
+        colacion_pm: 'Colacion PM',
+        cena: 'Cena',
+      };
 
       const estadoAct: Record<string, string> = {
         programada: 'Programada',
@@ -709,39 +602,392 @@ export default function Dashboard() {
         cancelada: 'Cancelada',
       };
 
-      const actsData = datosDelDia.actividades
-        .sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
-        .map(act => [
-          format(act.fechaInicio, 'HH:mm'),
-          act.nombre || '--',
-          act.tipo || '--',
-          estadoAct[act.estado] || act.estado,
+      // Helper para manejar paginación
+      const checkPageBreak = (neededSpace: number = 40) => {
+        if (yPos > 270 - neededSpace) {
+          pdfDoc.addPage();
+          yPos = 20;
+        }
+      };
+
+      // === HEADER PREMIUM ===
+      // Fondo degradado lavanda
+      pdfDoc.setFillColor(250, 245, 255);
+      pdfDoc.rect(0, 0, pageWidth, 45, 'F');
+      pdfDoc.setFillColor(245, 238, 252);
+      pdfDoc.rect(0, 35, pageWidth, 10, 'F');
+
+      // Título principal
+      pdfDoc.setFontSize(24);
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.setTextColor(107, 70, 193); // Lavanda oscuro
+      pdfDoc.text('Mamá Yola', pageWidth / 2, 18, { align: 'center' });
+
+      // Subtítulo
+      pdfDoc.setFontSize(14);
+      pdfDoc.setFont('helvetica', 'normal');
+      pdfDoc.setTextColor(120, 100, 160);
+      pdfDoc.text('Resumen del Día', pageWidth / 2, 28, { align: 'center' });
+
+      // Fecha
+      pdfDoc.setFontSize(11);
+      pdfDoc.setTextColor(100, 80, 140);
+      const fechaFormateada = format(hoy, "EEEE d 'de' MMMM, yyyy", { locale: es });
+      pdfDoc.text(fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1), pageWidth / 2, 40, { align: 'center' });
+
+      pdfDoc.setTextColor(0, 0, 0);
+      yPos = 55;
+
+      // === SECCIÓN 1: SIGNOS VITALES ===
+      if (datosDelDia.signosVitales.length > 0) {
+        checkPageBreak(50);
+
+        // Título con icono
+        pdfDoc.setFillColor(252, 235, 235);
+        pdfDoc.roundedRect(marginLeft, yPos - 5, contentWidth, 12, 3, 3, 'F');
+        pdfDoc.setFontSize(13);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setTextColor(180, 60, 60);
+        pdfDoc.text('SIGNOS VITALES', marginLeft + 5, yPos + 3);
+        pdfDoc.setTextColor(0, 0, 0);
+        yPos += 12;
+
+        const signosData = datosDelDia.signosVitales.map(sv => [
+          format(sv.fecha, 'HH:mm'),
+          sv.presionArterialSistolica && sv.presionArterialDiastolica
+            ? `${sv.presionArterialSistolica}/${sv.presionArterialDiastolica}`
+            : '--',
+          sv.frecuenciaCardiaca ? `${sv.frecuenciaCardiaca} bpm` : '--',
+          sv.spo2 ? `${sv.spo2}%` : '--',
+          sv.temperatura ? `${sv.temperatura}°C` : '--',
         ]);
 
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Hora', 'Actividad', 'Tipo', 'Estado']],
-        body: actsData,
-        theme: 'grid',
-        headStyles: { fillColor: [155, 89, 182] },
-        margin: { left: 20, right: 20 },
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-    }
+        autoTable(pdfDoc, {
+          startY: yPos,
+          head: [['Hora', 'Presión Arterial', 'FC', 'SpO2', 'Temp']],
+          body: signosData,
+          theme: 'grid',
+          headStyles: { fillColor: [220, 100, 100], textColor: 255, fontStyle: 'bold' },
+          styles: { fontSize: 10, cellPadding: 4 },
+          margin: { left: marginLeft, right: marginRight },
+        });
+        yPos = (pdfDoc as any).lastAutoTable.finalY + 15;
+      }
 
-    // === FOOTER ===
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Página ${i} de ${pageCount}`, 105, 285, { align: 'center' });
-      doc.text('Generado con Mamá Yola - Sistema de Gestión de Cuidado', 105, 290, { align: 'center' });
-    }
+      // === SECCIÓN 2: CHEQUEO DIARIO ===
+      if (datosDelDia.chequeos.length > 0) {
+        const chequeo = datosDelDia.chequeos[0];
+        checkPageBreak(60);
 
-    // Guardar
-    const fechaArchivo = format(hoy, 'dd-MM-yyyy');
-    doc.save(`resumen-dia-${fechaArchivo}.pdf`);
+        // Título con icono
+        pdfDoc.setFillColor(232, 245, 233);
+        pdfDoc.roundedRect(marginLeft, yPos - 5, contentWidth, 12, 3, 3, 'F');
+        pdfDoc.setFontSize(13);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setTextColor(60, 130, 70);
+        pdfDoc.text('CHEQUEO DIARIO', marginLeft + 5, yPos + 3);
+        pdfDoc.setTextColor(0, 0, 0);
+        yPos += 12;
+
+        const actitudMap: Record<string, string> = {
+          positiva: 'Positiva',
+          neutral: 'Neutral',
+          irritable: 'Irritable',
+          triste: 'Triste',
+          ansiosa: 'Ansiosa',
+        };
+
+        const chequeoData = [
+          ['Estado General', chequeo.estadoGeneral?.actitud?.map(a => actitudMap[a] || a).join(', ') || '--'],
+          ['Nivel Actividad', chequeo.estadoGeneral?.nivelActividad || '--'],
+          ['Cooperación', chequeo.estadoGeneral?.nivelCooperacion || '--'],
+          ['Sueño', chequeo.estadoGeneral?.estadoSueno || '--'],
+          ['Dolor', chequeo.estadoGeneral?.dolor?.nivel && chequeo.estadoGeneral.dolor.nivel !== 'sin_dolor'
+            ? `Sí - ${chequeo.estadoGeneral.dolor.nivel}` : 'No'],
+        ];
+
+        if (chequeo.estadoGeneral?.dolor?.ubicacion) {
+          chequeoData.push(['Ubicación dolor', chequeo.estadoGeneral.dolor.ubicacion]);
+        }
+
+        autoTable(pdfDoc, {
+          startY: yPos,
+          head: [['Aspecto', 'Estado']],
+          body: chequeoData,
+          theme: 'grid',
+          headStyles: { fillColor: [92, 184, 92], textColor: 255, fontStyle: 'bold' },
+          styles: { fontSize: 10, cellPadding: 4 },
+          margin: { left: marginLeft, right: marginRight },
+        });
+        yPos = (pdfDoc as any).lastAutoTable.finalY + 10;
+
+        // Funciones corporales
+        if (chequeo.miccionesNumero !== undefined || chequeo.evacuacionesNumero !== undefined) {
+          checkPageBreak(40);
+          const funcionesData = [];
+          if (chequeo.miccionesNumero !== undefined) {
+            funcionesData.push(['Micciones', `${chequeo.miccionesNumero} - ${chequeo.miccionesCaracteristicas || 'Normal'}`]);
+          }
+          if (chequeo.evacuacionesNumero !== undefined) {
+            const bristolTexto = chequeo.evacuacionesBristol?.length
+              ? chequeo.evacuacionesBristol.map((b, i) =>
+                  b ? `${chequeo.evacuacionesBristol!.length > 1 ? `#${i+1}: ` : ''}${getBristolNombre(b)}` : ''
+                ).filter(Boolean).join(', ')
+              : '';
+            funcionesData.push(['Evacuaciones', `${chequeo.evacuacionesNumero} - ${bristolTexto} ${chequeo.evacuacionesColor || ''}`.trim()]);
+          }
+          if (chequeo.dificultadEvacuar) {
+            funcionesData.push(['Dificultad', 'Sí']);
+          }
+
+          if (funcionesData.length > 0) {
+            autoTable(pdfDoc, {
+              startY: yPos,
+              head: [['Función Corporal', 'Detalle']],
+              body: funcionesData,
+              theme: 'grid',
+              headStyles: { fillColor: [241, 196, 15], textColor: 50, fontStyle: 'bold' },
+              styles: { fontSize: 10, cellPadding: 4 },
+              margin: { left: marginLeft, right: marginRight },
+            });
+            yPos = (pdfDoc as any).lastAutoTable.finalY + 15;
+          }
+        }
+      }
+
+      // === SECCIÓN 3: MEDICAMENTOS ===
+      if (procesosMedicamentos.length > 0) {
+        checkPageBreak(50);
+
+        // Título con icono
+        pdfDoc.setFillColor(255, 235, 238);
+        pdfDoc.roundedRect(marginLeft, yPos - 5, contentWidth, 12, 3, 3, 'F');
+        pdfDoc.setFontSize(13);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setTextColor(180, 50, 50);
+        pdfDoc.text('MEDICAMENTOS', marginLeft + 5, yPos + 3);
+        pdfDoc.setTextColor(0, 0, 0);
+        yPos += 12;
+
+        const estadoLabel: Record<string, string> = {
+          completado: 'Tomado',
+          pendiente: 'Pendiente',
+          vencido: 'Vencido',
+        };
+
+        const medsData = procesosMedicamentos
+          .sort((a, b) => (a.horaProgramada || '').localeCompare(b.horaProgramada || ''))
+          .map(med => [
+            med.horaProgramada,
+            med.nombre,
+            estadoLabel[med.estado] || med.estado,
+            med.detalle || '',
+          ]);
+
+        autoTable(pdfDoc, {
+          startY: yPos,
+          head: [['Hora', 'Medicamento', 'Estado', 'Dosis']],
+          body: medsData,
+          theme: 'grid',
+          headStyles: { fillColor: [217, 83, 79], textColor: 255, fontStyle: 'bold' },
+          styles: { fontSize: 10, cellPadding: 4 },
+          margin: { left: marginLeft, right: marginRight },
+          columnStyles: {
+            0: { cellWidth: 20 },
+            2: { cellWidth: 30 },
+          },
+        });
+        yPos = (pdfDoc as any).lastAutoTable.finalY + 15;
+      }
+
+      // === SECCIÓN 4: MENÚ DEL DÍA CON IMÁGENES ===
+      if (datosDelDia.menus.length > 0) {
+        checkPageBreak(70);
+
+        // Título con icono
+        pdfDoc.setFillColor(255, 248, 225);
+        pdfDoc.roundedRect(marginLeft, yPos - 5, contentWidth, 12, 3, 3, 'F');
+        pdfDoc.setFontSize(13);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setTextColor(180, 120, 40);
+        pdfDoc.text('MENU DEL DIA', marginLeft + 5, yPos + 3);
+        pdfDoc.setTextColor(0, 0, 0);
+        yPos += 15;
+
+        const menusOrdenados = datosDelDia.menus.sort((a, b) => {
+          const orden = ['desayuno', 'colacion_am', 'almuerzo', 'colacion_pm', 'cena'];
+          return orden.indexOf(a.tiempoComidaId) - orden.indexOf(b.tiempoComidaId);
+        });
+
+        for (const menu of menusOrdenados) {
+          if (!menu.platillos?.length) continue;
+
+          checkPageBreak(IMG_HEIGHT + 35);
+
+          // Subtítulo del tiempo de comida
+          pdfDoc.setFillColor(252, 250, 245);
+          pdfDoc.roundedRect(marginLeft, yPos, contentWidth, 10, 2, 2, 'F');
+          pdfDoc.setFontSize(11);
+          pdfDoc.setFont('helvetica', 'bold');
+          pdfDoc.setTextColor(140, 100, 30);
+          pdfDoc.text(tiempoLabelCorto[menu.tiempoComidaId] || menu.tiempoComidaId, marginLeft + 5, yPos + 7);
+          pdfDoc.setTextColor(0, 0, 0);
+          yPos += 15;
+
+          // Grid de platillos con imágenes
+          let xPos = marginLeft;
+          for (const platillo of menu.platillos) {
+            // Verificar si necesitamos nueva fila
+            if (xPos + IMG_WIDTH > pageWidth - marginRight) {
+              xPos = marginLeft;
+              yPos += IMG_HEIGHT + 18;
+              checkPageBreak(IMG_HEIGHT + 18);
+            }
+
+            // Obtener URL de foto
+            let fotoUrl = platillo.fotoCustom;
+            if (!fotoUrl && platillo.recetaId) {
+              const receta = recetasMap.get(platillo.recetaId);
+              if (receta?.foto) fotoUrl = receta.foto;
+            }
+
+            // Borde redondeado alrededor de la imagen
+            pdfDoc.setDrawColor(220, 210, 200);
+            pdfDoc.setLineWidth(0.5);
+            pdfDoc.roundedRect(xPos - 1, yPos - 1, IMG_WIDTH + 2, IMG_HEIGHT + 2, 3, 3, 'S');
+
+            if (fotoUrl && imageCache.has(fotoUrl)) {
+              try {
+                pdfDoc.addImage(imageCache.get(fotoUrl)!, 'JPEG', xPos, yPos, IMG_WIDTH, IMG_HEIGHT);
+              } catch {
+                // Si falla, mostrar placeholder
+                pdfDoc.setFillColor(248, 245, 252);
+                pdfDoc.roundedRect(xPos, yPos, IMG_WIDTH, IMG_HEIGHT, 2, 2, 'F');
+                pdfDoc.setFontSize(10);
+                pdfDoc.setTextColor(180, 170, 200);
+                pdfDoc.text('Sin foto', xPos + IMG_WIDTH / 2, yPos + IMG_HEIGHT / 2, { align: 'center' });
+                pdfDoc.setTextColor(0, 0, 0);
+              }
+            } else {
+              // Placeholder elegante (sin imagen)
+              pdfDoc.setFillColor(248, 245, 252);
+              pdfDoc.roundedRect(xPos, yPos, IMG_WIDTH, IMG_HEIGHT, 2, 2, 'F');
+              pdfDoc.setFontSize(10);
+              pdfDoc.setTextColor(180, 170, 200);
+              pdfDoc.text('Sin foto', xPos + IMG_WIDTH / 2, yPos + IMG_HEIGHT / 2, { align: 'center' });
+              pdfDoc.setTextColor(0, 0, 0);
+            }
+
+            // Nombre del platillo debajo
+            pdfDoc.setFontSize(8);
+            pdfDoc.setFont('helvetica', 'normal');
+            const nombre = platillo.recetaNombre || platillo.nombreCustom || 'Sin nombre';
+            const nombreTruncado = nombre.length > 20 ? nombre.slice(0, 18) + '...' : nombre;
+            pdfDoc.text(nombreTruncado, xPos + IMG_WIDTH / 2, yPos + IMG_HEIGHT + 6, { align: 'center' });
+
+            xPos += IMG_WIDTH + IMG_GAP;
+          }
+
+          yPos += IMG_HEIGHT + 20;
+        }
+        yPos += 5;
+      }
+
+      // === SECCIÓN 5: ACTIVIDADES CON FOTOS ===
+      if (datosDelDia.actividades.length > 0) {
+        checkPageBreak(60);
+
+        // Título con icono
+        pdfDoc.setFillColor(243, 232, 255);
+        pdfDoc.roundedRect(marginLeft, yPos - 5, contentWidth, 12, 3, 3, 'F');
+        pdfDoc.setFontSize(13);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setTextColor(120, 70, 160);
+        pdfDoc.text('ACTIVIDADES DEL DIA', marginLeft + 5, yPos + 3);
+        pdfDoc.setTextColor(0, 0, 0);
+        yPos += 15;
+
+        const actividadesOrdenadas = datosDelDia.actividades
+          .sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime());
+
+        for (const actividad of actividadesOrdenadas) {
+          const tieneFootos = actividad.fotos && actividad.fotos.length > 0;
+          const alturaCard = tieneFootos ? IMG_HEIGHT + 35 : 25;
+
+          checkPageBreak(alturaCard);
+
+          // Card de actividad
+          pdfDoc.setFillColor(252, 250, 255);
+          pdfDoc.setDrawColor(230, 220, 240);
+          pdfDoc.roundedRect(marginLeft, yPos, contentWidth, tieneFootos ? IMG_HEIGHT + 30 : 20, 3, 3, 'FD');
+
+          // Nombre de actividad
+          pdfDoc.setFontSize(11);
+          pdfDoc.setFont('helvetica', 'bold');
+          pdfDoc.setTextColor(80, 60, 100);
+          pdfDoc.text(actividad.nombre || 'Sin nombre', marginLeft + 5, yPos + 8);
+
+          // Info secundaria
+          pdfDoc.setFontSize(9);
+          pdfDoc.setFont('helvetica', 'normal');
+          pdfDoc.setTextColor(120, 100, 140);
+          const horaStr = format(actividad.fechaInicio, 'HH:mm');
+          const infoText = `${horaStr} • ${actividad.tipo || ''} • ${estadoAct[actividad.estado] || actividad.estado}`;
+          pdfDoc.text(infoText, marginLeft + 5, yPos + 15);
+          pdfDoc.setTextColor(0, 0, 0);
+
+          // Fotos de la actividad (si existen)
+          if (tieneFootos) {
+            let fotoX = marginLeft + 5;
+            const fotoY = yPos + 22;
+            const fotosAMostrar = actividad.fotos!.slice(0, 3);
+
+            for (const fotoUrl of fotosAMostrar) {
+              if (imageCache.has(fotoUrl)) {
+                try {
+                  pdfDoc.addImage(imageCache.get(fotoUrl)!, 'JPEG', fotoX, fotoY, IMG_WIDTH, IMG_HEIGHT);
+                } catch {
+                  // Ignorar errores de imagen
+                }
+              }
+              fotoX += IMG_WIDTH + IMG_GAP;
+            }
+            yPos += IMG_HEIGHT + 35;
+          } else {
+            yPos += 25;
+          }
+        }
+        yPos += 5;
+      }
+
+      // === FOOTER PREMIUM ===
+      const pageCount = (pdfDoc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdfDoc.setPage(i);
+
+        // Línea decorativa
+        pdfDoc.setDrawColor(200, 180, 220);
+        pdfDoc.setLineWidth(0.5);
+        pdfDoc.line(marginLeft, 280, pageWidth - marginRight, 280);
+
+        // Texto del footer
+        pdfDoc.setFontSize(8);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.setTextColor(140, 120, 160);
+        pdfDoc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, 286, { align: 'center' });
+        pdfDoc.text('Generado con Mamá Yola - Sistema de Gestión de Cuidado', pageWidth / 2, 291, { align: 'center' });
+      }
+
+      // Guardar
+      const fechaArchivo = format(hoy, 'dd-MM-yyyy');
+      pdfDoc.save(`resumen-dia-${fechaArchivo}.pdf`);
+
+    } catch (error) {
+      console.error('Error al generar PDF:', error);
+      alert('Hubo un error al generar el PDF. Por favor intenta de nuevo.');
+    } finally {
+      setExportandoPDF(false);
+    }
   }
 
   if (loading) {
@@ -772,13 +1018,25 @@ export default function Dashboard() {
           </div>
           <button
             onClick={exportarResumenDia}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
+            disabled={exportandoPDF}
+            className={`flex items-center gap-2 px-4 py-2.5 text-white font-medium rounded-xl shadow-md transition-all ${
+              exportandoPDF
+                ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-wait'
+                : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 hover:shadow-lg active:scale-[0.98]'
+            }`}
             title="Exportar resumen del día en PDF"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span className="hidden sm:inline">Resumen PDF</span>
+            {exportandoPDF ? (
+              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            <span className="hidden sm:inline">{exportandoPDF ? 'Generando...' : 'Resumen PDF'}</span>
           </button>
         </div>
       </div>
