@@ -553,15 +553,21 @@ export default function Dashboard() {
       };
 
       const chequeoData = [
-        ['Estado General', actitudMap[chequeo.actitud || ''] || chequeo.actitud || '--'],
-        ['Nivel Actividad', chequeo.nivelActividad || '--'],
-        ['Cooperación', chequeo.nivelCooperacion || '--'],
-        ['Sueño', chequeo.suenoCalidad || '--'],
-        ['Dolor', chequeo.dolorPresente ? `Sí - Nivel ${chequeo.dolorNivel || 0}/10` : 'No'],
+        ['Estado General',
+          chequeo.estadoGeneral?.actitud?.map(a => actitudMap[a] || a).join(', ') || '--'
+        ],
+        ['Nivel Actividad', chequeo.estadoGeneral?.nivelActividad || '--'],
+        ['Cooperación', chequeo.estadoGeneral?.nivelCooperacion || '--'],
+        ['Sueño', chequeo.estadoGeneral?.estadoSueno || '--'],
+        ['Dolor',
+          chequeo.estadoGeneral?.dolor?.nivel && chequeo.estadoGeneral.dolor.nivel !== 'sin_dolor'
+            ? `Sí - ${chequeo.estadoGeneral.dolor.nivel}`
+            : 'No'
+        ],
       ];
 
-      if (chequeo.dolorPresente && chequeo.dolorUbicacion) {
-        chequeoData.push(['Ubicación dolor', chequeo.dolorUbicacion]);
+      if (chequeo.estadoGeneral?.dolor?.ubicacion) {
+        chequeoData.push(['Ubicación dolor', chequeo.estadoGeneral.dolor.ubicacion]);
       }
 
       autoTable(doc, {
