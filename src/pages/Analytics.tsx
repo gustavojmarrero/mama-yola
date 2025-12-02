@@ -332,7 +332,7 @@ export default function Analytics() {
         {/* Gráficas */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Presión Arterial */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white rounded-lg shadow p-4" style={{ minWidth: 300 }}>
             <h3 className="font-semibold text-gray-900 mb-4">📈 Presión Arterial</h3>
             {signosData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
@@ -354,7 +354,7 @@ export default function Analytics() {
           </div>
 
           {/* SpO2 y FC */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white rounded-lg shadow p-4" style={{ minWidth: 300 }}>
             <h3 className="font-semibold text-gray-900 mb-4">📈 SpO2 y Frecuencia Cardíaca</h3>
             {signosData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
@@ -377,7 +377,7 @@ export default function Analytics() {
           </div>
 
           {/* Temperatura */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white rounded-lg shadow p-4" style={{ minWidth: 300 }}>
             <h3 className="font-semibold text-gray-900 mb-4">🌡️ Temperatura</h3>
             {signosData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
@@ -401,7 +401,7 @@ export default function Analytics() {
           </div>
 
           {/* Adherencia a medicamentos */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white rounded-lg shadow p-4" style={{ minWidth: 300 }}>
             <h3 className="font-semibold text-gray-900 mb-4">💊 Distribución de Medicamentos</h3>
             {datosPieMedicamentos().length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
@@ -431,7 +431,7 @@ export default function Analytics() {
           </div>
 
           {/* Evacuaciones */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white rounded-lg shadow p-4" style={{ minWidth: 300 }}>
             <h3 className="font-semibold text-gray-900 mb-4">🚽 Evacuaciones Diarias</h3>
             {datosEvacuaciones().length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
@@ -451,7 +451,7 @@ export default function Analytics() {
           </div>
 
           {/* Consumo de agua */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white rounded-lg shadow p-4" style={{ minWidth: 300 }}>
             <h3 className="font-semibold text-gray-900 mb-4">💧 Consumo de Agua</h3>
             {datosAgua().length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
