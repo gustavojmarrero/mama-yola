@@ -493,7 +493,10 @@ export default function MenuComida() {
 
     try {
       setUploadingEditFoto(true);
-      const storageRef = ref(storage, `platillos-custom/${Date.now()}_${file.name}`);
+      // Usar nombre seguro sin caracteres especiales (fix para Android Chrome)
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const safeFileName = `${Date.now()}.${extension}`;
+      const storageRef = ref(storage, `platillos-custom/${safeFileName}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       setEditFotoCustom(url);
@@ -1111,7 +1114,10 @@ export default function MenuComida() {
 
     try {
       setUploadingFoto(true);
-      const storageRef = ref(storage, `recetas/${Date.now()}_${file.name}`);
+      // Usar nombre seguro sin caracteres especiales (fix para Android Chrome)
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const safeFileName = `${Date.now()}.${extension}`;
+      const storageRef = ref(storage, `recetas/${safeFileName}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       setFormReceta({ ...formReceta, foto: url });
@@ -1130,7 +1136,10 @@ export default function MenuComida() {
 
     try {
       setUploadingFotoCustom(true);
-      const storageRef = ref(storage, `platillos-custom/${Date.now()}_${file.name}`);
+      // Usar nombre seguro sin caracteres especiales (fix para Android Chrome)
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const safeFileName = `${Date.now()}.${extension}`;
+      const storageRef = ref(storage, `platillos-custom/${safeFileName}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       setFotoCustom(url);
