@@ -307,7 +307,7 @@ export default function EditarProgramacionModal({
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                 </svg>
-                Slot Abierto
+                Actividad Opcional
               </button>
             </div>
           </div>
@@ -350,17 +350,6 @@ export default function EditarProgramacionModal({
               <p className="text-sm text-blue-700">
                 Los cambios solo afectan las <strong>instancias futuras</strong>. Las actividades ya completadas o pendientes de días anteriores no se modificarán.
               </p>
-            </div>
-
-            {/* Tipo de actividad */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de Actividad
-              </label>
-              <SelectorTipoActividad
-                value={form.tipo}
-                onChange={(tipo) => handleChange('tipo', tipo)}
-              />
             </div>
 
             {esDefinida ? (
@@ -440,7 +429,18 @@ export default function EditarProgramacionModal({
               </>
             ) : (
               <>
-                {/* Slot abierto - Duración estimada */}
+                {/* Selector de Tipo de Actividad - solo para actividades opcionales */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Actividad
+                  </label>
+                  <SelectorTipoActividad
+                    value={form.tipo}
+                    onChange={(tipo) => handleChange('tipo', tipo)}
+                  />
+                </div>
+
+                {/* Actividad opcional - Duración estimada */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Duración Estimada (min)

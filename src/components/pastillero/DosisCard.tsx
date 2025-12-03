@@ -4,6 +4,7 @@ interface DosisCardProps {
   dosis: DosisDelDia;
   viewMode: 'grid' | 'list';
   onRegistrar: (dosis: DosisDelDia) => void;
+  compact?: boolean; // Modo compacto para usar dentro de grupos
 }
 
 function getEstadoColor(estado?: EstadoMedicamento) {
@@ -34,9 +35,54 @@ function getEstadoLabel(estado?: EstadoMedicamento) {
   }
 }
 
-export default function DosisCard({ dosis, viewMode, onRegistrar }: DosisCardProps) {
+export default function DosisCard({ dosis, viewMode, onRegistrar, compact = false }: DosisCardProps) {
   const estado = dosis.registro?.estado || 'pendiente';
   const esPendiente = !dosis.registro;
+
+  // Modo compacto para usar dentro de grupos de horario
+  if (compact) {
+    return (
+      <div className="px-4 py-3 hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-3">
+          {/* Foto pequeña o icono */}
+          {dosis.medicamento.foto ? (
+            <img
+              src={dosis.medicamento.foto}
+              alt={dosis.medicamento.nombre}
+              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+            </div>
+          )}
+
+          {/* Info del medicamento */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className="font-medium text-gray-900 truncate">{dosis.medicamento.nombre}</h4>
+              <span className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium ${getEstadoColor(estado)}`}>
+                {getEstadoLabel(estado)}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500">{dosis.medicamento.dosis}</p>
+          </div>
+
+          {/* Botón registrar individual */}
+          {esPendiente && (
+            <button
+              onClick={() => onRegistrar(dosis)}
+              className="flex-shrink-0 px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium"
+            >
+              Registrar
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (viewMode === 'grid') {
     return (

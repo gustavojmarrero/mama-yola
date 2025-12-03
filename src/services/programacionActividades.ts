@@ -245,7 +245,7 @@ export function getNombreProgramacion(
   }
   if (programacion.modalidad === 'slot_abierto' && programacion.slotAbierto) {
     const tipo = programacion.slotAbierto.tipo === 'fisica' ? 'Física' : 'Cognitiva';
-    return `Slot Abierto (${tipo})`;
+    return `Actividad Opcional (${tipo})`;
   }
   return 'Actividad';
 }

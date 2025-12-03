@@ -29,6 +29,16 @@ import { useTransito } from '../hooks/useTransito';
 const PACIENTE_ID = 'paciente-principal';
 const ITEMS_PER_PAGE = 10;
 
+// Interfaz para agrupar dosis por horario
+interface GrupoHorario {
+  horario: string;
+  dosis: DosisDelDia[];
+  todasPendientes: boolean;
+  todasRegistradas: boolean;
+  algunaRetrasada: boolean;
+  pendientesCount: number;
+}
+
 const SORT_OPTIONS_HOY = [
   { value: 'horario_asc', label: 'Horario (temprano primero)' },
   { value: 'horario_desc', label: 'Horario (tarde primero)' },
@@ -133,6 +143,10 @@ export default function PastilleroDiario() {
   const [filtroEstadoHoy, setFiltroEstadoHoy] = useState<string>('todos');
   const [visibleCountHoy, setVisibleCountHoy] = useState(ITEMS_PER_PAGE);
   const [visibleCountHistorial, setVisibleCountHistorial] = useState(ITEMS_PER_PAGE);
+
+  // Estados para registro masivo por horario
+  const [grupoSeleccionado, setGrupoSeleccionado] = useState<GrupoHorario | null>(null);
+  const [modalGrupoAbierto, setModalGrupoAbierto] = useState(false);
 
   useEffect(() => {
     cargarDosisDelDia();
@@ -286,6 +300,75 @@ export default function PastilleroDiario() {
     setModalAbierto(true);
   }
 
+  // Abrir modal para registro masivo de un grupo
+  function abrirModalGrupo(grupo: GrupoHorario) {
+    setGrupoSeleccionado(grupo);
+    setEstadoSeleccionado('tomado');
+    setNotas('');
+    setModalGrupoAbierto(true);
+  }
+
+  // Registrar todas las dosis pendientes de un grupo
+  async function registrarGrupoHorario() {
+    if (!grupoSeleccionado || !usuario) return;
+
+    const dosisPendientes = grupoSeleccionado.dosis.filter(d => !d.registro);
+    if (dosisPendientes.length === 0) return;
+
+    try {
+      setLoading(true);
+      const ahora = new Date();
+
+      for (const dosis of dosisPendientes) {
+        const [hora, minuto] = dosis.horario.split(':').map(Number);
+        const fechaHoraProgramada = new Date();
+        fechaHoraProgramada.setHours(hora, minuto, 0, 0);
+
+        const registroData: Record<string, unknown> = {
+          pacienteId: PACIENTE_ID,
+          medicamentoId: dosis.medicamento.id,
+          medicamentoNombre: dosis.medicamento.nombre,
+          fechaHoraProgramada,
+          estado: estadoSeleccionado,
+          administradoPor: usuario.uid,
+          horario: dosis.horario,
+          creadoEn: ahora,
+        };
+
+        if (estadoSeleccionado === 'tomado') {
+          registroData.fechaHoraReal = ahora;
+          registroData.retrasoMinutos = Math.floor(
+            (ahora.getTime() - fechaHoraProgramada.getTime()) / 60000
+          );
+        }
+        if (notas) {
+          registroData.notas = notas;
+        }
+
+        await addDoc(
+          collection(db, 'pacientes', PACIENTE_ID, 'registroMedicamentos'),
+          registroData
+        );
+
+        // Descontar del inventario si fue tomado
+        if (estadoSeleccionado === 'tomado') {
+          await descontarInventarioMedicamento(dosis.medicamento.id, dosis.medicamento.nombre);
+        }
+      }
+
+      alert(`${dosisPendientes.length} medicamentos registrados exitosamente`);
+      setModalGrupoAbierto(false);
+      setGrupoSeleccionado(null);
+      setNotas('');
+      cargarDosisDelDia();
+    } catch (error) {
+      console.error('Error registrando grupo:', error);
+      alert('Error al registrar medicamentos');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function registrarAdministracion() {
     if (!dosisSeleccionada || !usuario) return;
 
@@ -424,6 +507,32 @@ export default function PastilleroDiario() {
     return resultado;
   }, [dosisDelDia, searchTerm, filtroEstadoHoy, sortByHoy]);
 
+  // Agrupar dosis por horario
+  const dosisAgrupadasPorHorario = useMemo((): GrupoHorario[] => {
+    const grupos = new Map<string, DosisDelDia[]>();
+
+    for (const dosis of dosisFiltradas) {
+      const existing = grupos.get(dosis.horario) || [];
+      existing.push(dosis);
+      grupos.set(dosis.horario, existing);
+    }
+
+    // Convertir a array ordenado por horario
+    return Array.from(grupos.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([horario, dosis]) => {
+        const pendientesCount = dosis.filter(d => !d.registro).length;
+        return {
+          horario,
+          dosis,
+          todasPendientes: dosis.every(d => !d.registro),
+          todasRegistradas: dosis.every(d => d.registro),
+          algunaRetrasada: dosis.some(d => d.retrasoMinutos && d.retrasoMinutos > 0),
+          pendientesCount,
+        };
+      });
+  }, [dosisFiltradas]);
+
   // Lógica de filtrado y ordenamiento para Historial
   const historialFiltrado = useMemo(() => {
     let resultado = [...historialRegistros];
@@ -546,7 +655,7 @@ export default function PastilleroDiario() {
           </div>
         </div>
 
-        {/* Lista de dosis */}
+        {/* Lista de dosis agrupadas por horario */}
         {dosisDelDia.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
             <svg
@@ -564,36 +673,77 @@ export default function PastilleroDiario() {
             </svg>
             <p className="text-gray-500 text-lg">No hay medicamentos programados para hoy</p>
           </div>
-        ) : dosisFiltradas.length === 0 ? (
+        ) : dosisAgrupadasPorHorario.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center shadow-sm">
             <p className="text-gray-500">No se encontraron dosis que coincidan con los filtros</p>
           </div>
         ) : (
-          <>
-            <div
-              className={
-                vista === 'grid'
-                  ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
-                  : 'space-y-4'
-              }
-            >
-              {dosisVisibles.map((dosis, index) => (
-                <DosisCard
-                  key={`${dosis.medicamento.id}-${dosis.horario}-${index}`}
-                  dosis={dosis}
-                  viewMode={vista}
-                  onRegistrar={abrirModal}
-                />
-              ))}
-            </div>
-            <LoadMoreButton
-              onClick={handleLoadMoreHoy}
-              hasMore={hasMoreHoy}
-              loadedCount={dosisVisibles.length}
-              totalCount={dosisFiltradas.length}
-              itemsPerLoad={ITEMS_PER_PAGE}
-            />
-          </>
+          <div className="space-y-4">
+            {dosisAgrupadasPorHorario.map((grupo) => (
+              <div
+                key={grupo.horario}
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
+              >
+                {/* Header del grupo con horario */}
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="text-lg font-semibold text-gray-900">{grupo.horario}</span>
+                      <span className="text-sm text-gray-500 ml-2">
+                        ({grupo.dosis.length} medicamento{grupo.dosis.length > 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    {grupo.algunaRetrasada && !grupo.todasRegistradas && (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                        Retrasado
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Botón registro masivo - solo si hay pendientes */}
+                  <div className="flex items-center gap-2">
+                    {grupo.pendientesCount > 0 && grupo.dosis.length > 1 && (
+                      <button
+                        onClick={() => abrirModalGrupo(grupo)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Registrar todas
+                      </button>
+                    )}
+                    {grupo.todasRegistradas && (
+                      <span className="px-3 py-1.5 bg-green-100 text-green-700 text-sm font-medium rounded-full flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Completado
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista de medicamentos del grupo */}
+                <div className="divide-y divide-gray-100">
+                  {grupo.dosis.map((dosis, idx) => (
+                    <DosisCard
+                      key={`${dosis.medicamento.id}-${grupo.horario}-${idx}`}
+                      dosis={dosis}
+                      viewMode="list"
+                      onRegistrar={abrirModal}
+                      compact
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     );
@@ -829,6 +979,136 @@ export default function PastilleroDiario() {
                   }}
                   disabled={loading}
                   className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors disabled:bg-gray-300"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Registro Masivo por Horario */}
+        {modalGrupoAbierto && grupoSeleccionado && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Registrar medicamentos
+              </h2>
+              <p className="text-gray-600 mb-4">
+                Horario: <span className="font-semibold">{grupoSeleccionado.horario}</span>
+              </p>
+
+              {/* Lista de medicamentos pendientes */}
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Medicamentos a registrar ({grupoSeleccionado.pendientesCount}):
+                </p>
+                <div className="bg-gray-50 rounded-lg divide-y divide-gray-200 border border-gray-200">
+                  {grupoSeleccionado.dosis
+                    .filter(d => !d.registro)
+                    .map((dosis, idx) => (
+                      <div key={idx} className="px-4 py-3 flex items-center gap-3">
+                        {dosis.medicamento.foto ? (
+                          <img
+                            src={dosis.medicamento.foto}
+                            alt={dosis.medicamento.nombre}
+                            className="w-10 h-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                            </svg>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900">{dosis.medicamento.nombre}</p>
+                          <p className="text-sm text-gray-500">{dosis.medicamento.dosis}</p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Selector de estado */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estado para todos *
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => setEstadoSeleccionado('tomado')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      estadoSeleccionado === 'tomado'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Tomado
+                  </button>
+                  <button
+                    onClick={() => setEstadoSeleccionado('rechazado')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      estadoSeleccionado === 'rechazado'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Rechazado
+                  </button>
+                  <button
+                    onClick={() => setEstadoSeleccionado('omitido')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      estadoSeleccionado === 'omitido'
+                        ? 'bg-yellow-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Omitido
+                  </button>
+                </div>
+              </div>
+
+              {/* Notas */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notas (opcional, se aplica a todos)
+                </label>
+                <textarea
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Observaciones..."
+                />
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button
+                  onClick={registrarGrupoHorario}
+                  disabled={loading}
+                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    'Guardando...'
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Registrar {grupoSeleccionado.pendientesCount} medicamentos
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setModalGrupoAbierto(false);
+                    setGrupoSeleccionado(null);
+                    setNotas('');
+                  }}
+                  disabled={loading}
+                  className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors disabled:bg-gray-300"
                 >
                   Cancelar
                 </button>

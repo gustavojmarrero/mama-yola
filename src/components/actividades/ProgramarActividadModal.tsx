@@ -267,21 +267,10 @@ export default function ProgramarActividadModal({
                   `}
                 >
                   <div className="text-2xl mb-1">🎯</div>
-                  <div className="font-medium text-gray-800">Slot Abierto</div>
+                  <div className="font-medium text-gray-800">Actividad Opcional</div>
                   <div className="text-xs text-gray-500">Cuidador elige</div>
                 </button>
               </div>
-            </div>
-
-            {/* Selector de Tipo de Actividad */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de Actividad
-              </label>
-              <SelectorTipoActividad
-                value={form.tipo}
-                onChange={(tipo) => handleChange('tipo', tipo)}
-              />
             </div>
 
             {/* Campos para Actividad Definida */}
@@ -400,9 +389,20 @@ export default function ProgramarActividadModal({
               </>
             )}
 
-            {/* Campos para Slot Abierto */}
+            {/* Campos para Actividad Opcional (Slot Abierto) */}
             {form.modalidad === 'slot_abierto' && (
               <>
+                {/* Selector de Tipo de Actividad - solo para actividades opcionales */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Actividad
+                  </label>
+                  <SelectorTipoActividad
+                    value={form.tipo}
+                    onChange={(tipo) => handleChange('tipo', tipo)}
+                  />
+                </div>
+
                 <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
                   <div className="flex items-start gap-3">
                     <span className="text-2xl">{tipoConfig.icon}</span>
