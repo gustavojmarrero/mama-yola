@@ -4,6 +4,7 @@ import {
   TipoActividadV2,
   TIPOS_ACTIVIDAD_CONFIG,
   DIAS_SEMANA,
+  ModalidadProgramacion,
 } from '../../types/actividades';
 import type { TurnoActividad, NivelEnergia } from '../../types';
 import {
@@ -30,6 +31,7 @@ interface EditarProgramacionModalProps {
 }
 
 interface FormState {
+  modalidad: ModalidadProgramacion;
   tipo: TipoActividadV2;
   nombre: string;
   descripcion: string;
@@ -51,6 +53,7 @@ export default function EditarProgramacionModal({
   configHorarios,
 }: EditarProgramacionModalProps) {
   const [form, setForm] = useState<FormState>({
+    modalidad: 'definida',
     tipo: 'fisica',
     nombre: '',
     descripcion: '',
@@ -72,6 +75,7 @@ export default function EditarProgramacionModal({
     if (programacion && isOpen) {
       if (programacion.modalidad === 'definida' && programacion.actividadDefinida) {
         setForm({
+          modalidad: 'definida',
           tipo: programacion.actividadDefinida.tipo,
           nombre: programacion.actividadDefinida.nombre,
           descripcion: programacion.actividadDefinida.descripcion || '',
@@ -80,17 +84,18 @@ export default function EditarProgramacionModal({
           nivelEnergia: programacion.actividadDefinida.nivelEnergia,
           horaPreferida: programacion.horaPreferida,
           diasSemana: programacion.diasSemana,
-          duracionEstimada: 30,
-          instrucciones: '',
+          duracionEstimada: programacion.slotAbierto?.duracionEstimada || 30,
+          instrucciones: programacion.slotAbierto?.instrucciones || '',
         });
       } else if (programacion.modalidad === 'slot_abierto' && programacion.slotAbierto) {
         setForm({
+          modalidad: 'slot_abierto',
           tipo: programacion.slotAbierto.tipo,
-          nombre: '',
-          descripcion: '',
-          duracion: 30,
-          ubicacion: '',
-          nivelEnergia: 'medio',
+          nombre: programacion.actividadDefinida?.nombre || '',
+          descripcion: programacion.actividadDefinida?.descripcion || '',
+          duracion: programacion.actividadDefinida?.duracion || 30,
+          ubicacion: programacion.actividadDefinida?.ubicacion || '',
+          nivelEnergia: programacion.actividadDefinida?.nivelEnergia || 'medio',
           horaPreferida: programacion.horaPreferida,
           diasSemana: programacion.diasSemana,
           duracionEstimada: programacion.slotAbierto.duracionEstimada,
@@ -115,8 +120,8 @@ export default function EditarProgramacionModal({
   const handleGuardar = async () => {
     if (!programacion) return;
 
-    // Validaciones
-    if (programacion.modalidad === 'definida' && !form.nombre.trim()) {
+    // Validaciones según la modalidad seleccionada
+    if (form.modalidad === 'definida' && !form.nombre.trim()) {
       setError('El nombre de la actividad es requerido');
       return;
     }
@@ -132,8 +137,10 @@ export default function EditarProgramacionModal({
       // Eliminar instancias futuras pendientes para que se regeneren con los nuevos datos
       await eliminarInstanciasFuturasPendientes(programacion.id);
 
-      if (programacion.modalidad === 'definida') {
+      if (form.modalidad === 'definida') {
+        // Guardar como actividad definida
         await actualizarProgramacion(programacion.id, {
+          modalidad: 'definida',
           actividadDefinida: {
             nombre: form.nombre.trim(),
             tipo: form.tipo,
@@ -143,18 +150,22 @@ export default function EditarProgramacionModal({
             materialesNecesarios: programacion.actividadDefinida?.materialesNecesarios || [],
             nivelEnergia: form.nivelEnergia,
           },
+          slotAbierto: null,
           turno,
           horaPreferida: form.horaPreferida,
           diasSemana: form.diasSemana,
         });
       } else {
+        // Guardar como slot abierto
         await actualizarProgramacion(programacion.id, {
+          modalidad: 'slot_abierto',
           slotAbierto: {
             tipo: form.tipo,
             duracionEstimada: form.duracionEstimada,
             instrucciones: form.instrucciones.trim() || '',
             plantillasPermitidas: programacion.slotAbierto?.plantillasPermitidas || [],
           },
+          actividadDefinida: null,
           turno,
           horaPreferida: form.horaPreferida,
           diasSemana: form.diasSemana,
@@ -194,7 +205,7 @@ export default function EditarProgramacionModal({
 
   if (!isOpen || !programacion) return null;
 
-  const esDefinida = programacion.modalidad === 'definida';
+  const esDefinida = form.modalidad === 'definida';
   const tipoConfig = TIPOS_ACTIVIDAD_CONFIG[form.tipo];
 
   return (
@@ -268,11 +279,36 @@ export default function EditarProgramacionModal({
                 </button>
               </div>
             </div>
-            <div className={`mt-2 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 ${tipoConfig.bgColor}`}>
-              <span>{tipoConfig.icon}</span>
-              <span className="text-sm font-medium">
-                {esDefinida ? 'Actividad Definida' : 'Slot Abierto'}
-              </span>
+            {/* Selector de modalidad */}
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleChange('modalidad', 'definida')}
+                className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  form.modalidad === 'definida'
+                    ? 'bg-lavender-100 text-lavender-700 ring-2 ring-lavender-500'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Definida
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChange('modalidad', 'slot_abierto')}
+                className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  form.modalidad === 'slot_abierto'
+                    ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-500'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                </svg>
+                Slot Abierto
+              </button>
             </div>
           </div>
 
