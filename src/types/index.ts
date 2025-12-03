@@ -224,6 +224,7 @@ export interface RegistroMedicamento {
   fechaHoraProgramada: Date;
   fechaHoraReal?: Date;
   estado: EstadoMedicamento;
+  horario?: string; // Hora programada en formato "HH:mm"
   retrasoMinutos?: number; // calculado
   notas?: string;
   administradoPor?: string; // userId

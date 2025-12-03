@@ -169,7 +169,8 @@ function signosVitalesCompletado(
 }
 
 /**
- * Verifica si un medicamento fue tomado a una hora específica
+ * Verifica si un medicamento fue procesado a una hora específica
+ * Un medicamento se considera procesado si su estado es 'tomado', 'rechazado' u 'omitido'
  */
 function medicamentoCompletado(
   registros: RegistroMedicamento[],
@@ -178,18 +179,24 @@ function medicamentoCompletado(
   fecha: Date
 ): { completado: boolean; horaCompletado?: Date } {
   const hoy = fechaLocalString(fecha);
-  const horaProg = horaStringADate(horaProgramada, fecha);
+
+  // Estados que indican que el medicamento ya fue procesado (no está pendiente)
+  const estadosProcesados = ['tomado', 'rechazado', 'omitido'];
 
   const registro = registros.find(r => {
     if (r.medicamentoId !== medicamentoId) return false;
+
     const fechaProg = r.fechaHoraProgramada instanceof Date
       ? r.fechaHoraProgramada
       : new Date(r.fechaHoraProgramada);
     if (fechaLocalString(fechaProg) !== hoy) return false;
 
-    // Verificar que sea cercano a la hora programada
-    const diff = Math.abs(diferenciaMinutos(fechaProg, horaProg));
-    return diff <= 30 && r.estado === 'tomado';
+    // Comparar directamente el horario si está disponible (más preciso)
+    // o usar la hora de fechaHoraProgramada
+    const horarioRegistro = r.horario ||
+      `${String(fechaProg.getHours()).padStart(2, '0')}:${String(fechaProg.getMinutes()).padStart(2, '0')}`;
+
+    return horarioRegistro === horaProgramada && estadosProcesados.includes(r.estado);
   });
 
   if (registro?.fechaHoraReal) {

@@ -303,9 +303,10 @@ export default function Dashboard() {
       const total = adherenciaSnap.docs.filter(d => ['tomado', 'rechazado', 'omitido'].includes(d.data().estado)).length;
       const adherencia = total > 0 ? Math.round((tomados / total) * 100) : 100;
 
-      // Último chequeo
+      // Chequeo de hoy
       const qChequeo = query(
         collection(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios'),
+        where('fecha', '>=', Timestamp.fromDate(hoy)),
         orderBy('fecha', 'desc'),
         limit(1)
       );
@@ -1042,7 +1043,7 @@ export default function Dashboard() {
       </div>
 
       {/* Métricas Resumen - Cards Premium */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {/* Medicamentos pendientes */}
         <Link
           to="/pastillero-diario"
@@ -1088,34 +1089,6 @@ export default function Dashboard() {
           )}
         </Link>
 
-        {/* Chequeo */}
-        <Link
-          to="/chequeo-diario"
-          className="group bg-gradient-to-br from-white via-white to-success-light/50 border-l-4 border-success rounded-xl p-4 md:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
-        >
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-10 h-10 bg-success-light rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-              📋
-            </div>
-          </div>
-          {metrics.ultimoChequeo?.completado ? (
-            <>
-              <div className="text-xl md:text-2xl font-bold text-success font-display flex items-center gap-2">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Completo
-              </div>
-              <div className="text-sm text-warm-500 font-medium">Chequeo de hoy</div>
-            </>
-          ) : (
-            <>
-              <div className="text-xl md:text-2xl font-bold text-warning-dark font-display">Pendiente</div>
-              <div className="text-sm text-warm-500 font-medium">Chequeo diario</div>
-            </>
-          )}
-        </Link>
-
         {/* Cambio de Sábanas */}
         <Link
           to="/chequeo-diario"
@@ -1155,7 +1128,7 @@ export default function Dashboard() {
           <div className="text-sm text-warm-500 font-medium">
             {estadoSabanas?.vencido
               ? 'Cambiar sábanas'
-              : `día${estadoSabanas?.diasRestantes !== 1 ? 's' : ''} para cambio`}
+              : `día${estadoSabanas?.diasRestantes !== 1 ? 's' : ''} para cambio de sábanas`}
           </div>
         </Link>
       </div>

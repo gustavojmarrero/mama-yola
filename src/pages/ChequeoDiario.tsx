@@ -841,15 +841,7 @@ export default function ChequeoDiarioPage() {
     // Validar el chequeo
     const { valido, errores } = validarChequeo();
     if (!valido) {
-      alert('No se puede completar el chequeo:\n\n' + errores.join('\n'));
-      return;
-    }
-
-    const mensajeConfirmacion = yaCompletado
-      ? '¿Estás seguro de actualizar el chequeo?'
-      : '¿Estás seguro de completar el chequeo?';
-
-    if (!confirm(mensajeConfirmacion)) {
+      alert('No se puede guardar el chequeo:\n\n' + errores.join('\n'));
       return;
     }
 
@@ -885,12 +877,11 @@ export default function ChequeoDiarioPage() {
       // Crear notificación de chequeo completado
       await crearNotificacionChequeoCompletado();
 
-      let mensajeExito = 'Chequeo completado exitosamente';
+      let mensajeExito = 'Chequeo guardado exitosamente';
       if (alertas.length > 0) {
         mensajeExito += `\n\nSe generaron ${alertas.length} alerta(s) que requieren atención.`;
+        alert(mensajeExito);
       }
-
-      alert(mensajeExito);
       cargarChequeoDelDia();
     } catch (error) {
       console.error('Error completando chequeo:', error);
@@ -2487,11 +2478,11 @@ export default function ChequeoDiarioPage() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={guardarBorrador}
+                onClick={handleCompletarChequeo}
                 disabled={saving}
-                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                {saving ? 'Guardando...' : 'Actualizar Chequeo'}
+                {saving ? 'Guardando...' : 'Guardar Chequeo'}
               </button>
             </div>
           </div>
