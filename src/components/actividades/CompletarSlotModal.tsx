@@ -62,7 +62,7 @@ export default function CompletarSlotModal({
   // Cargar plantillas filtradas
   useEffect(() => {
     const cargarPlantillas = async () => {
-      if (!isOpen || !instancia || !instancia.slotAbierto) return;
+      if (!isOpen || !instancia) return;
 
       setLoading(true);
       try {
@@ -85,14 +85,14 @@ export default function CompletarSlotModal({
           ...doc.data(),
         })) as PlantillaActividad[];
 
-        // Filtrar por tipo
+        // Filtrar por tipo - usar instancia.tipo directamente
         todas = todas.filter((p) => {
           const tipoMapeado = mapearTipoActividad(p.tipo);
-          return tipoMapeado === instancia.slotAbierto!.tipo;
+          return tipoMapeado === instancia.tipo;
         });
 
         // Filtrar por plantillas permitidas si hay restricciones
-        const permitidas = instancia.slotAbierto.plantillasPermitidas;
+        const permitidas = instancia.slotAbierto?.plantillasPermitidas;
         if (permitidas && permitidas.length > 0) {
           todas = todas.filter((p) => permitidas.includes(p.id));
         }
@@ -232,7 +232,7 @@ export default function CompletarSlotModal({
                   ? 'Elegir Actividad'
                   : paso === 'completar'
                   ? 'Completar Actividad'
-                  : 'Omitir Slot'}
+                  : 'Omitir Actividad'}
               </h2>
               <button
                 onClick={onClose}
@@ -250,7 +250,7 @@ export default function CompletarSlotModal({
                 <span className="text-xl">{tipoConfig.icon}</span>
                 <div>
                   <h3 className="font-medium text-gray-800">
-                    Slot {tipoConfig.label} - {instancia.horaPreferida}
+                    Actividad {tipoConfig.label} - {instancia.horaPreferida}
                   </h3>
                   <p className="text-sm text-gray-600">
                     {instancia.slotAbierto.duracionEstimada} min estimados

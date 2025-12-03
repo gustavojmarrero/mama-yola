@@ -6,16 +6,12 @@ import Layout from '../components/common/Layout';
 import {
   InstanciaActividadCard,
   ProgramarActividadModal,
-  CompletarActividadModal,
   CompletarSlotModal,
-  PanelCumplimiento,
   EditarProgramacionModal,
 } from '../components/actividades';
 import {
   InstanciaActividad,
   ProgramacionActividad,
-  TIPOS_ACTIVIDAD_CONFIG,
-  DIAS_SEMANA,
 } from '../types/actividades';
 import { getProgramacionesActivas } from '../services/programacionActividades';
 import {
@@ -45,7 +41,6 @@ export default function ActividadesV2() {
 
   // Modales
   const [modalProgramar, setModalProgramar] = useState(false);
-  const [modalCompletar, setModalCompletar] = useState(false);
   const [modalSlot, setModalSlot] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [instanciaSeleccionada, setInstanciaSeleccionada] = useState<InstanciaActividad | null>(null);
@@ -54,7 +49,10 @@ export default function ActividadesV2() {
 
   // Permisos
   const puedeProgramar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
-  const puedeCompletar = userProfile?.rol === 'cuidador';
+  // Todos los roles pueden registrar actividades
+  const puedeCompletar = userProfile?.rol === 'cuidador' || userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
+  // Solo familiares y supervisores pueden editar programaciones
+  const puedeEditar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
 
   // Cargar configuración de horarios
   useEffect(() => {
@@ -147,23 +145,32 @@ export default function ActividadesV2() {
     return instancias.filter((i) => isSameDay(new Date(i.fecha), fecha));
   };
 
-  // Agrupar por estado
-  const agruparPorEstado = (insts: InstanciaActividad[]) => {
-    const pendientes = insts.filter((i) => i.estado === 'pendiente');
-    const completadas = insts.filter((i) => i.estado === 'completada');
-    const otras = insts.filter((i) => i.estado === 'omitida' || i.estado === 'cancelada');
-    return { pendientes, completadas, otras };
+  // Agrupar actividades: definidas (info) vs slots (interactivos)
+  const agruparPorModalidad = (insts: InstanciaActividad[]) => {
+    const definidas = insts.filter((i) => i.modalidad === 'definida');
+    const slots = insts.filter((i) => i.modalidad === 'slot_abierto');
+    const slotsCompletados = slots.filter((s) => s.estado === 'completada');
+    const slotsPendientes = slots.filter((s) => s.estado === 'pendiente');
+    return { definidas, slots, slotsCompletados, slotsPendientes };
   };
 
-  // Manejar click en instancia
+  // Manejar click en instancia - SOLO para slots abiertos
   const handleInstanciaClick = (instancia: InstanciaActividad) => {
+    // Solo los slots son interactivos, las actividades definidas son solo informativas
+    if (instancia.modalidad !== 'slot_abierto') return;
     if (instancia.estado !== 'pendiente') return;
 
     setInstanciaSeleccionada(instancia);
-    if (instancia.modalidad === 'slot_abierto') {
-      setModalSlot(true);
-    } else {
-      setModalCompletar(true);
+    setModalSlot(true);
+  };
+
+  // Manejar edición de programación desde una instancia
+  const handleEditarInstancia = (instancia: InstanciaActividad) => {
+    // Buscar la programación asociada a esta instancia
+    const programacion = programaciones.find(p => p.id === instancia.programacionId);
+    if (programacion) {
+      setProgramacionSeleccionada(programacion);
+      setModalEditar(true);
     }
   };
 
@@ -289,26 +296,16 @@ export default function ActividadesV2() {
           </div>
         </div>
 
-        {/* Panel de Cumplimiento (solo en vista semana) */}
-        {vista === 'semana' && (
-          <PanelCumplimiento
-            fechaInicio={inicioSemana}
-            fechaFin={finSemana}
-            onRefresh={handleSuccess}
-          />
-        )}
-
         {/* Contenido principal */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-lavender-600"></div>
           </div>
         ) : vista === 'dia' ? (
-          /* Vista día */
+          /* Vista día - lista plana sin agrupación por estado */
           <div className="space-y-4">
             {(() => {
               const insts = instanciasDelDia(fechaActual);
-              const { pendientes, completadas, otras } = agruparPorEstado(insts);
 
               if (insts.length === 0) {
                 return (
@@ -328,62 +325,32 @@ export default function ActividadesV2() {
 
               return (
                 <>
-                  {/* Pendientes */}
-                  {pendientes.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-amber-400 rounded-full"></span>
-                        Pendientes ({pendientes.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {pendientes.map((inst) => (
+                  {/* Lista única cronológica - todas las actividades ordenadas por hora */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                      Actividades del día ({insts.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {insts
+                        .sort((a, b) => a.horaPreferida.localeCompare(b.horaPreferida))
+                        .map((inst) => (
                           <InstanciaActividadCard
                             key={inst.id}
                             instancia={inst}
-                            onClick={puedeCompletar ? () => handleInstanciaClick(inst) : undefined}
-                            showActions={puedeCompletar}
+                            onClick={
+                              puedeCompletar && inst.modalidad === 'slot_abierto' && inst.estado === 'pendiente'
+                                ? () => handleInstanciaClick(inst)
+                                : undefined
+                            }
+                            showActions={puedeCompletar && inst.modalidad === 'slot_abierto' && inst.estado === 'pendiente'}
                             onCompletar={() => handleInstanciaClick(inst)}
+                            puedeEditar={puedeEditar}
+                            onEditar={() => handleEditarInstancia(inst)}
                           />
                         ))}
-                      </div>
                     </div>
-                  )}
-
-                  {/* Completadas */}
-                  {completadas.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                        Completadas ({completadas.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {completadas.map((inst) => (
-                          <InstanciaActividadCard
-                            key={inst.id}
-                            instancia={inst}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Omitidas/Canceladas */}
-                  {otras.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-red-400 rounded-full"></span>
-                        No realizadas ({otras.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {otras.map((inst) => (
-                          <InstanciaActividadCard
-                            key={inst.id}
-                            instancia={inst}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </>
               );
             })()}
@@ -394,7 +361,7 @@ export default function ActividadesV2() {
             {diasSemana.map((dia) => {
               const insts = instanciasDelDia(dia);
               const esHoyDia = isSameDay(dia, new Date());
-              const { pendientes, completadas } = agruparPorEstado(insts);
+              const { definidas, slotsCompletados, slotsPendientes } = agruparPorModalidad(insts);
 
               return (
                 <div
@@ -411,7 +378,12 @@ export default function ActividadesV2() {
                       )}
                     </h3>
                     <div className="text-xs text-gray-500">
-                      {completadas.length}/{insts.length} completadas
+                      {definidas.length} actividades
+                      {(slotsPendientes.length + slotsCompletados.length) > 0 && (
+                        <span className="ml-1">
+                          • {slotsCompletados.length}/{slotsPendientes.length + slotsCompletados.length} opcionales
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -425,10 +397,12 @@ export default function ActividadesV2() {
                           instancia={inst}
                           compact
                           onClick={
-                            puedeCompletar && inst.estado === 'pendiente'
+                            puedeCompletar && inst.modalidad === 'slot_abierto' && inst.estado === 'pendiente'
                               ? () => handleInstanciaClick(inst)
                               : undefined
                           }
+                          puedeEditar={puedeEditar}
+                          onEditar={() => handleEditarInstancia(inst)}
                         />
                       ))}
                     </div>
@@ -439,60 +413,6 @@ export default function ActividadesV2() {
           </div>
         )}
 
-        {/* Resumen de programaciones activas */}
-        {puedeProgramar && programaciones.length > 0 && (
-          <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="font-medium text-gray-800 mb-3">
-              Programaciones Activas ({programaciones.length})
-            </h3>
-            <div className="space-y-2">
-              {programaciones.slice(0, 5).map((prog) => {
-                const tipo =
-                  prog.modalidad === 'definida'
-                    ? prog.actividadDefinida?.tipo
-                    : prog.slotAbierto?.tipo;
-                const nombre =
-                  prog.modalidad === 'definida'
-                    ? prog.actividadDefinida?.nombre
-                    : `Slot ${tipo === 'fisica' ? 'Físico' : 'Cognitivo'}`;
-                const config = TIPOS_ACTIVIDAD_CONFIG[tipo || 'cognitiva'];
-
-                return (
-                  <div
-                    key={prog.id}
-                    onClick={() => {
-                      setProgramacionSeleccionada(prog);
-                      setModalEditar(true);
-                    }}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>{config.icon}</span>
-                      <span className="text-sm font-medium">{nombre}</span>
-                      {prog.modalidad === 'slot_abierto' && (
-                        <span className="text-xs px-2 py-0.5 bg-gray-200 rounded">Slot</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs text-gray-500">
-                        {prog.horaPreferida} •{' '}
-                        {prog.diasSemana.map((d) => DIAS_SEMANA[d].corto).join(', ')}
-                      </div>
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                );
-              })}
-              {programaciones.length > 5 && (
-                <p className="text-xs text-gray-500 text-center">
-                  +{programaciones.length - 5} más
-                </p>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Modal Programar */}
@@ -504,20 +424,7 @@ export default function ActividadesV2() {
         configHorarios={configHorarios || undefined}
       />
 
-      {/* Modal Completar Actividad Definida */}
-      <CompletarActividadModal
-        isOpen={modalCompletar}
-        onClose={() => {
-          setModalCompletar(false);
-          setInstanciaSeleccionada(null);
-        }}
-        onSuccess={handleSuccess}
-        instancia={instanciaSeleccionada}
-        userId={userProfile?.id || ''}
-        userNombre={userProfile?.nombre || ''}
-      />
-
-      {/* Modal Completar Slot */}
+      {/* Modal Completar Slot - para registrar qué actividad opcional se realizó */}
       <CompletarSlotModal
         isOpen={modalSlot}
         onClose={() => {

@@ -285,7 +285,7 @@ export function getNombreInstancia(instancia: InstanciaActividad): string {
     if (instancia.actividadElegida) {
       return instancia.actividadElegida.nombre;
     }
-    return `Slot ${TIPOS_ACTIVIDAD_CONFIG[instancia.tipo].label}`;
+    return `Actividad ${TIPOS_ACTIVIDAD_CONFIG[instancia.tipo].label}`;
   }
 
   return 'Actividad';

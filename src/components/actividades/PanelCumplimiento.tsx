@@ -117,7 +117,7 @@ export default function PanelCumplimiento({
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-800">
-            Panel de Cumplimiento
+            Actividades Opcionales
           </h3>
           <p className="text-sm text-gray-500">{fechaRangoTexto()}</p>
         </div>
@@ -163,43 +163,35 @@ export default function PanelCumplimiento({
               <span className={`text-3xl font-bold ${getColorPorcentaje(estadisticas.porcentajeCumplimiento)}`}>
                 {estadisticas.porcentajeCumplimiento}%
               </span>
-              <span className="text-xs text-gray-500">Cumplimiento</span>
+              <span className="text-xs text-gray-500">Realizadas</span>
             </div>
           </div>
         </div>
 
-        {/* Grid de estadísticas */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Grid de estadísticas - Solo para actividades opcionales (slots) */}
+        <div className="grid grid-cols-3 gap-3">
           {/* Total */}
-          <div className="bg-gray-50 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-gray-800">
+          <div className="bg-purple-50 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-purple-700">
               {estadisticas.total}
             </div>
-            <div className="text-xs text-gray-500">Programadas</div>
+            <div className="text-xs text-purple-600">Opcionales</div>
           </div>
 
-          {/* Completadas */}
+          {/* Realizadas */}
           <div className="bg-green-50 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-green-600">
               {estadisticas.completadas}
             </div>
-            <div className="text-xs text-green-700">Completadas</div>
+            <div className="text-xs text-green-700">Realizadas</div>
           </div>
 
-          {/* Omitidas */}
-          <div className="bg-red-50 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {estadisticas.omitidas}
+          {/* Sin realizar */}
+          <div className="bg-gray-50 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-gray-600">
+              {estadisticas.pendientes + estadisticas.omitidas}
             </div>
-            <div className="text-xs text-red-700">Omitidas</div>
-          </div>
-
-          {/* Pendientes */}
-          <div className="bg-amber-50 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-amber-600">
-              {estadisticas.pendientes}
-            </div>
-            <div className="text-xs text-amber-700">Pendientes</div>
+            <div className="text-xs text-gray-500">Sin realizar</div>
           </div>
         </div>
 

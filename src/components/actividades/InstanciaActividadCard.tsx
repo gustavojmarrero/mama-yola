@@ -13,6 +13,8 @@ interface InstanciaActividadCardProps {
   showActions?: boolean;
   onCompletar?: () => void;
   onOmitir?: () => void;
+  onEditar?: () => void;
+  puedeEditar?: boolean;
 }
 
 export default function InstanciaActividadCard({
@@ -22,6 +24,8 @@ export default function InstanciaActividadCard({
   showActions = false,
   onCompletar,
   onOmitir,
+  onEditar,
+  puedeEditar = false,
 }: InstanciaActividadCardProps) {
   const tipoConfig = TIPOS_ACTIVIDAD_CONFIG[instancia.tipo];
   const estadoConfig = ESTADOS_INSTANCIA_CONFIG[instancia.estado];
@@ -35,22 +39,15 @@ export default function InstanciaActividadCard({
   fechaInstancia.setHours(hora, minuto, 0, 0);
   const estaVencida = instancia.estado === 'pendiente' && fechaInstancia < ahora;
 
-  // Estilos según modalidad y estado
+  // Estilos - todas las actividades se ven igual (neutras)
+  // Solo los slots completados tienen estilo diferente para mostrar que ya se registró
   const getCardStyles = () => {
-    if (instancia.estado === 'completada') {
-      return 'bg-green-50 border-l-4 border-green-400';
+    // Slots completados - mostrar que ya se registró
+    if (instancia.modalidad === 'slot_abierto' && instancia.estado === 'completada') {
+      return 'bg-green-50 border border-green-200';
     }
-    if (instancia.estado === 'omitida' || instancia.estado === 'cancelada') {
-      return 'bg-red-50 border-l-4 border-red-400';
-    }
-    if (estaVencida) {
-      return 'bg-red-50 border-l-4 border-red-400';
-    }
-    if (instancia.modalidad === 'slot_abierto') {
-      return 'bg-gray-50 border-2 border-dashed border-gray-300';
-    }
-    // Actividad definida pendiente
-    return 'bg-amber-50 border-l-4 border-amber-400';
+    // Todas las demás actividades - estilo neutro uniforme
+    return 'bg-white border border-gray-200';
   };
 
   // Ubicación a mostrar
@@ -70,11 +67,14 @@ export default function InstanciaActividadCard({
   };
 
   if (compact) {
+    const isSlot = instancia.modalidad === 'slot_abierto';
+    const isSlotPendiente = isSlot && instancia.estado === 'pendiente';
     return (
       <div
         onClick={onClick}
         className={`
-          p-2 rounded-lg cursor-pointer transition-all hover:shadow-md
+          p-2 rounded-lg transition-all
+          ${isSlotPendiente && onClick ? 'cursor-pointer hover:shadow-md' : ''}
           ${getCardStyles()}
         `}
       >
@@ -82,11 +82,24 @@ export default function InstanciaActividadCard({
           <span className="text-sm">{tipoConfig.icon}</span>
           <span className="text-xs font-medium truncate flex-1">{nombre}</span>
           <span className="text-xs text-gray-500">{instancia.horaPreferida}</span>
-          {instancia.estado === 'completada' && (
+          {/* Solo mostrar check para slots ya registrados */}
+          {isSlot && instancia.estado === 'completada' && (
             <span className="text-green-600">✓</span>
           )}
-          {instancia.modalidad === 'slot_abierto' && instancia.estado === 'pendiente' && (
-            <span className="text-gray-400">?</span>
+          {/* Botón editar para familiares/supervisores */}
+          {puedeEditar && onEditar && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditar();
+              }}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              title="Editar programación"
+            >
+              <svg className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
           )}
         </div>
       </div>
@@ -122,15 +135,25 @@ export default function InstanciaActividadCard({
           </div>
         </div>
 
-        {/* Badge de estado */}
-        <div
-          className={`
-            px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1
-            ${estadoConfig.bgColor} ${estadoConfig.color}
-          `}
-        >
-          <span>{estadoConfig.icon}</span>
-          <span>{estadoConfig.label}</span>
+        {/* Tipo de actividad y botón editar */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400 px-2 py-1">
+            {tipoConfig.label}
+          </span>
+          {puedeEditar && onEditar && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditar();
+              }}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Editar programación"
+            >
+              <svg className="w-4 h-4 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -223,26 +246,17 @@ export default function InstanciaActividadCard({
         </div>
       )}
 
-      {/* Botones de acción */}
-      {showActions && instancia.estado === 'pendiente' && (
-        <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
+      {/* Botones de acción - SOLO para slots, las definidas son solo informativas */}
+      {showActions && instancia.modalidad === 'slot_abierto' && instancia.estado === 'pendiente' && (
+        <div className="mt-3 pt-3 border-t border-purple-200 flex gap-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onCompletar?.();
             }}
-            className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+            className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
           >
-            {instancia.modalidad === 'slot_abierto' ? 'Elegir y Completar' : 'Completar'}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOmitir?.();
-            }}
-            className="py-2 px-4 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
-          >
-            Omitir
+            Registrar actividad realizada
           </button>
         </div>
       )}
