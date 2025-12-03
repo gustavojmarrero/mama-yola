@@ -18,13 +18,15 @@ import {
   RegistroMedicamento,
   ChequeoDiario,
   Medicamento,
-  Actividad,
   MenuTiempoComida,
   ConfiguracionHorarios,
   TiempoComidaConfig,
   ProcesoDelDia,
   Receta,
 } from '../types';
+import { getInstanciasPorFecha } from '../services/instanciasActividades';
+import type { InstanciaActividad } from '../types/actividades';
+import { getNombreInstancia, TIPOS_ACTIVIDAD_CONFIG, ESTADOS_INSTANCIA_CONFIG } from '../types/actividades';
 import ProcesoCard, { ProcesoGrupo } from '../components/dashboard/ProcesoCard';
 import { getBristolNombre } from '../constants/bristol';
 import {
@@ -77,7 +79,7 @@ export default function Dashboard() {
     signosVitales: SignoVital[];
     menus: MenuTiempoComida[];
     medicamentos: RegistroMedicamento[];
-    actividades: Actividad[];
+    actividades: InstanciaActividad[];
   }>({
     chequeos: [],
     signosVitales: [],
@@ -147,26 +149,8 @@ export default function Dashboard() {
         ...d.data(),
       })) as Medicamento[];
 
-      // 4. Cargar actividades del día
-      const qActs = query(
-        collection(db, 'pacientes', PACIENTE_ID, 'actividades'),
-        where('fechaInicio', '>=', Timestamp.fromDate(hoy)),
-        where('fechaInicio', '<', Timestamp.fromDate(manana))
-      );
-      const actsSnap = await getDocs(qActs);
-      const actividades: Actividad[] = actsSnap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          ...data,
-          fechaInicio: data.fechaInicio?.toDate() || new Date(),
-          fechaFin: data.fechaFin?.toDate() || new Date(),
-          horaInicioReal: data.horaInicioReal?.toDate(),
-          horaFinReal: data.horaFinReal?.toDate(),
-          creadoEn: data.creadoEn?.toDate() || new Date(),
-          actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
-        } as Actividad;
-      });
+      // 4. Cargar instancias de actividades del día (V2)
+      const actividades = await getInstanciasPorFecha(hoy);
 
       // 5. Cargar registros del día: chequeos
       const qChequeos = query(
@@ -548,10 +532,11 @@ export default function Dashboard() {
         });
       });
 
-      // Fotos de actividades
+      // Fotos de actividades (V2: fotos están en ejecucion.fotos)
       datosDelDia.actividades.forEach(act => {
-        if (act.fotos?.length) {
-          fotoUrls.push(...act.fotos.slice(0, 3)); // Max 3 fotos por actividad
+        const fotos = act.ejecucion?.fotos;
+        if (fotos?.length) {
+          fotoUrls.push(...fotos.slice(0, 3)); // Max 3 fotos por actividad
         }
       });
 
@@ -711,6 +696,11 @@ export default function Dashboard() {
           chequeoData.push(['Ubicación dolor', chequeo.estadoGeneral.dolor.ubicacion]);
         }
 
+        // Cambio de sábanas
+        if (chequeo.cambioSabanas) {
+          chequeoData.push(['Cambio de Sábanas', 'Sí']);
+        }
+
         autoTable(pdfDoc, {
           startY: yPos,
           head: [['Aspecto', 'Estado']],
@@ -722,23 +712,40 @@ export default function Dashboard() {
         });
         yPos = (pdfDoc as any).lastAutoTable.finalY + 10;
 
-        // Funciones corporales
-        if (chequeo.miccionesNumero !== undefined || chequeo.evacuacionesNumero !== undefined) {
+        // Notas del estado general
+        if (chequeo.estadoGeneral?.notasGenerales) {
+          pdfDoc.setFontSize(10);
+          pdfDoc.setFont('helvetica', 'italic');
+          pdfDoc.setTextColor(80, 80, 80);
+          const notasLines = pdfDoc.splitTextToSize(`Notas: ${chequeo.estadoGeneral.notasGenerales}`, contentWidth - 10);
+          pdfDoc.text(notasLines, marginLeft + 5, yPos);
+          yPos += notasLines.length * 5 + 5;
+          pdfDoc.setTextColor(0, 0, 0);
+        }
+
+        // Funciones corporales (acceso correcto via funcionesCorporales)
+        const fc = chequeo.funcionesCorporales;
+        if (fc?.miccionesNumero !== undefined || fc?.evacuacionesNumero !== undefined) {
           checkPageBreak(40);
-          const funcionesData = [];
-          if (chequeo.miccionesNumero !== undefined) {
-            funcionesData.push(['Micciones', `${chequeo.miccionesNumero} - ${chequeo.miccionesCaracteristicas || 'Normal'}`]);
+          const funcionesData: string[][] = [];
+          if (fc.miccionesNumero !== undefined) {
+            funcionesData.push(['Micciones', `${fc.miccionesNumero} - ${fc.miccionesCaracteristicas || 'Normal'}`]);
           }
-          if (chequeo.evacuacionesNumero !== undefined) {
-            const bristolTexto = chequeo.evacuacionesBristol?.length
-              ? chequeo.evacuacionesBristol.map((b, i) =>
-                  b ? `${chequeo.evacuacionesBristol!.length > 1 ? `#${i+1}: ` : ''}${getBristolNombre(b)}` : ''
+          if (fc.evacuacionesNumero !== undefined) {
+            const bristolTexto = fc.evacuacionesBristol?.length
+              ? fc.evacuacionesBristol.map((b: string, i: number) =>
+                  b ? `${fc.evacuacionesBristol!.length > 1 ? `#${i+1}: ` : ''}${getBristolNombre(b)}` : ''
                 ).filter(Boolean).join(', ')
               : '';
-            funcionesData.push(['Evacuaciones', `${chequeo.evacuacionesNumero} - ${bristolTexto} ${chequeo.evacuacionesColor || ''}`.trim()]);
+            funcionesData.push(['Evacuaciones', `${fc.evacuacionesNumero} - ${bristolTexto} ${fc.evacuacionesColor || ''}`.trim()]);
           }
-          if (chequeo.dificultadEvacuar) {
-            funcionesData.push(['Dificultad', 'Sí']);
+          if (fc.dificultadEvacuar) {
+            funcionesData.push(['Dificultad para evacuar', 'Sí']);
+          }
+          // Laxantes utilizados
+          if (fc.laxantesUsados?.length) {
+            const laxantesTexto = fc.laxantesUsados.map((l: { nombre: string; cantidad: string }) => `${l.nombre} (${l.cantidad})`).join(', ');
+            funcionesData.push(['Laxantes utilizados', laxantesTexto]);
           }
 
           if (funcionesData.length > 0) {
@@ -753,6 +760,37 @@ export default function Dashboard() {
             });
             yPos = (pdfDoc as any).lastAutoTable.finalY + 15;
           }
+        }
+
+        // Consumibles usados
+        if (chequeo.consumiblesUsados?.length) {
+          checkPageBreak(40);
+
+          pdfDoc.setFillColor(230, 240, 255);
+          pdfDoc.roundedRect(marginLeft, yPos - 5, contentWidth, 12, 3, 3, 'F');
+          pdfDoc.setFontSize(12);
+          pdfDoc.setFont('helvetica', 'bold');
+          pdfDoc.setTextColor(60, 90, 140);
+          pdfDoc.text('CONSUMIBLES USADOS', marginLeft + 5, yPos + 3);
+          pdfDoc.setTextColor(0, 0, 0);
+          yPos += 12;
+
+          const consumiblesData = chequeo.consumiblesUsados.map((c: { itemNombre: string; cantidad: number; comentario?: string }) => [
+            c.itemNombre,
+            c.cantidad.toString(),
+            c.comentario || ''
+          ]);
+
+          autoTable(pdfDoc, {
+            startY: yPos,
+            head: [['Consumible', 'Cantidad', 'Comentario']],
+            body: consumiblesData,
+            theme: 'grid',
+            headStyles: { fillColor: [100, 140, 200], textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 10, cellPadding: 4 },
+            margin: { left: marginLeft, right: marginRight },
+          });
+          yPos = (pdfDoc as any).lastAutoTable.finalY + 15;
         }
       }
 
@@ -894,8 +932,65 @@ export default function Dashboard() {
         yPos += 5;
       }
 
-      // === SECCIÓN 5: ACTIVIDADES CON FOTOS ===
-      if (datosDelDia.actividades.length > 0) {
+      // === SECCIÓN 5: RESUMEN Y OBSERVACIONES ===
+      if (datosDelDia.chequeos.length > 0) {
+        const chequeoResumen = datosDelDia.chequeos[0];
+        const tieneResumen = chequeoResumen.resumen?.resumenGeneral ||
+                             chequeoResumen.resumen?.observacionesImportantes ||
+                             chequeoResumen.resumen?.recomendacionesSiguienteTurno;
+
+        if (tieneResumen) {
+          checkPageBreak(60);
+
+          pdfDoc.setFillColor(255, 245, 230);
+          pdfDoc.roundedRect(marginLeft, yPos - 5, contentWidth, 12, 3, 3, 'F');
+          pdfDoc.setFontSize(13);
+          pdfDoc.setFont('helvetica', 'bold');
+          pdfDoc.setTextColor(160, 100, 40);
+          pdfDoc.text('RESUMEN Y OBSERVACIONES', marginLeft + 5, yPos + 3);
+          pdfDoc.setTextColor(0, 0, 0);
+          yPos += 15;
+
+          pdfDoc.setFontSize(10);
+
+          if (chequeoResumen.resumen?.resumenGeneral) {
+            pdfDoc.setFont('helvetica', 'bold');
+            pdfDoc.text('Resumen:', marginLeft + 5, yPos);
+            pdfDoc.setFont('helvetica', 'normal');
+            const lines = pdfDoc.splitTextToSize(chequeoResumen.resumen.resumenGeneral, contentWidth - 10);
+            pdfDoc.text(lines, marginLeft + 5, yPos + 5);
+            yPos += 5 + (lines.length * 5) + 8;
+          }
+
+          if (chequeoResumen.resumen?.observacionesImportantes) {
+            checkPageBreak(25);
+            pdfDoc.setFont('helvetica', 'bold');
+            pdfDoc.text('Observaciones Importantes:', marginLeft + 5, yPos);
+            pdfDoc.setFont('helvetica', 'normal');
+            const lines = pdfDoc.splitTextToSize(chequeoResumen.resumen.observacionesImportantes, contentWidth - 10);
+            pdfDoc.text(lines, marginLeft + 5, yPos + 5);
+            yPos += 5 + (lines.length * 5) + 8;
+          }
+
+          if (chequeoResumen.resumen?.recomendacionesSiguienteTurno) {
+            checkPageBreak(25);
+            pdfDoc.setFont('helvetica', 'bold');
+            pdfDoc.text('Recomendaciones Siguiente Turno:', marginLeft + 5, yPos);
+            pdfDoc.setFont('helvetica', 'normal');
+            const lines = pdfDoc.splitTextToSize(chequeoResumen.resumen.recomendacionesSiguienteTurno, contentWidth - 10);
+            pdfDoc.text(lines, marginLeft + 5, yPos + 5);
+            yPos += 5 + (lines.length * 5) + 10;
+          }
+        }
+      }
+
+      // === SECCIÓN 6: ACTIVIDADES CON FOTOS ===
+      // Filtrar canceladas y ordenar por hora preferida
+      const actividadesParaPDF = datosDelDia.actividades
+        .filter(a => a.estado !== 'cancelada')
+        .sort((a, b) => a.horaPreferida.localeCompare(b.horaPreferida));
+
+      if (actividadesParaPDF.length > 0) {
         checkPageBreak(60);
 
         // Título con icono
@@ -908,40 +1003,42 @@ export default function Dashboard() {
         pdfDoc.setTextColor(0, 0, 0);
         yPos += 15;
 
-        const actividadesOrdenadas = datosDelDia.actividades
-          .sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime());
-
-        for (const actividad of actividadesOrdenadas) {
-          const tieneFootos = actividad.fotos && actividad.fotos.length > 0;
-          const alturaCard = tieneFootos ? IMG_HEIGHT + 35 : 25;
+        for (const instancia of actividadesParaPDF) {
+          // Las fotos están en ejecucion.fotos (solo si completada)
+          const fotos = instancia.ejecucion?.fotos || [];
+          const tieneFotos = fotos.length > 0;
+          const alturaCard = tieneFotos ? IMG_HEIGHT + 35 : 25;
 
           checkPageBreak(alturaCard);
 
           // Card de actividad
           pdfDoc.setFillColor(252, 250, 255);
           pdfDoc.setDrawColor(230, 220, 240);
-          pdfDoc.roundedRect(marginLeft, yPos, contentWidth, tieneFootos ? IMG_HEIGHT + 30 : 20, 3, 3, 'FD');
+          pdfDoc.roundedRect(marginLeft, yPos, contentWidth, tieneFotos ? IMG_HEIGHT + 30 : 20, 3, 3, 'FD');
 
-          // Nombre de actividad
+          // Nombre de actividad (usando helper de V2)
+          const nombreActividad = getNombreInstancia(instancia);
           pdfDoc.setFontSize(11);
           pdfDoc.setFont('helvetica', 'bold');
           pdfDoc.setTextColor(80, 60, 100);
-          pdfDoc.text(actividad.nombre || 'Sin nombre', marginLeft + 5, yPos + 8);
+          pdfDoc.text(nombreActividad, marginLeft + 5, yPos + 8);
 
           // Info secundaria
           pdfDoc.setFontSize(9);
           pdfDoc.setFont('helvetica', 'normal');
           pdfDoc.setTextColor(120, 100, 140);
-          const horaStr = format(actividad.fechaInicio, 'HH:mm');
-          const infoText = `${horaStr} • ${actividad.tipo || ''} • ${estadoAct[actividad.estado] || actividad.estado}`;
+          const horaStr = instancia.horaPreferida;
+          const tipoLabel = TIPOS_ACTIVIDAD_CONFIG[instancia.tipo]?.label || instancia.tipo;
+          const estadoLabel = ESTADOS_INSTANCIA_CONFIG[instancia.estado]?.label || instancia.estado;
+          const infoText = `${horaStr} • ${tipoLabel} • ${estadoLabel}`;
           pdfDoc.text(infoText, marginLeft + 5, yPos + 15);
           pdfDoc.setTextColor(0, 0, 0);
 
           // Fotos de la actividad (si existen)
-          if (tieneFootos) {
+          if (tieneFotos) {
             let fotoX = marginLeft + 5;
             const fotoY = yPos + 22;
-            const fotosAMostrar = actividad.fotos!.slice(0, 3);
+            const fotosAMostrar = fotos.slice(0, 3);
 
             for (const fotoUrl of fotosAMostrar) {
               if (imageCache.has(fotoUrl)) {
