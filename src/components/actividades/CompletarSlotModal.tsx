@@ -126,10 +126,8 @@ export default function CompletarSlotModal({
 
   const handleSeleccionarPlantilla = (plantilla: PlantillaActividad) => {
     setPlantillaSeleccionada(plantilla);
-    setForm((prev) => ({
-      ...prev,
-      duracionReal: plantilla.duracion,
-    }));
+    // La duración viene del slot, no de la plantilla
+    // No cambiar duracionReal, ya viene inicializada con la del slot
     setPaso('completar');
   };
 
@@ -145,10 +143,11 @@ export default function CompletarSlotModal({
     setError(null);
 
     try {
+      // La duración viene del slot, no de la plantilla
       const actividadElegida: ActividadElegida = {
         plantillaId: plantillaSeleccionada.id,
         nombre: plantillaSeleccionada.nombre,
-        duracion: plantillaSeleccionada.duracion,
+        duracion: instancia.slotAbierto?.duracionEstimada || form.duracionReal,
         descripcion: plantillaSeleccionada.descripcion,
         ubicacion: plantillaSeleccionada.ubicacion,
         nivelEnergia: plantillaSeleccionada.nivelEnergia,
@@ -310,15 +309,11 @@ export default function CompletarSlotModal({
                             </span>
                             {plantilla.favorita && <span className="text-amber-500">★</span>}
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <span>{plantilla.duracion} min</span>
-                            {plantilla.ubicacion && (
-                              <>
-                                <span>•</span>
-                                <span>{plantilla.ubicacion}</span>
-                              </>
-                            )}
-                          </div>
+                          {plantilla.ubicacion && (
+                            <div className="text-xs text-gray-500">
+                              {plantilla.ubicacion}
+                            </div>
+                          )}
                         </div>
                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -347,10 +342,9 @@ export default function CompletarSlotModal({
                     <span className="text-xl">{tipoConfig.icon}</span>
                     <div>
                       <h3 className="font-medium text-gray-800">{plantillaSeleccionada.nombre}</h3>
-                      <p className="text-xs text-gray-600">
-                        {plantillaSeleccionada.duracion} min
-                        {plantillaSeleccionada.ubicacion && ` • ${plantillaSeleccionada.ubicacion}`}
-                      </p>
+                      {plantillaSeleccionada.ubicacion && (
+                        <p className="text-xs text-gray-600">{plantillaSeleccionada.ubicacion}</p>
+                      )}
                     </div>
                     <button
                       onClick={() => {

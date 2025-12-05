@@ -122,19 +122,18 @@ export default function EditarInstanciaCompletadaModal({
 
   const handleSeleccionarPlantilla = (plantilla: PlantillaActividad) => {
     setPlantillaSeleccionada(plantilla);
+    // La duración viene del slot, no de la plantilla
+    const duracionSlot = instancia?.slotAbierto?.duracionEstimada || form.duracionReal;
     const nuevaActividad: ActividadElegida = {
       plantillaId: plantilla.id,
       nombre: plantilla.nombre,
-      duracion: plantilla.duracion,
+      duracion: duracionSlot,
       descripcion: plantilla.descripcion,
       ubicacion: plantilla.ubicacion,
       nivelEnergia: plantilla.nivelEnergia,
     };
     setActividadElegida(nuevaActividad);
-    setForm((prev) => ({
-      ...prev,
-      duracionReal: plantilla.duracion,
-    }));
+    // No cambiar duracionReal, mantener la que ya tiene
     setPaso('editar');
   };
 
@@ -229,10 +228,9 @@ export default function EditarInstanciaCompletadaModal({
                     <span className="text-xl">{tipoConfig.icon}</span>
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-800">{actividadElegida.nombre}</h3>
-                      <p className="text-xs text-gray-600">
-                        {actividadElegida.duracion} min
-                        {actividadElegida.ubicacion && ` • ${actividadElegida.ubicacion}`}
-                      </p>
+                      {actividadElegida.ubicacion && (
+                        <p className="text-xs text-gray-600">{actividadElegida.ubicacion}</p>
+                      )}
                     </div>
                     <button
                       onClick={() => setPaso('cambiar')}
@@ -385,15 +383,11 @@ export default function EditarInstanciaCompletadaModal({
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <span>{plantilla.duracion} min</span>
-                              {plantilla.ubicacion && (
-                                <>
-                                  <span>•</span>
-                                  <span>{plantilla.ubicacion}</span>
-                                </>
-                              )}
-                            </div>
+                            {plantilla.ubicacion && (
+                              <div className="text-xs text-gray-500">
+                                {plantilla.ubicacion}
+                              </div>
+                            )}
                           </div>
                           <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
