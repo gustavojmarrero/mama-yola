@@ -187,7 +187,6 @@ export interface ChequeoDiario {
   // Cambio de sábanas
   cambioSabanas?: boolean;
 
-  completado: boolean;
   creadoEn: Date;
   actualizadoEn: Date;
 }

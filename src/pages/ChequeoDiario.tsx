@@ -95,8 +95,8 @@ export default function ChequeoDiarioPage() {
 
   // Detectar cambios en el formulario para marcar como dirty
   useEffect(() => {
-    // Solo marcar como dirty si no es el estado inicial y no está completado
-    if (!loading && chequeoActual && !chequeoActual.completado) {
+    // Solo marcar como dirty si no es el estado inicial
+    if (!loading && chequeoActual) {
       setIsDirty(true);
     }
   }, [formData]);
@@ -104,13 +104,13 @@ export default function ChequeoDiarioPage() {
   // Guardado automático cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
-      if (chequeoActual && !chequeoActual.completado) {
-        guardarBorrador();
+      if (isDirty) {
+        guardarChequeo();
       }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [chequeoActual, formData]);
+  }, [formData, isDirty]);
 
   async function cargarChequeoDelDia() {
     try {
@@ -333,6 +333,102 @@ export default function ChequeoDiarioPage() {
     }
   }
 
+  // Sincroniza consumibles: revierte eliminados/reducidos y descuenta nuevos/incrementados
+  async function sincronizarConsumibles() {
+    const ahora = Timestamp.now();
+    const consumiblesGuardados = chequeoActual?.consumiblesUsados || [];
+    const consumiblesActuales = formData.consumiblesUsados.filter(c => c.itemId && c.cantidad > 0);
+
+    // 1. Revertir consumibles eliminados o reducidos
+    for (const guardado of consumiblesGuardados) {
+      const actual = consumiblesActuales.find(c => c.itemId === guardado.itemId);
+      const cantidadGuardada = guardado.cantidad || 0;
+      const cantidadActual = actual?.cantidad || 0;
+
+      if (cantidadActual < cantidadGuardada) {
+        // Hay que revertir la diferencia
+        const cantidadARevertir = cantidadGuardada - cantidadActual;
+
+        try {
+          const itemRef = doc(db, 'pacientes', PACIENTE_ID, 'inventario', guardado.itemId);
+          const itemDoc = await getDoc(itemRef);
+
+          if (itemDoc.exists()) {
+            const itemData = itemDoc.data();
+            const nuevaCantidad = (itemData.cantidadOperativo || 0) + cantidadARevertir;
+
+            await updateDoc(itemRef, {
+              cantidadOperativo: nuevaCantidad,
+              actualizadoEn: ahora,
+            });
+
+            await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'movimientosInventario'), {
+              pacienteId: PACIENTE_ID,
+              tipo: 'entrada',
+              itemId: guardado.itemId,
+              itemNombre: guardado.itemNombre,
+              origen: 'consumido',
+              destino: 'operativo',
+              cantidad: cantidadARevertir,
+              motivo: 'Reversión por edición de chequeo diario',
+              usuarioId: userProfile?.id || '',
+              usuarioNombre: userProfile?.nombre || 'Usuario',
+              fecha: ahora,
+              creadoEn: ahora,
+            });
+          }
+        } catch (error) {
+          console.error(`Error revirtiendo consumible ${guardado.itemNombre}:`, error);
+        }
+      }
+    }
+
+    // 2. Descontar consumibles nuevos o incrementados
+    for (const actual of consumiblesActuales) {
+      const guardado = consumiblesGuardados.find(c => c.itemId === actual.itemId);
+      const cantidadGuardada = guardado?.cantidad || 0;
+      const cantidadActual = actual.cantidad || 0;
+
+      if (cantidadActual > cantidadGuardada) {
+        // Hay que descontar la diferencia
+        const cantidadADescontar = cantidadActual - cantidadGuardada;
+
+        try {
+          const itemRef = doc(db, 'pacientes', PACIENTE_ID, 'inventario', actual.itemId);
+          const itemDoc = await getDoc(itemRef);
+
+          if (itemDoc.exists()) {
+            const itemData = itemDoc.data();
+            const nuevaCantidad = Math.max(0, (itemData.cantidadOperativo || 0) - cantidadADescontar);
+
+            await updateDoc(itemRef, {
+              cantidadOperativo: nuevaCantidad,
+              actualizadoEn: ahora,
+            });
+
+            await addDoc(collection(db, 'pacientes', PACIENTE_ID, 'movimientosInventario'), {
+              pacienteId: PACIENTE_ID,
+              tipo: 'salida',
+              itemId: actual.itemId,
+              itemNombre: actual.itemNombre,
+              origen: 'operativo',
+              destino: 'consumido',
+              cantidad: cantidadADescontar,
+              motivo: 'Consumo registrado en chequeo diario',
+              notas: actual.comentario || undefined,
+              usuarioId: userProfile?.id || '',
+              usuarioNombre: userProfile?.nombre || 'Usuario',
+              fecha: ahora,
+              creadoEn: ahora,
+            });
+          }
+        } catch (error) {
+          console.error(`Error descontando consumible ${actual.itemNombre}:`, error);
+        }
+      }
+    }
+  }
+
   async function cargarHistorialChequeos() {
     try {
       setLoading(true);
@@ -345,7 +441,6 @@ export default function ChequeoDiarioPage() {
       const q = query(
         collection(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios'),
         where('fecha', '>=', hace30Dias),
-        where('completado', '==', true),
         orderBy('fecha', 'desc')
       );
 
@@ -625,11 +720,14 @@ export default function ChequeoDiarioPage() {
     doc.save(nombreArchivo);
   }
 
-  async function guardarBorrador() {
+  async function guardarChequeo() {
     try {
       setSaving(true);
 
-      const datosChequeo = construirDatosChequeo(false);
+      const datosChequeo = construirDatosChequeo();
+
+      // Sincronizar consumibles (revertir eliminados, descontar nuevos)
+      await sincronizarConsumibles();
 
       if (chequeoActual) {
         // Actualizar chequeo existente
@@ -652,16 +750,26 @@ export default function ChequeoDiarioPage() {
         } as ChequeoDiario);
       }
 
+      // Generar alertas automáticas
+      const alertas = await generarAlertas();
+      if (alertas.length > 0) {
+        alert(`Se generaron ${alertas.length} alerta(s) que requieren atención.`);
+      }
+
       setUltimoGuardado(new Date());
       markAsSaved();
+
+      // Recargar para actualizar el estado guardado
+      cargarChequeoDelDia();
     } catch (error) {
-      console.error('Error guardando borrador:', error);
+      console.error('Error guardando chequeo:', error);
+      alert('Error al guardar chequeo');
     } finally {
       setSaving(false);
     }
   }
 
-  function construirDatosChequeo(completado: boolean) {
+  function construirDatosChequeo() {
     return {
       pacienteId: PACIENTE_ID,
       fecha: new Date(),
@@ -729,7 +837,6 @@ export default function ChequeoDiarioPage() {
       // Cambio de sábanas
       ...(formData.cambioSabanas && { cambioSabanas: true }),
 
-      completado,
       creadoEn: chequeoActual?.creadoEn || new Date(),
       actualizadoEn: new Date()
     };
@@ -837,59 +944,6 @@ export default function ChequeoDiarioPage() {
     }
   }
 
-  async function handleCompletarChequeo() {
-    // Validar el chequeo
-    const { valido, errores } = validarChequeo();
-    if (!valido) {
-      alert('No se puede guardar el chequeo:\n\n' + errores.join('\n'));
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const datosChequeo = construirDatosChequeo(true);
-
-      // Guardar o actualizar el chequeo
-      if (chequeoActual) {
-        await updateDoc(
-          doc(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios', chequeoActual.id),
-          {
-            ...datosChequeo,
-            actualizadoEn: new Date()
-          }
-        );
-      } else {
-        await addDoc(
-          collection(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios'),
-          datosChequeo
-        );
-      }
-
-      // Descontar consumibles del inventario
-      if (formData.consumiblesUsados.length > 0) {
-        await descontarConsumiblesDelInventario();
-      }
-
-      // Generar alertas automáticas
-      const alertas = await generarAlertas();
-
-      // Crear notificación de chequeo completado
-      await crearNotificacionChequeoCompletado();
-
-      let mensajeExito = 'Chequeo guardado exitosamente';
-      if (alertas.length > 0) {
-        mensajeExito += `\n\nSe generaron ${alertas.length} alerta(s) que requieren atención.`;
-        alert(mensajeExito);
-      }
-      cargarChequeoDelDia();
-    } catch (error) {
-      console.error('Error completando chequeo:', error);
-      alert('Error al completar chequeo');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   function toggleActitud(valor: string) {
     if (formData.actitud.includes(valor)) {
@@ -1014,7 +1068,6 @@ export default function ChequeoDiarioPage() {
     );
   }
 
-  const yaCompletado = chequeoActual?.completado;
 
   // Vista de historial de chequeos
   function renderHistorial() {
@@ -1048,7 +1101,7 @@ export default function ChequeoDiarioPage() {
         {/* Lista de chequeos */}
         {chequeosFiltrados.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
-            <p className="text-gray-500 text-lg">No hay chequeos completados en los últimos 30 días</p>
+            <p className="text-gray-500 text-lg">No hay chequeos guardados en los últimos 30 días</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1683,7 +1736,7 @@ export default function ChequeoDiarioPage() {
             </div>
 
             {/* Indicador de cambios sin guardar */}
-            {isDirty && vistaActual === 'hoy' && !chequeoActual?.completado && (
+            {isDirty && vistaActual === 'hoy' && (
               <span className="text-sm text-orange-600 flex items-center gap-1">
                 <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
                 Cambios sin guardar
@@ -2478,7 +2531,7 @@ export default function ChequeoDiarioPage() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={handleCompletarChequeo}
+                onClick={guardarChequeo}
                 disabled={saving}
                 className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
