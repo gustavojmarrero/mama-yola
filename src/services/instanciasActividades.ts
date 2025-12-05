@@ -270,22 +270,21 @@ export async function completarInstanciaDefinida(
 ): Promise<void> {
   const docRef = doc(getInstanciasRef(), instanciaId);
 
-  const ejecucion: EjecucionActividad = {
+  // Construir objeto de ejecución sin campos undefined (Firestore no los acepta)
+  const ejecucion: Record<string, unknown> = {
     completadaPor,
     completadaPorNombre,
-    completadaEn: new Date(),
+    completadaEn: Timestamp.now(),
     duracionReal,
-    participacion,
-    estadoAnimo,
-    notas,
   };
+
+  if (participacion) ejecucion.participacion = participacion;
+  if (estadoAnimo) ejecucion.estadoAnimo = estadoAnimo;
+  if (notas) ejecucion.notas = notas;
 
   await updateDoc(docRef, {
     estado: 'completada' as EstadoInstancia,
-    ejecucion: {
-      ...ejecucion,
-      completadaEn: Timestamp.now(),
-    },
+    ejecucion,
     actualizadoEn: Timestamp.now(),
   });
 }
@@ -305,23 +304,22 @@ export async function completarSlotAbierto(
 ): Promise<void> {
   const docRef = doc(getInstanciasRef(), instanciaId);
 
-  const ejecucion: EjecucionActividad = {
+  // Construir objeto de ejecución sin campos undefined (Firestore no los acepta)
+  const ejecucion: Record<string, unknown> = {
     completadaPor,
     completadaPorNombre,
-    completadaEn: new Date(),
+    completadaEn: Timestamp.now(),
     duracionReal,
-    participacion,
-    estadoAnimo,
-    notas,
   };
+
+  if (participacion) ejecucion.participacion = participacion;
+  if (estadoAnimo) ejecucion.estadoAnimo = estadoAnimo;
+  if (notas) ejecucion.notas = notas;
 
   await updateDoc(docRef, {
     estado: 'completada' as EstadoInstancia,
     actividadElegida,
-    ejecucion: {
-      ...ejecucion,
-      completadaEn: Timestamp.now(),
-    },
+    ejecucion,
     actualizadoEn: Timestamp.now(),
   });
 }
@@ -486,4 +484,45 @@ export async function eliminarInstanciasFuturasPendientes(
 
   await batch.commit();
   return snapshot.size;
+}
+
+/**
+ * Actualiza una instancia de slot completada (cambiar actividad elegida y/o detalles)
+ */
+export async function actualizarInstanciaCompletada(
+  instanciaId: string,
+  actividadElegida: ActividadElegida,
+  duracionReal: number,
+  participacion?: ParticipacionActividad,
+  estadoAnimo?: string,
+  notas?: string
+): Promise<void> {
+  const docRef = doc(getInstanciasRef(), instanciaId);
+
+  // Construir objeto de ejecución sin campos undefined (Firestore no los acepta)
+  const ejecucion: Record<string, unknown> = {
+    duracionReal,
+  };
+
+  if (participacion) ejecucion.participacion = participacion;
+  if (estadoAnimo) ejecucion.estadoAnimo = estadoAnimo;
+  if (notas) ejecucion.notas = notas;
+
+  // Obtener la instancia actual para preservar datos de completado originales
+  const instanciaDoc = await getDoc(docRef);
+  if (!instanciaDoc.exists()) {
+    throw new Error('Instancia no encontrada');
+  }
+
+  const instanciaActual = instanciaDoc.data();
+  const ejecucionActual = instanciaActual.ejecucion || {};
+
+  await updateDoc(docRef, {
+    actividadElegida,
+    ejecucion: {
+      ...ejecucionActual,
+      ...ejecucion,
+    },
+    actualizadoEn: Timestamp.now(),
+  });
 }

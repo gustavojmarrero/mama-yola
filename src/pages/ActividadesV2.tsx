@@ -8,6 +8,7 @@ import {
   ProgramarActividadModal,
   CompletarSlotModal,
   EditarProgramacionModal,
+  EditarInstanciaCompletadaModal,
 } from '../components/actividades';
 import {
   InstanciaActividad,
@@ -43,6 +44,7 @@ export default function ActividadesV2() {
   const [modalProgramar, setModalProgramar] = useState(false);
   const [modalSlot, setModalSlot] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
+  const [modalEditarInstancia, setModalEditarInstancia] = useState(false);
   const [instanciaSeleccionada, setInstanciaSeleccionada] = useState<InstanciaActividad | null>(null);
   const [programacionSeleccionada, setProgramacionSeleccionada] = useState<ProgramacionActividad | null>(null);
 
@@ -151,9 +153,16 @@ export default function ActividadesV2() {
     setModalSlot(true);
   };
 
-  // Manejar edición de programación desde una instancia
+  // Manejar edición desde una instancia
   const handleEditarInstancia = (instancia: InstanciaActividad) => {
-    // Buscar la programación asociada a esta instancia
+    // Si es un slot completado, editar la actividad elegida
+    if (instancia.estado === 'completada' && instancia.modalidad === 'slot_abierto') {
+      setInstanciaSeleccionada(instancia);
+      setModalEditarInstancia(true);
+      return;
+    }
+
+    // Si no, editar la programación (comportamiento original)
     const programacion = programaciones.find(p => p.id === instancia.programacionId);
     if (programacion) {
       setProgramacionSeleccionada(programacion);
@@ -434,6 +443,17 @@ export default function ActividadesV2() {
         onSuccess={handleSuccess}
         programacion={programacionSeleccionada}
         configHorarios={configHorarios || undefined}
+      />
+
+      {/* Modal Editar Instancia Completada - para cambiar la actividad elegida */}
+      <EditarInstanciaCompletadaModal
+        isOpen={modalEditarInstancia}
+        onClose={() => {
+          setModalEditarInstancia(false);
+          setInstanciaSeleccionada(null);
+        }}
+        onSuccess={handleSuccess}
+        instancia={instanciaSeleccionada}
       />
     </Layout>
   );

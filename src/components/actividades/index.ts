@@ -14,6 +14,7 @@ export { default as ProgramarActividadModal } from './ProgramarActividadModal';
 export { default as CompletarActividadModal } from './CompletarActividadModal';
 export { default as CompletarSlotModal } from './CompletarSlotModal';
 export { default as EditarProgramacionModal } from './EditarProgramacionModal';
+export { default as EditarInstanciaCompletadaModal } from './EditarInstanciaCompletadaModal';
 
 // Dashboard V2
 export { default as PanelCumplimiento } from './PanelCumplimiento';
