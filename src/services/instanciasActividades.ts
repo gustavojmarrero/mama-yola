@@ -207,17 +207,22 @@ export async function generarInstanciasParaFecha(
     (p) => p.activo && p.diasSemana.includes(diaSemana)
   );
 
+  if (programacionesDelDia.length === 0) return 0;
+
+  // Obtener todas las instancias existentes del día en UNA sola query
+  const instanciasExistentes = await getInstanciasPorFecha(fecha);
+  const idsExistentes = new Set(instanciasExistentes.map((i) => i.id));
+
   let creadas = 0;
   const batch = writeBatch(db);
 
   for (const prog of programacionesDelDia) {
     const instanciaId = generarIdInstancia(prog.id, fechaNormalizada);
+
+    // Verificar si ya existe usando el Set (sin query adicional)
+    if (idsExistentes.has(instanciaId)) continue;
+
     const docRef = doc(getInstanciasRef(), instanciaId);
-
-    // Verificar si ya existe
-    const existente = await getDoc(docRef);
-    if (existente.exists()) continue;
-
     const tipo =
       prog.modalidad === 'definida'
         ? prog.actividadDefinida!.tipo

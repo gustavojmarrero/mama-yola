@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/common/Layout';
@@ -85,13 +85,19 @@ export default function ActividadesV2() {
     cargar();
   }, []);
 
-  // Generar y cargar instancias cuando cambia la fecha o programaciones
+  // Cargar instancias cuando cambia la fecha o programaciones
   useEffect(() => {
+    // Solo cargar si hay programaciones (evita doble ejecución inicial)
+    if (programaciones.length === 0) {
+      setLoading(false);
+      return;
+    }
+
     async function cargarInstancias() {
       setLoading(true);
       try {
-        // Generar instancias para la fecha/rango
         if (vista === 'dia') {
+          // Generar instancias faltantes y cargar en una sola operación
           await generarInstanciasParaFecha(fechaActual, programaciones);
           const insts = await getInstanciasPorFecha(fechaActual);
           setInstancias(insts);
@@ -99,10 +105,14 @@ export default function ActividadesV2() {
           const inicio = startOfWeek(fechaActual, { weekStartsOn: 1 });
           const fin = endOfWeek(fechaActual, { weekStartsOn: 1 });
 
-          // Generar para cada día de la semana
+          // Generar para cada día de la semana en paralelo
+          const dias = [];
           for (let d = inicio; d <= fin; d = addDays(d, 1)) {
-            await generarInstanciasParaFecha(d, programaciones);
+            dias.push(d);
           }
+          await Promise.all(
+            dias.map((d) => generarInstanciasParaFecha(d, programaciones))
+          );
 
           const insts = await getInstanciasPorRango(inicio, fin);
           setInstancias(insts);
@@ -114,31 +124,8 @@ export default function ActividadesV2() {
       }
     }
 
-    if (programaciones.length >= 0) {
-      cargarInstancias();
-    }
+    cargarInstancias();
   }, [fechaActual, vista, programaciones]);
-
-  // Listener para instancias en tiempo real
-  useEffect(() => {
-    const instanciasRef = collection(db, 'pacientes', PACIENTE_ID, 'instanciasActividades');
-    const q = query(instanciasRef, orderBy('fecha', 'asc'));
-
-    const unsubscribe = onSnapshot(q, async () => {
-      // Recargar instancias cuando hay cambios
-      if (vista === 'dia') {
-        const insts = await getInstanciasPorFecha(fechaActual);
-        setInstancias(insts);
-      } else {
-        const inicio = startOfWeek(fechaActual, { weekStartsOn: 1 });
-        const fin = endOfWeek(fechaActual, { weekStartsOn: 1 });
-        const insts = await getInstanciasPorRango(inicio, fin);
-        setInstancias(insts);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [fechaActual, vista]);
 
   // Instancias del día seleccionado
   const instanciasDelDia = (fecha: Date) => {
