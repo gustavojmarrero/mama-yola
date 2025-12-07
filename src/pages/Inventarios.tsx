@@ -59,6 +59,18 @@ const categorias: { value: CategoriaInventario; label: string; icon: string }[] 
 
 const unidades = ['piezas', 'cajas', 'frascos', 'ml', 'tabletas', 'sobres', 'unidades', 'paquetes'];
 
+// Helper para formatear nombres de almacén en historial
+const formatAlmacen = (almacen?: string): string => {
+  const nombres: Record<string, string> = {
+    'maestro': 'Maestro',
+    'transito': 'Tránsito',
+    'operativo': 'Operativo',
+    'externo': 'Externo',
+    'consumido': 'Consumido'
+  };
+  return almacen ? nombres[almacen] || almacen : '?';
+};
+
 export default function Inventarios() {
   const { currentUser, userProfile } = useAuth();
   const [items, setItems] = useState<ItemInventario[]>([]);
@@ -1646,8 +1658,13 @@ export default function Inventarios() {
                             <span className="font-medium text-gray-900">{mov.itemNombre}</span>
                           </div>
                           <p className="text-sm text-gray-600">
-                            {mov.tipo === 'entrada' ? '+' : mov.tipo === 'ajuste' ? '=' : '-'}
-                            {mov.cantidad} unidades
+                            {Math.abs(mov.cantidad)} unidades
+                            {(mov.origen || mov.destino) && (
+                              <span className="text-gray-400">
+                                {' • '}
+                                {formatAlmacen(mov.origen)} → {formatAlmacen(mov.destino)}
+                              </span>
+                            )}
                             {mov.motivo && ` • ${mov.motivo}`}
                           </p>
                           {mov.notas && (
