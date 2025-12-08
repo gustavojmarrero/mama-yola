@@ -57,10 +57,30 @@ export function useTransito(): UseTransitoReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Calcular dosis diarias de un medicamento
-  const calcularDosisDiaria = useCallback((medicamento: Medicamento): number => {
-    return medicamento.horarios?.length || 1;
+  // Parsear cantidad del campo dosis (ej: "1/2" -> 0.5, "1" -> 1, "2" -> 2)
+  const parsearCantidadDosis = useCallback((dosis: string): number => {
+    if (!dosis) return 1;
+    const dosisLower = dosis.toLowerCase().trim();
+
+    // Detectar fracciones comunes
+    if (dosisLower.includes('1/4') || dosisLower.includes('cuarto')) return 0.25;
+    if (dosisLower.includes('1/2') || dosisLower.includes('media') || dosisLower.includes('medio')) return 0.5;
+    if (dosisLower.includes('3/4')) return 0.75;
+    if (dosisLower.includes('1 1/2') || dosisLower.includes('una y media')) return 1.5;
+
+    // Si empieza con un número entero solo (ej: "2", "1")
+    const match = dosisLower.match(/^(\d+)(?:\s|$)/);
+    if (match) return parseInt(match[1], 10);
+
+    return 1; // Por defecto 1 tableta
   }, []);
+
+  // Calcular dosis diarias de un medicamento (cantidad por toma × tomas por día)
+  const calcularDosisDiaria = useCallback((medicamento: Medicamento): number => {
+    const cantidadPorToma = parsearCantidadDosis(medicamento.dosis);
+    const tomasPorDia = medicamento.horarios?.length || 1;
+    return cantidadPorToma * tomasPorDia;
+  }, [parsearCantidadDosis]);
 
   // Calcular días restantes basado en stock en tránsito y dosis diarias
   const calcularDiasRestantes = useCallback((item: ItemInventario, dosisDelDia: number): number => {
@@ -185,18 +205,27 @@ export function useTransito(): UseTransitoReturn {
       setSolicitudesPendientes(solicitudes);
 
       // Combinar items con información de dosis diarias
-      const itemsConDosis: ItemTransitoConDosis[] = items.map((item) => {
-        // Buscar el medicamento vinculado
-        const medicamento = meds.find((m) => m.id === item.medicamentoId);
-        const dosisDelDia = medicamento ? calcularDosisDiaria(medicamento) : 1;
-        const diasEstimados = calcularDiasRestantes(item, dosisDelDia);
+      // Filtrar items cuyo medicamento vinculado esté desactivado
+      const itemsConDosis: ItemTransitoConDosis[] = items
+        .filter((item) => {
+          // Si tiene medicamentoId, verificar que el medicamento esté activo
+          if (item.medicamentoId) {
+            return meds.some((m) => m.id === item.medicamentoId);
+          }
+          return true; // Items sin medicamentoId se incluyen
+        })
+        .map((item) => {
+          // Buscar el medicamento vinculado
+          const medicamento = meds.find((m) => m.id === item.medicamentoId);
+          const dosisDelDia = medicamento ? calcularDosisDiaria(medicamento) : 1;
+          const diasEstimados = calcularDiasRestantes(item, dosisDelDia);
 
-        return {
-          ...item,
-          dosisDelDia,
-          diasEstimados,
-        };
-      });
+          return {
+            ...item,
+            dosisDelDia,
+            diasEstimados,
+          };
+        });
 
       setItemsTransito(itemsConDosis);
     } catch (err) {
