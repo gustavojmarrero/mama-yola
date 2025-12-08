@@ -29,6 +29,7 @@ import InventarioItemCard from '../components/inventarios/InventarioItemCard';
 import ReporteDiferenciaModal from '../components/inventarios/ReporteDiferenciaModal';
 import ReportesPendientesList from '../components/inventarios/ReportesPendientesList';
 import { useReportesDiferencia } from '../hooks/useReportesDiferencia';
+import { useTransito } from '../hooks/useTransito';
 
 const PACIENTE_ID = 'paciente-principal';
 const DIAS_ALERTA_VENCIMIENTO = 3;
@@ -105,6 +106,9 @@ export default function Inventarios() {
     aprobarReporte,
     rechazarReporte,
   } = useReportesDiferencia();
+
+  // Hook de tránsito para obtener dosis diarias
+  const { itemsTransito } = useTransito();
 
   // Estados para reportes de diferencias
   const [showReporteDiferenciaModal, setShowReporteDiferenciaModal] = useState(false);
@@ -601,14 +605,37 @@ export default function Inventarios() {
     }
   }
 
+  // Calcular días restantes hasta el domingo (inclusive)
+  function getDiasHastaDomingo(): number {
+    const hoy = new Date();
+    const diaSemana = hoy.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+    if (diaSemana === 0) return 1; // Si es domingo, necesita para hoy
+    return 7 - diaSemana + 1; // +1 incluye el domingo
+  }
+
   function getEstadoItem(item: ItemInventario) {
     const cantidadTotal = item.cantidadMaestro + (item.cantidadTransito || 0) + item.cantidadOperativo;
 
     if (cantidadTotal === 0) return 'critico';
-    // Verificar si alguno de los inventarios está bajo
-    if (item.cantidadMaestro <= item.nivelMinimoMaestro || item.cantidadOperativo <= item.nivelMinimoOperativo) return 'bajo';
-    // Verificar tránsito solo para items vinculados al pastillero
-    if (item.vinculadoPastillero && (item.cantidadTransito || 0) <= (item.nivelMinimoTransito || 0)) return 'bajo';
+
+    // Para items vinculados al pastillero (medicamentos): solo verificar si tránsito alcanza para la semana
+    if (item.vinculadoPastillero) {
+      const itemConDosis = itemsTransito.find((i) => i.id === item.id);
+      if (itemConDosis) {
+        const diasRestantes = getDiasHastaDomingo();
+        const necesario = itemConDosis.dosisDelDia * diasRestantes;
+        if ((item.cantidadTransito || 0) < necesario) return 'bajo';
+      }
+      // Si es medicamento y tiene stock suficiente en tránsito (o aún no cargó itemsTransito), está OK
+      return 'ok';
+    }
+
+    // Para items NO vinculados al pastillero (consumibles, materiales):
+    // Verificar el total combinado contra el nivel mínimo más alto configurado
+    // Solo marcar bajo si está ESTRICTAMENTE por debajo del mínimo
+    const nivelMinimo = Math.max(item.nivelMinimoMaestro || 0, item.nivelMinimoOperativo || 0);
+    if (nivelMinimo > 0 && cantidadTotal < nivelMinimo) return 'bajo';
+
     return 'ok';
   }
 

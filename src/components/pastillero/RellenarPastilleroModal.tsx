@@ -8,6 +8,32 @@ interface ItemConDosis extends ItemInventario {
   diasEstimados: number;
 }
 
+// Formatear números para mostrar fracciones comunes o redondear
+function formatearNumero(num: number): string {
+  // Si es entero, mostrar sin decimales
+  if (Number.isInteger(num)) return num.toString();
+
+  // Fracciones comunes
+  const fracciones: [number, string][] = [
+    [0.25, '¼'],
+    [0.5, '½'],
+    [0.75, '¾'],
+    [1/7, '1/7'],
+    [2/7, '2/7'],
+    [3/7, '3/7'],
+    [1.5, '1½'],
+    [2.5, '2½'],
+    [3.5, '3½'],
+  ];
+
+  for (const [valor, simbolo] of fracciones) {
+    if (Math.abs(num - valor) < 0.001) return simbolo;
+  }
+
+  // Si no es fracción conocida, redondear a 1 decimal
+  return num.toFixed(1);
+}
+
 interface RellenarPastilleroModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -121,7 +147,7 @@ export default function RellenarPastilleroModal({
               <ul className="mt-2 space-y-1">
                 {itemsConFaltante.map((item) => (
                   <li key={item.id} className="text-sm text-orange-700">
-                    • {item.nombre}: Faltan <strong>{item.faltante}</strong> {item.unidad} para la semana
+                    • {item.nombre}: Faltan <strong>{formatearNumero(item.faltante)}</strong> {item.unidad} para la semana
                   </li>
                 ))}
               </ul>
@@ -171,10 +197,10 @@ export default function RellenarPastilleroModal({
                         )}
                       </td>
                       <td className="px-4 py-3 text-center text-sm text-gray-600">
-                        {item.dosisDelDia}
+                        {formatearNumero(item.dosisDelDia)}
                       </td>
                       <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">
-                        {item.necesarioSemana}
+                        {formatearNumero(item.necesarioSemana)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
@@ -202,7 +228,7 @@ export default function RellenarPastilleroModal({
                           <span className="text-green-600 text-sm">✓ OK</span>
                         ) : (
                           <span className="text-orange-600 text-sm">
-                            Faltan {item.faltante}
+                            Faltan {formatearNumero(item.faltante)}
                           </span>
                         )}
                       </td>

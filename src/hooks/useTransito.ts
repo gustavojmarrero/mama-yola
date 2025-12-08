@@ -75,11 +75,17 @@ export function useTransito(): UseTransitoReturn {
     return 1; // Por defecto 1 tableta
   }, []);
 
-  // Calcular dosis diarias de un medicamento (cantidad por toma × tomas por día)
+  // Calcular dosis diarias de un medicamento (cantidad por toma × tomas por día × días por semana / 7)
   const calcularDosisDiaria = useCallback((medicamento: Medicamento): number => {
     const cantidadPorToma = parsearCantidadDosis(medicamento.dosis);
     const tomasPorDia = medicamento.horarios?.length || 1;
-    return cantidadPorToma * tomasPorDia;
+
+    // Si tiene días específicos, calcular promedio diario
+    const diasSemana = medicamento.frecuencia?.diasSemana;
+    const diasPorSemana = diasSemana && diasSemana.length > 0 ? diasSemana.length : 7;
+
+    // Dosis promedio por día = (cantidad × tomas × días) / 7
+    return (cantidadPorToma * tomasPorDia * diasPorSemana) / 7;
   }, [parsearCantidadDosis]);
 
   // Calcular días restantes basado en stock en tránsito y dosis diarias
