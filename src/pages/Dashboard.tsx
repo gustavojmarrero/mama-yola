@@ -63,6 +63,9 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [exportandoPDF, setExportandoPDF] = useState(false);
+  const [fechaPDFSeleccionada, setFechaPDFSeleccionada] = useState<string>(
+    format(new Date(), 'yyyy-MM-dd')
+  );
   const [procesos, setProcesos] = useState<ProcesoDelDia[]>([]);
   const [horaActual, setHoraActual] = useState(new Date());
 
@@ -472,32 +475,184 @@ export default function Dashboard() {
     }
   }
 
+  // Función para cargar datos históricos de cualquier fecha
+  async function cargarDatosParaFecha(fecha: Date): Promise<{
+    chequeos: ChequeoDiario[];
+    signosVitales: SignoVital[];
+    menus: MenuTiempoComida[];
+    medicamentos: RegistroMedicamento[];
+    actividades: InstanciaActividad[];
+    procesosMedicamentos: ProcesoDelDia[];
+  }> {
+    const fechaInicio = startOfDay(fecha);
+    const fechaFin = addDays(fechaInicio, 1);
+
+    // 1. Cargar chequeos diarios
+    const qChequeos = query(
+      collection(db, 'pacientes', PACIENTE_ID, 'chequeosDiarios'),
+      where('fecha', '>=', Timestamp.fromDate(fechaInicio)),
+      where('fecha', '<', Timestamp.fromDate(fechaFin))
+    );
+    const chequeosSnap = await getDocs(qChequeos);
+    const chequeos = chequeosSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        fecha: data.fecha?.toDate() || new Date(),
+        horaRegistro: data.horaRegistro?.toDate() || new Date(),
+        creadoEn: data.creadoEn?.toDate() || new Date(),
+        actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
+      } as ChequeoDiario;
+    });
+
+    // 2. Cargar signos vitales
+    const qSignos = query(
+      collection(db, 'pacientes', PACIENTE_ID, 'signosVitales'),
+      where('fecha', '>=', Timestamp.fromDate(fechaInicio)),
+      where('fecha', '<', Timestamp.fromDate(fechaFin))
+    );
+    const signosSnap = await getDocs(qSignos);
+    const signosVitales = signosSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        fecha: data.fecha?.toDate() || new Date(),
+        creadoEn: data.creadoEn?.toDate() || new Date(),
+      } as SignoVital;
+    });
+
+    // 3. Cargar menús del día
+    const qMenus = query(
+      collection(db, 'pacientes', PACIENTE_ID, 'menusDiarios'),
+      where('fecha', '>=', Timestamp.fromDate(fechaInicio)),
+      where('fecha', '<', Timestamp.fromDate(fechaFin))
+    );
+    const menusSnap = await getDocs(qMenus);
+    const menus = menusSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        fecha: data.fecha?.toDate() || new Date(),
+        creadoEn: data.creadoEn?.toDate() || new Date(),
+        actualizadoEn: data.actualizadoEn?.toDate() || new Date(),
+      } as MenuTiempoComida;
+    });
+
+    // 4. Cargar registro de medicamentos
+    const qRegMeds = query(
+      collection(db, 'pacientes', PACIENTE_ID, 'registroMedicamentos'),
+      where('fechaHoraProgramada', '>=', Timestamp.fromDate(fechaInicio)),
+      where('fechaHoraProgramada', '<', Timestamp.fromDate(fechaFin))
+    );
+    const regMedsSnap = await getDocs(qRegMeds);
+    const medicamentos = regMedsSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        fechaHoraProgramada: data.fechaHoraProgramada?.toDate() || new Date(),
+        fechaHoraReal: data.fechaHoraReal?.toDate(),
+        creadoEn: data.creadoEn?.toDate() || new Date(),
+      } as RegistroMedicamento;
+    });
+
+    // 5. Cargar instancias de actividades
+    const actividades = await getInstanciasPorFecha(fecha);
+
+    // 6. Calcular procesos de medicamentos
+    const configDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'configuracion', 'horarios'));
+    const config = configDoc.exists()
+      ? { ...configDoc.data() } as ConfiguracionHorarios
+      : CONFIG_HORARIOS_DEFAULT;
+
+    const tiemposComidaDoc = await getDoc(doc(db, 'pacientes', PACIENTE_ID, 'configuracion', 'tiemposComida'));
+    const tiemposComida = tiemposComidaDoc.exists() ? (tiemposComidaDoc.data().tiempos || []) as TiempoComidaConfig[] : [];
+
+    const qMeds = query(
+      collection(db, 'pacientes', PACIENTE_ID, 'medicamentos'),
+      where('activo', '==', true)
+    );
+    const medsSnap = await getDocs(qMeds);
+    const medicamentosActivos = medsSnap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as Medicamento[];
+
+    const procesosCalculados = calcularProcesosDelDia(fecha, {
+      config,
+      tiemposComida,
+      medicamentos: medicamentosActivos,
+      actividades,
+      registros: {
+        chequeosDiarios: chequeos,
+        signosVitales,
+        menusDiarios: menus,
+        registrosMedicamentos: medicamentos,
+      },
+    });
+
+    const procesosMedicamentos = procesosCalculados.filter(p => p.tipo === 'medicamento');
+
+    return {
+      chequeos,
+      signosVitales,
+      menus,
+      medicamentos,
+      actividades,
+      procesosMedicamentos,
+    };
+  }
+
   // Función para exportar resumen del día a PDF con imágenes y diseño premium
-  async function exportarResumenDia() {
-    // Obtener medicamentos desde procesos (incluye pendientes y completados)
-    const procesosMedicamentos = procesos.filter(p => p.tipo === 'medicamento');
-
-    // Verificar si hay datos para exportar
-    const hayDatos =
-      datosDelDia.chequeos.length > 0 ||
-      datosDelDia.signosVitales.length > 0 ||
-      datosDelDia.menus.length > 0 ||
-      procesosMedicamentos.length > 0 ||
-      datosDelDia.actividades.length > 0;
-
-    if (!hayDatos) {
-      alert('No hay datos registrados para el día de hoy. Registra algún chequeo, medicamento, menú o actividad primero.');
-      return;
-    }
+  async function exportarResumenDia(fechaExportar?: Date) {
+    const fechaObjetivo = fechaExportar || new Date();
+    const esHoy = isToday(fechaObjetivo);
 
     setExportandoPDF(true);
 
     try {
+      // Determinar datos a usar (hoy usa estado, fechas pasadas cargan de Firestore)
+      let datosExportar: typeof datosDelDia;
+      let procesosMedicamentosExportar: ProcesoDelDia[];
+
+      if (esHoy) {
+        datosExportar = datosDelDia;
+        procesosMedicamentosExportar = procesos.filter(p => p.tipo === 'medicamento');
+      } else {
+        const datosHistoricos = await cargarDatosParaFecha(fechaObjetivo);
+        datosExportar = {
+          chequeos: datosHistoricos.chequeos,
+          signosVitales: datosHistoricos.signosVitales,
+          menus: datosHistoricos.menus,
+          medicamentos: datosHistoricos.medicamentos,
+          actividades: datosHistoricos.actividades,
+        };
+        procesosMedicamentosExportar = datosHistoricos.procesosMedicamentos;
+      }
+
+      // Verificar si hay datos para exportar
+      const hayDatos =
+        datosExportar.chequeos.length > 0 ||
+        datosExportar.signosVitales.length > 0 ||
+        datosExportar.menus.length > 0 ||
+        procesosMedicamentosExportar.length > 0 ||
+        datosExportar.actividades.length > 0;
+
+      if (!hayDatos) {
+        const fechaFormateadaMsg = format(fechaObjetivo, "d 'de' MMMM", { locale: es });
+        alert(`No hay datos registrados para el ${fechaFormateadaMsg}. Selecciona otra fecha.`);
+        setExportandoPDF(false);
+        return;
+      }
+
       // === PASO 1: Cargar recetas para obtener fotos ===
       const recetasMap = new Map<string, Receta>();
       const recetaIds = new Set<string>();
 
-      datosDelDia.menus.forEach(menu => {
+      datosExportar.menus.forEach(menu => {
         menu.platillos?.forEach(p => {
           if (p.recetaId) recetaIds.add(p.recetaId);
         });
@@ -521,7 +676,7 @@ export default function Dashboard() {
       const fotoUrls: string[] = [];
 
       // Fotos de platillos
-      datosDelDia.menus.forEach(menu => {
+      datosExportar.menus.forEach(menu => {
         menu.platillos?.forEach(p => {
           if (p.fotoCustom) {
             fotoUrls.push(p.fotoCustom);
@@ -533,7 +688,7 @@ export default function Dashboard() {
       });
 
       // Fotos de actividades (V2: fotos están en ejecucion.fotos)
-      datosDelDia.actividades.forEach(act => {
+      datosExportar.actividades.forEach(act => {
         const fotos = act.ejecucion?.fotos;
         if (fotos?.length) {
           fotoUrls.push(...fotos.slice(0, 3)); // Max 3 fotos por actividad
@@ -552,7 +707,7 @@ export default function Dashboard() {
       // === PASO 3: Generar PDF ===
       const pdfDoc = new jsPDF();
       let yPos = 15;
-      const hoy = new Date();
+      const fechaPDF = fechaObjetivo;
       const pageWidth = 210; // A4 width in mm
       const marginLeft = 15;
       const marginRight = 15;
@@ -618,14 +773,14 @@ export default function Dashboard() {
       // Fecha
       pdfDoc.setFontSize(11);
       pdfDoc.setTextColor(100, 80, 140);
-      const fechaFormateada = format(hoy, "EEEE d 'de' MMMM, yyyy", { locale: es });
+      const fechaFormateada = format(fechaPDF, "EEEE d 'de' MMMM, yyyy", { locale: es });
       pdfDoc.text(fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1), pageWidth / 2, 40, { align: 'center' });
 
       pdfDoc.setTextColor(0, 0, 0);
       yPos = 55;
 
       // === SECCIÓN 1: SIGNOS VITALES ===
-      if (datosDelDia.signosVitales.length > 0) {
+      if (datosExportar.signosVitales.length > 0) {
         checkPageBreak(50);
 
         // Título con icono
@@ -638,7 +793,7 @@ export default function Dashboard() {
         pdfDoc.setTextColor(0, 0, 0);
         yPos += 12;
 
-        const signosData = datosDelDia.signosVitales.map(sv => [
+        const signosData = datosExportar.signosVitales.map(sv => [
           format(sv.fecha, 'HH:mm'),
           sv.presionArterialSistolica && sv.presionArterialDiastolica
             ? `${sv.presionArterialSistolica}/${sv.presionArterialDiastolica}`
@@ -661,8 +816,8 @@ export default function Dashboard() {
       }
 
       // === SECCIÓN 2: CHEQUEO DIARIO ===
-      if (datosDelDia.chequeos.length > 0) {
-        const chequeo = datosDelDia.chequeos[0];
+      if (datosExportar.chequeos.length > 0) {
+        const chequeo = datosExportar.chequeos[0];
         checkPageBreak(60);
 
         // Título con icono
@@ -795,7 +950,7 @@ export default function Dashboard() {
       }
 
       // === SECCIÓN 3: MEDICAMENTOS ===
-      if (procesosMedicamentos.length > 0) {
+      if (procesosMedicamentosExportar.length > 0) {
         checkPageBreak(50);
 
         // Título con icono
@@ -814,7 +969,7 @@ export default function Dashboard() {
           vencido: 'Vencido',
         };
 
-        const medsData = procesosMedicamentos
+        const medsData = procesosMedicamentosExportar
           .sort((a, b) => (a.horaProgramada || '').localeCompare(b.horaProgramada || ''))
           .map(med => [
             med.horaProgramada,
@@ -840,7 +995,7 @@ export default function Dashboard() {
       }
 
       // === SECCIÓN 4: MENÚ DEL DÍA CON IMÁGENES ===
-      if (datosDelDia.menus.length > 0) {
+      if (datosExportar.menus.length > 0) {
         checkPageBreak(70);
 
         // Título con icono
@@ -853,7 +1008,7 @@ export default function Dashboard() {
         pdfDoc.setTextColor(0, 0, 0);
         yPos += 15;
 
-        const menusOrdenados = datosDelDia.menus.sort((a, b) => {
+        const menusOrdenados = datosExportar.menus.sort((a, b) => {
           const orden = ['desayuno', 'colacion_am', 'almuerzo', 'colacion_pm', 'cena'];
           return orden.indexOf(a.tiempoComidaId) - orden.indexOf(b.tiempoComidaId);
         });
@@ -933,8 +1088,8 @@ export default function Dashboard() {
       }
 
       // === SECCIÓN 5: RESUMEN Y OBSERVACIONES ===
-      if (datosDelDia.chequeos.length > 0) {
-        const chequeoResumen = datosDelDia.chequeos[0];
+      if (datosExportar.chequeos.length > 0) {
+        const chequeoResumen = datosExportar.chequeos[0];
         const tieneResumen = chequeoResumen.resumen?.resumenGeneral ||
                              chequeoResumen.resumen?.observacionesImportantes ||
                              chequeoResumen.resumen?.recomendacionesSiguienteTurno;
@@ -986,7 +1141,7 @@ export default function Dashboard() {
 
       // === SECCIÓN 6: ACTIVIDADES CON FOTOS ===
       // Filtrar canceladas y ordenar por hora preferida
-      const actividadesParaPDF = datosDelDia.actividades
+      const actividadesParaPDF = datosExportar.actividades
         .filter(a => a.estado !== 'cancelada')
         .sort((a, b) => a.horaPreferida.localeCompare(b.horaPreferida));
 
@@ -1077,7 +1232,7 @@ export default function Dashboard() {
       }
 
       // Guardar
-      const fechaArchivo = format(hoy, 'dd-MM-yyyy');
+      const fechaArchivo = format(fechaPDF, 'dd-MM-yyyy');
       pdfDoc.save(`resumen-dia-${fechaArchivo}.pdf`);
 
     } catch (error) {
@@ -1114,28 +1269,46 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <button
-            onClick={exportarResumenDia}
-            disabled={exportandoPDF}
-            className={`flex items-center gap-2 px-4 py-2.5 text-white font-medium rounded-xl shadow-md transition-all ${
-              exportandoPDF
-                ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-wait'
-                : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 hover:shadow-lg active:scale-[0.98]'
-            }`}
-            title="Exportar resumen del día en PDF"
-          >
-            {exportandoPDF ? (
-              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            )}
-            <span className="hidden sm:inline">{exportandoPDF ? 'Generando...' : 'Resumen PDF'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Selector de fecha para historial */}
+            <input
+              type="date"
+              value={fechaPDFSeleccionada}
+              onChange={(e) => setFechaPDFSeleccionada(e.target.value)}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              className="px-3 py-2.5 border border-warm-200 rounded-xl text-sm text-warm-700
+                         bg-white shadow-sm focus:ring-2 focus:ring-lavender-300 focus:border-lavender-400
+                         cursor-pointer hover:border-lavender-300 transition-colors"
+              title="Seleccionar fecha para el resumen"
+            />
+
+            {/* Botón PDF */}
+            <button
+              onClick={() => {
+                const fecha = new Date(fechaPDFSeleccionada + 'T12:00:00');
+                exportarResumenDia(fecha);
+              }}
+              disabled={exportandoPDF}
+              className={`flex items-center gap-2 px-4 py-2.5 text-white font-medium rounded-xl shadow-md transition-all ${
+                exportandoPDF
+                  ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-wait'
+                  : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 hover:shadow-lg active:scale-[0.98]'
+              }`}
+              title={`Exportar resumen del ${format(new Date(fechaPDFSeleccionada + 'T12:00:00'), "d 'de' MMMM", { locale: es })}`}
+            >
+              {exportandoPDF ? (
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              <span className="hidden sm:inline">{exportandoPDF ? 'Generando...' : 'Resumen PDF'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
