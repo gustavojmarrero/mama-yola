@@ -10,6 +10,7 @@ import PastilleroDiario from './pages/PastilleroDiario'
 import Contactos from './pages/Contactos'
 import Eventos from './pages/Eventos'
 import Inventarios from './pages/Inventarios'
+import SolicitudesMateriales from './pages/SolicitudesMateriales'
 import Turnos from './pages/Turnos'
 import Actividades from './pages/Actividades'
 import ActividadesV2 from './pages/ActividadesV2'
@@ -106,6 +107,14 @@ function App() {
         element={
           <PrivateRoute>
             <Inventarios />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/solicitudes"
+        element={
+          <PrivateRoute>
+            <SolicitudesMateriales />
           </PrivateRoute>
         }
       />

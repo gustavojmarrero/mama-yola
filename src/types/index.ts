@@ -764,5 +764,70 @@ export interface ReporteDiferencia {
   actualizadoEn: Date;
 }
 
+// ===== TIPOS DE SOLICITUD DE MATERIALES =====
+
+export type EstadoSolicitudMaterial =
+  | 'pendiente'    // Esperando aprobación
+  | 'aprobada'     // Aprobada, pendiente de compra
+  | 'rechazada'    // Rechazada con motivo
+  | 'comprada'     // Comprada, pendiente de entrega
+  | 'entregada';   // Entregada e ingresada al inventario
+
+export type UrgenciaMaterial = 'baja' | 'normal' | 'alta' | 'urgente';
+export type OrigenItemSolicitud = 'inventario' | 'nuevo';
+
+export interface ItemSolicitudMaterial {
+  itemId?: string;                    // ID si es item existente del inventario
+  nombre: string;
+  categoria: CategoriaInventario;
+  cantidad: number;
+  unidad: string;
+  origenItem: OrigenItemSolicitud;    // 'inventario' si ya existe, 'nuevo' si es item nuevo
+  motivo?: string;                    // Razón específica para este item
+  cantidadActualInventario?: number;  // Solo para items existentes
+}
+
+export interface SolicitudMaterial {
+  id: string;
+  pacienteId: string;
+
+  // Información del solicitante
+  solicitadoPor: string;              // userId
+  solicitadoPorNombre: string;
+  solicitadoPorRol: Rol;
+
+  // Items solicitados
+  items: ItemSolicitudMaterial[];
+
+  // Metadatos de la solicitud
+  estado: EstadoSolicitudMaterial;
+  urgencia: UrgenciaMaterial;
+  motivoGeneral?: string;             // Razón general de la solicitud
+  fechaNecesaria?: Date;              // Fecha para cuando se necesita
+
+  // Flujo de aprobación
+  revisadoPor?: string;
+  revisadoPorNombre?: string;
+  revisadoEn?: Date;
+  motivoRechazo?: string;
+
+  // Flujo de compra
+  compradoPor?: string;
+  compradoPorNombre?: string;
+  compradoEn?: Date;
+  notasCompra?: string;
+  costoTotal?: number;
+
+  // Flujo de entrega
+  entregadoPor?: string;
+  entregadoPorNombre?: string;
+  entregadoEn?: Date;
+  notasEntrega?: string;
+
+  // Timestamps
+  creadoEn: Date;
+  actualizadoEn: Date;
+}
+
 // ===== RE-EXPORTAR TIPOS DE ACTIVIDADES V2 =====
 export * from './actividades';

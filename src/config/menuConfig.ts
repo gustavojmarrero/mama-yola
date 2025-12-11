@@ -28,6 +28,7 @@ export const MENU_ITEMS: MenuItem[] = [
   // Gestión
   { id: '/dashboard', name: 'Dashboard', path: '/dashboard', icon: '🏠', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/inventarios', name: 'Inventarios', path: '/inventarios', icon: '📦', roles: ['familiar', 'supervisor', 'cuidador'] },
+  { id: '/solicitudes', name: 'Solicitudes', path: '/solicitudes', icon: '🛒', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/turnos', name: 'Turnos', path: '/turnos', icon: '👥', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/actividades', name: 'Actividades', path: '/actividades', icon: '🎯', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/plantillas', name: 'Plantillas', path: '/plantillas', icon: '📑', roles: ['familiar', 'supervisor'] },
@@ -60,6 +61,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     items: [
       MENU_ITEMS.find(i => i.id === '/dashboard')!,
       MENU_ITEMS.find(i => i.id === '/inventarios')!,
+      MENU_ITEMS.find(i => i.id === '/solicitudes')!,
       MENU_ITEMS.find(i => i.id === '/turnos')!,
       MENU_ITEMS.find(i => i.id === '/actividades')!,
       MENU_ITEMS.find(i => i.id === '/plantillas')!,
