@@ -32,6 +32,42 @@ function getFaviconUrl(url: string): string {
   }
 }
 
+// Función para obtener thumbnail automático de la URL
+function getAutoThumbnail(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
+
+    // YouTube - extraer ID del video y usar thumbnail
+    if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+      let videoId = '';
+      if (domain.includes('youtu.be')) {
+        videoId = urlObj.pathname.slice(1);
+      } else {
+        videoId = urlObj.searchParams.get('v') || '';
+      }
+      if (videoId) {
+        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+      }
+    }
+
+    // Vimeo
+    if (domain.includes('vimeo.com')) {
+      const vimeoId = urlObj.pathname.split('/').pop();
+      if (vimeoId) {
+        return `https://vumbnail.com/${vimeoId}.jpg`;
+      }
+    }
+
+    // Spotify - no hay thumbnails públicos fáciles
+    // Google Photos - no expone thumbnails públicamente
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Función para obtener el dominio legible
 function getDomainName(url: string): string {
   try {
@@ -76,6 +112,8 @@ export default function RecursoCard({
   const domainName = getDomainName(recurso.url);
   const bgGradient = getBackgroundGradient(recurso.url);
   const categoriaColor = categoria?.color || '#8B7BB8';
+  // Usar thumbnail manual si existe, sino intentar obtener uno automático
+  const thumbnailUrl = recurso.thumbnail || getAutoThumbnail(recurso.url);
 
   return (
     <div
@@ -88,9 +126,9 @@ export default function RecursoCard({
     >
       {/* Thumbnail o placeholder con gradiente */}
       <div className={`relative h-36 bg-gradient-to-br ${bgGradient} overflow-hidden`}>
-        {recurso.thumbnail ? (
+        {thumbnailUrl ? (
           <img
-            src={recurso.thumbnail}
+            src={thumbnailUrl}
             alt={recurso.titulo}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             onError={(e) => {
