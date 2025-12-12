@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../config/firebase';
 import {
   InstanciaActividad,
   ActividadElegida,
@@ -58,6 +59,14 @@ export default function CompletarSlotModal({
   const [motivoOmision, setMotivoOmision] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados para captura de actividad custom
+  const [customForm, setCustomForm] = useState({
+    nombre: '',
+    descripcion: '',
+    foto: '',
+  });
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
 
   // Cargar plantillas filtradas
   useEffect(() => {
@@ -121,6 +130,8 @@ export default function CompletarSlotModal({
       });
       setMotivoOmision('');
       setError(null);
+      // Reset formulario custom
+      setCustomForm({ nombre: '', descripcion: '', foto: '' });
     }
   }, [isOpen, instancia]);
 
@@ -131,27 +142,70 @@ export default function CompletarSlotModal({
     setPaso('completar');
   };
 
+  const handleSeleccionarCustom = () => {
+    if (!customForm.nombre.trim()) return;
+    setPlantillaSeleccionada(null); // Asegurar que no hay plantilla seleccionada
+    setPaso('completar');
+  };
+
+  const handleFotoCustomUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSubiendoFoto(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}.${ext}`;
+      const storageRef = ref(storage, `actividades-custom/${fileName}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setCustomForm(prev => ({ ...prev, foto: url }));
+    } catch (error) {
+      console.error('Error al subir foto:', error);
+      setError('Error al subir la foto');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
   const handleChange = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setError(null);
   };
 
   const handleCompletar = async () => {
-    if (!instancia || !plantillaSeleccionada) return;
+    if (!instancia) return;
+
+    // Validar que hay plantilla seleccionada O datos custom
+    if (!plantillaSeleccionada && !customForm.nombre.trim()) return;
 
     setSaving(true);
     setError(null);
 
     try {
-      // La duración viene del slot, no de la plantilla
-      const actividadElegida: ActividadElegida = {
-        plantillaId: plantillaSeleccionada.id,
-        nombre: plantillaSeleccionada.nombre,
-        duracion: instancia.slotAbierto?.duracionEstimada || form.duracionReal,
-        descripcion: plantillaSeleccionada.descripcion,
-        ubicacion: plantillaSeleccionada.ubicacion,
-        nivelEnergia: plantillaSeleccionada.nivelEnergia,
-      };
+      let actividadElegida: ActividadElegida;
+
+      if (plantillaSeleccionada) {
+        // Flujo existente: plantilla seleccionada
+        actividadElegida = {
+          plantillaId: plantillaSeleccionada.id,
+          nombre: plantillaSeleccionada.nombre,
+          duracion: instancia.slotAbierto?.duracionEstimada || form.duracionReal,
+          descripcion: plantillaSeleccionada.descripcion,
+          ubicacion: plantillaSeleccionada.ubicacion,
+          nivelEnergia: plantillaSeleccionada.nivelEnergia,
+        };
+      } else {
+        // Nuevo flujo: actividad custom
+        actividadElegida = {
+          plantillaId: null,
+          nombre: customForm.nombre.trim(),
+          duracion: form.duracionReal,
+          descripcion: customForm.descripcion.trim() || undefined,
+          esCustom: true,
+          fotoCustom: customForm.foto || undefined,
+        };
+      }
 
       await completarSlotAbierto(
         instancia.id,
@@ -323,6 +377,113 @@ export default function CompletarSlotModal({
                   </div>
                 )}
 
+                {/* Separador y formulario para actividad custom */}
+                {!loading && (
+                  <>
+                    <div className="relative my-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200"></div>
+                      </div>
+                      <div className="relative flex justify-center text-xs">
+                        <span className="px-2 bg-white text-gray-500">
+                          o capturar actividad nueva
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 p-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                      {/* Nombre */}
+                      <input
+                        type="text"
+                        value={customForm.nombre}
+                        onChange={(e) => setCustomForm(prev => ({ ...prev, nombre: e.target.value }))}
+                        placeholder="Nombre de la actividad realizada..."
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-lavender-500 focus:border-transparent bg-white"
+                      />
+
+                      {/* Campos adicionales cuando hay nombre */}
+                      {customForm.nombre.trim() && (
+                        <>
+                          {/* Descripción */}
+                          <textarea
+                            value={customForm.descripcion}
+                            onChange={(e) => setCustomForm(prev => ({ ...prev, descripcion: e.target.value }))}
+                            placeholder="Descripción breve (opcional)..."
+                            rows={2}
+                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-lavender-500 focus:border-transparent resize-none bg-white"
+                          />
+
+                          {/* Foto */}
+                          <div className="flex gap-2">
+                            {customForm.foto ? (
+                              <div className="relative">
+                                <img
+                                  src={customForm.foto}
+                                  alt="Preview"
+                                  className="w-16 h-16 rounded-lg object-cover"
+                                />
+                                <button
+                                  onClick={() => setCustomForm(prev => ({ ...prev, foto: '' }))}
+                                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <label className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-gray-200 rounded-xl bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    onChange={handleFotoCustomUpload}
+                                    className="hidden"
+                                    disabled={subiendoFoto}
+                                  />
+                                  {subiendoFoto ? (
+                                    <div className="w-4 h-4 border-2 border-gray-300 border-t-lavender-600 rounded-full animate-spin" />
+                                  ) : (
+                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                  )}
+                                  <span className="text-sm text-gray-600">Foto</span>
+                                </label>
+                                <label className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-gray-200 rounded-xl bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFotoCustomUpload}
+                                    className="hidden"
+                                    disabled={subiendoFoto}
+                                  />
+                                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <span className="text-sm text-gray-600">Galería</span>
+                                </label>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Botón continuar */}
+                          <button
+                            onClick={handleSeleccionarCustom}
+                            disabled={!customForm.nombre.trim()}
+                            className="w-full py-3 bg-lavender-600 text-white rounded-xl font-medium hover:bg-lavender-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            Continuar con esta actividad
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 {/* Botón omitir */}
                 <button
                   onClick={() => setPaso('omitir')}
@@ -334,16 +495,36 @@ export default function CompletarSlotModal({
             )}
 
             {/* Paso 2: Completar detalles */}
-            {paso === 'completar' && plantillaSeleccionada && (
+            {paso === 'completar' && (plantillaSeleccionada || customForm.nombre.trim()) && (
               <div className="space-y-5">
-                {/* Plantilla seleccionada */}
+                {/* Actividad seleccionada (plantilla o custom) */}
                 <div className={`p-3 rounded-xl ${tipoConfig.bgColor}`}>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{tipoConfig.icon}</span>
-                    <div>
-                      <h3 className="font-medium text-gray-800">{plantillaSeleccionada.nombre}</h3>
-                      {plantillaSeleccionada.ubicacion && (
+                    {/* Foto o icono */}
+                    {plantillaSeleccionada?.foto ? (
+                      <img
+                        src={plantillaSeleccionada.foto}
+                        alt={plantillaSeleccionada.nombre}
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : customForm.foto ? (
+                      <img
+                        src={customForm.foto}
+                        alt={customForm.nombre}
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <span className="text-xl">{tipoConfig.icon}</span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-800 truncate">
+                        {plantillaSeleccionada?.nombre || customForm.nombre}
+                      </h3>
+                      {plantillaSeleccionada?.ubicacion && (
                         <p className="text-xs text-gray-600">{plantillaSeleccionada.ubicacion}</p>
+                      )}
+                      {!plantillaSeleccionada && customForm.descripcion && (
+                        <p className="text-xs text-gray-600 truncate">{customForm.descripcion}</p>
                       )}
                     </div>
                     <button

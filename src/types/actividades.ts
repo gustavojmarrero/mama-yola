@@ -132,12 +132,15 @@ export interface ProgramacionActividad {
  * Datos de la actividad elegida por el cuidador (para slots abiertos)
  */
 export interface ActividadElegida {
-  plantillaId: string;
+  plantillaId: string | null; // null = actividad custom sin plantilla
   nombre: string;
   duracion: number;
   descripcion?: string;
   ubicacion?: string;
   nivelEnergia?: NivelEnergia;
+  // Campos para actividades custom (sin plantilla)
+  esCustom?: boolean;
+  fotoCustom?: string;
 }
 
 /**
