@@ -308,3 +308,65 @@ export async function contarProgramacionesPorTipo(): Promise<{
 
   return { fisica, cognitiva, total: programaciones.length };
 }
+
+/**
+ * Identifica y elimina programaciones duplicadas.
+ * Dos programaciones se consideran duplicadas si tienen:
+ * - Misma modalidad
+ * - Mismo nombre (para definidas) o mismo tipo (para slots)
+ * - Misma hora preferida
+ * - Mismos días de la semana
+ *
+ * Mantiene la programación más antigua y elimina las demás.
+ * Retorna el número de programaciones eliminadas.
+ */
+export async function limpiarProgramacionesDuplicadas(): Promise<{
+  duplicadosEncontrados: number;
+  programacionesEliminadas: string[];
+}> {
+  const programaciones = await getProgramacionesActivas();
+
+  // Crear una clave única para cada programación
+  const getKey = (p: ProgramacionActividad): string => {
+    const diasKey = [...p.diasSemana].sort().join(',');
+    if (p.modalidad === 'definida' && p.actividadDefinida) {
+      return `definida_${p.actividadDefinida.nombre}_${p.horaPreferida}_${diasKey}`;
+    }
+    if (p.modalidad === 'slot_abierto' && p.slotAbierto) {
+      return `slot_${p.slotAbierto.tipo}_${p.horaPreferida}_${diasKey}`;
+    }
+    return `unknown_${p.id}`;
+  };
+
+  // Agrupar por clave
+  const grupos = new Map<string, ProgramacionActividad[]>();
+  programaciones.forEach(p => {
+    const key = getKey(p);
+    if (!grupos.has(key)) grupos.set(key, []);
+    grupos.get(key)!.push(p);
+  });
+
+  // Identificar duplicados y eliminarlos (mantener el más antiguo)
+  const programacionesEliminadas: string[] = [];
+
+  for (const [, progs] of grupos) {
+    if (progs.length > 1) {
+      // Ordenar por fecha de creación (más antiguo primero)
+      const ordenados = progs.sort((a, b) =>
+        a.creadoEn.getTime() - b.creadoEn.getTime()
+      );
+
+      // Eliminar todos excepto el primero (más antiguo)
+      const duplicados = ordenados.slice(1);
+      for (const dup of duplicados) {
+        await desactivarProgramacion(dup.id);
+        programacionesEliminadas.push(dup.id);
+      }
+    }
+  }
+
+  return {
+    duplicadosEncontrados: programacionesEliminadas.length,
+    programacionesEliminadas,
+  };
+}

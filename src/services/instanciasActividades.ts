@@ -487,6 +487,181 @@ export async function eliminarInstanciasFuturasPendientes(
 }
 
 /**
+ * Elimina todas las instancias PENDIENTES de una lista de programaciones.
+ * Se usa después de desactivar programaciones duplicadas para limpiar
+ * las instancias huérfanas.
+ */
+export async function eliminarInstanciasPendientesDeProgramaciones(
+  programacionIds: string[]
+): Promise<number> {
+  if (programacionIds.length === 0) return 0;
+
+  let totalEliminadas = 0;
+
+  // Procesar en lotes de 10 para evitar límites de Firestore
+  for (let i = 0; i < programacionIds.length; i += 10) {
+    const batch = writeBatch(db);
+    const lote = programacionIds.slice(i, i + 10);
+
+    for (const progId of lote) {
+      const q = query(
+        getInstanciasRef(),
+        where('programacionId', '==', progId),
+        where('estado', '==', 'pendiente')
+      );
+
+      const snapshot = await getDocs(q);
+      snapshot.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+        totalEliminadas++;
+      });
+    }
+
+    await batch.commit();
+  }
+
+  return totalEliminadas;
+}
+
+/**
+ * Limpia instancias huérfanas y duplicadas para un rango de fechas.
+ *
+ * Elimina:
+ * 1. Instancias de programaciones que ya no están activas (huérfanas)
+ * 2. Para slots: si hay una completada y una pendiente del mismo tipo+hora, elimina la pendiente
+ * 3. Actividades definidas duplicadas del mismo nombre+hora (mantiene la de programación activa)
+ *
+ * @param programacionesActivas - IDs de programaciones activas actuales
+ */
+export async function limpiarInstanciasHuerfanas(
+  fechaInicio: Date,
+  fechaFin: Date,
+  programacionesActivasIds: Set<string>
+): Promise<{
+  eliminadas: number;
+  instanciasEliminadas: string[];
+}> {
+  const instancias = await getInstanciasPorRango(fechaInicio, fechaFin);
+  const instanciasEliminadas: string[] = [];
+
+  // Agrupar por fecha + hora
+  const porFechaHora = new Map<string, InstanciaActividad[]>();
+  instancias.forEach(inst => {
+    const fechaStr = inst.fecha.toISOString().split('T')[0];
+    const key = `${fechaStr}_${inst.horaPreferida}`;
+    if (!porFechaHora.has(key)) porFechaHora.set(key, []);
+    porFechaHora.get(key)!.push(inst);
+  });
+
+  for (const [, grupo] of porFechaHora) {
+    // Si solo hay una instancia, verificar si es huérfana
+    if (grupo.length === 1) {
+      const inst = grupo[0];
+      // Solo eliminar huérfanas PENDIENTES (las completadas se mantienen como histórico)
+      if (!programacionesActivasIds.has(inst.programacionId) && inst.estado === 'pendiente') {
+        instanciasEliminadas.push(inst.id);
+      }
+      continue;
+    }
+
+    // Hay múltiples instancias para esta fecha+hora
+    const activas = grupo.filter(i => programacionesActivasIds.has(i.programacionId));
+    const huerfanas = grupo.filter(i => !programacionesActivasIds.has(i.programacionId));
+    const completadas = grupo.filter(i => i.estado === 'completada');
+    const pendientes = grupo.filter(i => i.estado === 'pendiente');
+
+    // 1. Eliminar huérfanas PENDIENTES
+    huerfanas.forEach(h => {
+      if (h.estado === 'pendiente' && !instanciasEliminadas.includes(h.id)) {
+        instanciasEliminadas.push(h.id);
+      }
+    });
+
+    // 2. Si hay completadas, eliminar pendientes del mismo tipo (son redundantes)
+    if (completadas.length > 0 && pendientes.length > 0) {
+      const tiposCompletados = new Set(completadas.map(c => c.tipo));
+      pendientes.forEach(p => {
+        if (tiposCompletados.has(p.tipo) && !instanciasEliminadas.includes(p.id)) {
+          instanciasEliminadas.push(p.id);
+        }
+      });
+    }
+
+    // 3. Si hay múltiples activas del mismo tipo, mantener solo una
+    const activasPorTipo = new Map<string, InstanciaActividad[]>();
+    activas.forEach(a => {
+      const tipoKey = a.modalidad === 'definida'
+        ? `definida_${a.actividadDefinida?.nombre}`
+        : `slot_${a.tipo}`;
+      if (!activasPorTipo.has(tipoKey)) activasPorTipo.set(tipoKey, []);
+      activasPorTipo.get(tipoKey)!.push(a);
+    });
+
+    for (const [, duplicadas] of activasPorTipo) {
+      if (duplicadas.length > 1) {
+        // Ordenar: completadas primero, luego por fecha de creación
+        const ordenadas = duplicadas.sort((a, b) => {
+          if (a.estado === 'completada' && b.estado !== 'completada') return -1;
+          if (b.estado === 'completada' && a.estado !== 'completada') return 1;
+          return a.creadoEn.getTime() - b.creadoEn.getTime();
+        });
+        // Eliminar todas excepto la primera
+        ordenadas.slice(1).forEach(dup => {
+          if (!instanciasEliminadas.includes(dup.id)) {
+            instanciasEliminadas.push(dup.id);
+          }
+        });
+      }
+    }
+  }
+
+  // Eliminar en batches
+  if (instanciasEliminadas.length > 0) {
+    let batch = writeBatch(db);
+    let batchCount = 0;
+
+    for (const id of instanciasEliminadas) {
+      const docRef = doc(getInstanciasRef(), id);
+      batch.delete(docRef);
+      batchCount++;
+
+      if (batchCount >= 450) {
+        await batch.commit();
+        batch = writeBatch(db);
+        batchCount = 0;
+      }
+    }
+
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+  }
+
+  return {
+    eliminadas: instanciasEliminadas.length,
+    instanciasEliminadas,
+  };
+}
+
+/**
+ * @deprecated Usar limpiarInstanciasHuerfanas en su lugar
+ */
+export async function limpiarInstanciasDuplicadas(
+  fechaInicio: Date,
+  fechaFin: Date
+): Promise<{
+  duplicadosEncontrados: number;
+  instanciasEliminadas: string[];
+}> {
+  // Función legacy - redirige a la nueva
+  const result = await limpiarInstanciasHuerfanas(fechaInicio, fechaFin, new Set());
+  return {
+    duplicadosEncontrados: result.eliminadas,
+    instanciasEliminadas: result.instanciasEliminadas,
+  };
+}
+
+/**
  * Actualiza una instancia de slot completada (cambiar actividad elegida y/o detalles)
  */
 export async function actualizarInstanciaCompletada(

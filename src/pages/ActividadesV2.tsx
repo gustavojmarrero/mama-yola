@@ -14,12 +14,208 @@ import {
   InstanciaActividad,
   ProgramacionActividad,
 } from '../types/actividades';
-import { getProgramacionesActivas } from '../services/programacionActividades';
+import { getProgramacionesActivas, limpiarProgramacionesDuplicadas } from '../services/programacionActividades';
 import {
   getInstanciasPorFecha,
   getInstanciasPorRango,
   generarInstanciasParaFecha,
+  eliminarInstanciasPendientesDeProgramaciones,
+  limpiarInstanciasHuerfanas,
 } from '../services/instanciasActividades';
+
+// Exponer funciones de diagnóstico y limpieza en window para ejecutar desde consola
+if (typeof window !== 'undefined') {
+  // Diagnóstico: ver todas las programaciones
+  (window as unknown as Record<string, unknown>).diagnostico = async () => {
+    console.log('🔍 Obteniendo programaciones activas...');
+    const progs = await getProgramacionesActivas();
+
+    console.log(`📋 Total programaciones activas: ${progs.length}`);
+
+    // Agrupar por tipo
+    const slots = progs.filter(p => p.modalidad === 'slot_abierto');
+    const definidas = progs.filter(p => p.modalidad === 'definida');
+
+    console.log(`\n📌 Actividades DEFINIDAS (${definidas.length}):`);
+    definidas.forEach(p => {
+      console.log(`  - ${p.actividadDefinida?.nombre} @ ${p.horaPreferida} (días: ${p.diasSemana.join(',')})`);
+    });
+
+    console.log(`\n🎯 SLOTS ABIERTOS (${slots.length}):`);
+    slots.forEach(p => {
+      console.log(`  - ${p.slotAbierto?.tipo} @ ${p.horaPreferida} (días: ${p.diasSemana.join(',')}) [ID: ${p.id}]`);
+    });
+
+    // Detectar duplicados de slots
+    const slotsAgrupados = new Map<string, typeof slots>();
+    slots.forEach(s => {
+      const key = `${s.slotAbierto?.tipo}_${s.horaPreferida}_${s.diasSemana.sort().join(',')}`;
+      if (!slotsAgrupados.has(key)) slotsAgrupados.set(key, []);
+      slotsAgrupados.get(key)!.push(s);
+    });
+
+    const duplicados = [...slotsAgrupados.entries()].filter(([, v]) => v.length > 1);
+    if (duplicados.length > 0) {
+      console.log(`\n⚠️ SLOTS DUPLICADOS ENCONTRADOS:`);
+      duplicados.forEach(([key, progs]) => {
+        console.log(`  ${key}: ${progs.length} programaciones`);
+        progs.forEach(p => console.log(`    - ID: ${p.id}`));
+      });
+    } else {
+      console.log(`\n✅ No hay slots duplicados en programaciones`);
+    }
+
+    return { total: progs.length, slots: slots.length, definidas: definidas.length, duplicados: duplicados.length };
+  };
+
+  // Limpieza inteligente del histórico
+  // Elimina:
+  // 1. Instancias huérfanas (de programaciones que ya no existen)
+  // 2. Slots pendientes cuando ya hay uno completado del mismo tipo+hora
+  // 3. Actividades definidas duplicadas (mismo nombre+hora)
+  (window as unknown as Record<string, unknown>).limpiarHistorico = async (diasAtras = 30) => {
+    console.log(`🧹 Limpiando histórico de los últimos ${diasAtras} días...`);
+
+    // 1. Obtener programaciones activas
+    const progsActivas = await getProgramacionesActivas();
+    const idsActivos = new Set(progsActivas.map(p => p.id));
+    console.log(`📋 Programaciones activas: ${idsActivos.size}`);
+
+    // 2. Obtener instancias del rango
+    const fechaFin = new Date();
+    const fechaInicio = new Date();
+    fechaInicio.setDate(fechaInicio.getDate() - diasAtras);
+
+    const instancias = await getInstanciasPorRango(fechaInicio, fechaFin);
+    console.log(`📋 Instancias en el rango: ${instancias.length}`);
+
+    // 3. Identificar instancias a eliminar
+    const aEliminar: string[] = [];
+
+    // PASO 1: Agrupar por programacionId + fecha para detectar duplicados por programación
+    const porProgFecha = new Map<string, typeof instancias>();
+    instancias.forEach(inst => {
+      const fechaStr = inst.fecha.toISOString().split('T')[0];
+      const key = `${inst.programacionId}_${fechaStr}`;
+      if (!porProgFecha.has(key)) porProgFecha.set(key, []);
+      porProgFecha.get(key)!.push(inst);
+    });
+
+    // Eliminar duplicados por programación+fecha (mantener completadas, luego la más antigua)
+    for (const [key, grupo] of porProgFecha) {
+      if (grupo.length <= 1) continue;
+
+      console.log(`  ⚠️ Duplicados para ${key}: ${grupo.length} instancias`);
+
+      // Ordenar: completadas primero, luego por ID (el formato sin guiones es más antiguo)
+      const ordenadas = grupo.sort((a, b) => {
+        if (a.estado === 'completada' && b.estado !== 'completada') return -1;
+        if (b.estado === 'completada' && a.estado !== 'completada') return 1;
+        // Preferir IDs sin guiones (formato antiguo correcto)
+        const aHasHyphen = a.id.includes('-');
+        const bHasHyphen = b.id.includes('-');
+        if (!aHasHyphen && bHasHyphen) return -1;
+        if (aHasHyphen && !bHasHyphen) return 1;
+        return a.creadoEn.getTime() - b.creadoEn.getTime();
+      });
+
+      // Mantener solo la primera, eliminar el resto
+      ordenadas.slice(1).forEach(dup => {
+        if (!aEliminar.includes(dup.id)) {
+          console.log(`    🗑️ Duplicado: ${dup.id} (estado: ${dup.estado})`);
+          aEliminar.push(dup.id);
+        }
+      });
+    }
+
+    // PASO 2: Agrupar por fecha + hora para detectar slots redundantes
+    const porFechaHora = new Map<string, typeof instancias>();
+    instancias.forEach(inst => {
+      if (aEliminar.includes(inst.id)) return; // Ignorar los ya marcados
+      const fechaStr = inst.fecha.toISOString().split('T')[0];
+      const key = `${fechaStr}_${inst.horaPreferida}`;
+      if (!porFechaHora.has(key)) porFechaHora.set(key, []);
+      porFechaHora.get(key)!.push(inst);
+    });
+
+    for (const [, grupo] of porFechaHora) {
+      if (grupo.length <= 1) continue;
+
+      // Separar por tipo
+      const completadas = grupo.filter(i => i.estado === 'completada');
+      const pendientes = grupo.filter(i => i.estado === 'pendiente');
+      const huerfanas = grupo.filter(i => !idsActivos.has(i.programacionId));
+
+      // Eliminar huérfanas pendientes
+      huerfanas.forEach(h => {
+        if (h.estado === 'pendiente' && !aEliminar.includes(h.id)) {
+          console.log(`  🗑️ Huérfana pendiente: ${h.id} (prog: ${h.programacionId})`);
+          aEliminar.push(h.id);
+        }
+      });
+
+      // Si hay una completada y pendientes del mismo tipo/hora, eliminar pendientes
+      if (completadas.length > 0 && pendientes.length > 0) {
+        // Agrupar por tipo (cognitiva/fisica)
+        const completadasPorTipo = new Map<string, typeof completadas>();
+        completadas.forEach(c => {
+          if (!completadasPorTipo.has(c.tipo)) completadasPorTipo.set(c.tipo, []);
+          completadasPorTipo.get(c.tipo)!.push(c);
+        });
+
+        pendientes.forEach(p => {
+          // Si hay una completada del mismo tipo, eliminar esta pendiente
+          if (completadasPorTipo.has(p.tipo) && !aEliminar.includes(p.id)) {
+            console.log(`  🗑️ Slot pendiente redundante: ${p.id} (ya hay completada del tipo ${p.tipo})`);
+            aEliminar.push(p.id);
+          }
+        });
+      }
+    }
+
+    console.log(`\n📊 Total identificado para eliminar: ${aEliminar.length}`);
+
+    // PASO 3: Eliminar las instancias identificadas directamente
+    if (aEliminar.length > 0) {
+      const { writeBatch, doc, collection } = await import('firebase/firestore');
+      const instanciasRef = collection(db, 'pacientes', 'paciente-principal', 'instanciasActividades');
+
+      let batch = writeBatch(db);
+      let batchCount = 0;
+
+      for (const id of aEliminar) {
+        const docRef = doc(instanciasRef, id);
+        batch.delete(docRef);
+        batchCount++;
+
+        if (batchCount >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchCount = 0;
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+    }
+
+    // También ejecutar la limpieza de huérfanas estándar
+    const resultado = await limpiarInstanciasHuerfanas(fechaInicio, fechaFin, idsActivos);
+    const totalEliminadas = aEliminar.length + resultado.eliminadas;
+
+    console.log(`✅ Eliminadas directamente: ${aEliminar.length}`);
+    console.log(`✅ Eliminadas por limpiarInstanciasHuerfanas: ${resultado.eliminadas}`);
+    console.log(`✅ TOTAL eliminadas: ${totalEliminadas}`);
+    if (totalEliminadas > 0) {
+      console.log('🔄 Recarga la página para ver los cambios');
+    } else {
+      console.log('✨ No hay instancias para limpiar');
+    }
+
+    return { eliminadas: totalEliminadas, ids: [...aEliminar, ...resultado.instanciasEliminadas] };
+  };
+}
 import { ConfiguracionHorarios } from '../types';
 import { CONFIG_HORARIOS_DEFAULT } from '../utils/procesosDelDia';
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, addWeeks, subWeeks } from 'date-fns';

@@ -1139,14 +1139,25 @@ export default function Dashboard() {
         }
       }
 
-      // === SECCIÓN 6: ACTIVIDADES CON FOTOS ===
-      // Filtrar canceladas y ordenar por hora preferida
-      const actividadesParaPDF = datosExportar.actividades
+      // === SECCIÓN 6: ACTIVIDADES EN 3 COLUMNAS COMPACTAS ===
+      // Filtrar canceladas, deduplicar por nombre+hora y ordenar por hora preferida
+      const actividadesUnicas = new Map<string, InstanciaActividad>();
+      datosExportar.actividades
         .filter(a => a.estado !== 'cancelada')
+        .forEach(a => {
+          // Usar nombre + hora como clave para deduplicar (evita duplicados con diferentes IDs)
+          const nombre = getNombreInstancia(a);
+          const clave = `${nombre}_${a.horaPreferida}`;
+          if (!actividadesUnicas.has(clave)) {
+            actividadesUnicas.set(clave, a);
+          }
+        });
+
+      const actividadesParaPDF = Array.from(actividadesUnicas.values())
         .sort((a, b) => a.horaPreferida.localeCompare(b.horaPreferida));
 
       if (actividadesParaPDF.length > 0) {
-        checkPageBreak(60);
+        checkPageBreak(50);
 
         // Título con icono
         pdfDoc.setFillColor(243, 232, 255);
@@ -1158,59 +1169,102 @@ export default function Dashboard() {
         pdfDoc.setTextColor(0, 0, 0);
         yPos += 15;
 
+        // Diseño compacto en 4 columnas - estilo uniforme sin estados
+        const NUM_COLS = 4;
+        const CARD_GAP = 3;
+        const COL_WIDTH = (contentWidth - (CARD_GAP * (NUM_COLS - 1))) / NUM_COLS;
+        const MIN_CARD_HEIGHT = 14;
+        const LINE_HEIGHT = 3.5; // Altura por línea de texto
+
+        // Colores diferenciados por tipo de actividad
+        const coloresPorTipo = {
+          fisica: {
+            bg: [235, 245, 255] as [number, number, number],     // Azul claro
+            border: [147, 197, 253] as [number, number, number], // Azul medio
+            text: [30, 64, 175] as [number, number, number],     // Azul oscuro
+            info: [59, 130, 246] as [number, number, number]     // Azul para info
+          },
+          cognitiva: {
+            bg: [250, 240, 255] as [number, number, number],     // Violeta claro
+            border: [200, 160, 220] as [number, number, number], // Violeta medio
+            text: [88, 60, 120] as [number, number, number],     // Violeta oscuro
+            info: [120, 100, 140] as [number, number, number]    // Violeta para info
+          }
+        };
+
+        // Pre-calcular alturas de cada fila (basado en el texto más largo de esa fila)
+        const actividadesConAltura: Array<{ instancia: InstanciaActividad; nombre: string; lineas: string[]; altura: number }> = [];
+
         for (const instancia of actividadesParaPDF) {
-          // Las fotos están en ejecucion.fotos (solo si completada)
-          const fotos = instancia.ejecucion?.fotos || [];
-          const tieneFotos = fotos.length > 0;
-          const alturaCard = tieneFotos ? IMG_HEIGHT + 35 : 25;
-
-          checkPageBreak(alturaCard);
-
-          // Card de actividad
-          pdfDoc.setFillColor(252, 250, 255);
-          pdfDoc.setDrawColor(230, 220, 240);
-          pdfDoc.roundedRect(marginLeft, yPos, contentWidth, tieneFotos ? IMG_HEIGHT + 30 : 20, 3, 3, 'FD');
-
-          // Nombre de actividad (usando helper de V2)
           const nombreActividad = getNombreInstancia(instancia);
-          pdfDoc.setFontSize(11);
+          pdfDoc.setFontSize(7);
           pdfDoc.setFont('helvetica', 'bold');
-          pdfDoc.setTextColor(80, 60, 100);
-          pdfDoc.text(nombreActividad, marginLeft + 5, yPos + 8);
+          const lineas = pdfDoc.splitTextToSize(nombreActividad, COL_WIDTH - 4);
+          const altura = Math.max(MIN_CARD_HEIGHT, 6 + (lineas.length * LINE_HEIGHT) + 6);
+          actividadesConAltura.push({ instancia, nombre: nombreActividad, lineas, altura });
+        }
 
-          // Info secundaria
-          pdfDoc.setFontSize(9);
-          pdfDoc.setFont('helvetica', 'normal');
-          pdfDoc.setTextColor(120, 100, 140);
-          const horaStr = instancia.horaPreferida;
-          const tipoLabel = TIPOS_ACTIVIDAD_CONFIG[instancia.tipo]?.label || instancia.tipo;
-          const estadoLabel = ESTADOS_INSTANCIA_CONFIG[instancia.estado]?.label || instancia.estado;
-          const infoText = `${horaStr} • ${tipoLabel} • ${estadoLabel}`;
-          pdfDoc.text(infoText, marginLeft + 5, yPos + 15);
-          pdfDoc.setTextColor(0, 0, 0);
+        // Agrupar en filas de 4 y calcular altura máxima por fila
+        let colIndex = 0;
+        let rowStartY = yPos;
+        let currentRowItems: typeof actividadesConAltura = [];
 
-          // Fotos de la actividad (si existen)
-          if (tieneFotos) {
-            let fotoX = marginLeft + 5;
-            const fotoY = yPos + 22;
-            const fotosAMostrar = fotos.slice(0, 3);
+        for (let i = 0; i < actividadesConAltura.length; i++) {
+          currentRowItems.push(actividadesConAltura[i]);
 
-            for (const fotoUrl of fotosAMostrar) {
-              if (imageCache.has(fotoUrl)) {
-                try {
-                  pdfDoc.addImage(imageCache.get(fotoUrl)!, 'JPEG', fotoX, fotoY, IMG_WIDTH, IMG_HEIGHT);
-                } catch {
-                  // Ignorar errores de imagen
-                }
-              }
-              fotoX += IMG_WIDTH + IMG_GAP;
+          // Si completamos una fila de 4 o es el último elemento
+          if (currentRowItems.length === NUM_COLS || i === actividadesConAltura.length - 1) {
+            // Calcular altura máxima de esta fila
+            const rowHeight = Math.max(...currentRowItems.map(item => item.altura));
+
+            // Verificar espacio para la fila
+            checkPageBreak(rowHeight + 5);
+            if (colIndex === 0) {
+              rowStartY = yPos;
             }
-            yPos += IMG_HEIGHT + 35;
-          } else {
-            yPos += 25;
+
+            // Dibujar cada card de la fila
+            for (let j = 0; j < currentRowItems.length; j++) {
+              const item = currentRowItems[j];
+              const xCol = marginLeft + (j * (COL_WIDTH + CARD_GAP));
+
+              // Obtener colores según tipo de actividad
+              const tipoActividad = item.instancia.tipo === 'fisica' ? 'fisica' : 'cognitiva';
+              const colores = coloresPorTipo[tipoActividad];
+
+              // Card con altura uniforme para la fila
+              pdfDoc.setFillColor(...colores.bg);
+              pdfDoc.setDrawColor(...colores.border);
+              pdfDoc.setLineWidth(0.4);
+              pdfDoc.roundedRect(xCol, rowStartY, COL_WIDTH, rowHeight, 2, 2, 'FD');
+
+              // Nombre de actividad (multilínea si es necesario)
+              pdfDoc.setFontSize(7);
+              pdfDoc.setFont('helvetica', 'bold');
+              pdfDoc.setTextColor(...colores.text);
+              let textY = rowStartY + 5;
+              for (const linea of item.lineas) {
+                pdfDoc.text(linea, xCol + 2, textY);
+                textY += LINE_HEIGHT;
+              }
+
+              // Info secundaria: hora y tipo
+              pdfDoc.setFontSize(6);
+              pdfDoc.setFont('helvetica', 'normal');
+              pdfDoc.setTextColor(...colores.info);
+              const tipoLabel = item.instancia.tipo === 'fisica' ? 'Fisica' : 'Cognitiva';
+              const infoText = `${item.instancia.horaPreferida} - ${tipoLabel}`;
+              pdfDoc.text(infoText, xCol + 2, rowStartY + rowHeight - 3);
+            }
+
+            pdfDoc.setTextColor(0, 0, 0);
+            yPos = rowStartY + rowHeight + 2;
+            currentRowItems = [];
+            colIndex = 0;
           }
         }
-        yPos += 5;
+
+        yPos += 3;
       }
 
       // === FOOTER PREMIUM ===
