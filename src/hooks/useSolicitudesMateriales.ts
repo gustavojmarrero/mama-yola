@@ -21,6 +21,13 @@ import {
 
 const PACIENTE_ID = 'paciente-principal';
 
+// Helper para eliminar campos undefined (Firestore no los acepta)
+function removeUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
+}
+
 // Datos para crear una nueva solicitud
 export interface CrearSolicitudData {
   items: ItemSolicitudMaterial[];
@@ -151,19 +158,30 @@ export function useSolicitudesMateriales(): UseSolicitudesMaterialesReturn {
     try {
       const ahora = Timestamp.now();
 
-      const nuevaSolicitud = {
+      // Limpiar items de valores undefined
+      const itemsLimpios = data.items.map(item =>
+        removeUndefined(item as unknown as Record<string, unknown>)
+      );
+
+      const nuevaSolicitud: Record<string, unknown> = {
         pacienteId: PACIENTE_ID,
         solicitadoPor: data.solicitadoPor,
         solicitadoPorNombre: data.solicitadoPorNombre,
         solicitadoPorRol: data.solicitadoPorRol,
-        items: data.items,
+        items: itemsLimpios,
         estado: 'pendiente' as EstadoSolicitudMaterial,
         urgencia: data.urgencia,
-        motivoGeneral: data.motivoGeneral || undefined,
-        fechaNecesaria: data.fechaNecesaria ? Timestamp.fromDate(data.fechaNecesaria) : undefined,
         creadoEn: ahora,
         actualizadoEn: ahora,
       };
+
+      // Solo agregar campos opcionales si tienen valor (Firestore no acepta undefined)
+      if (data.motivoGeneral) {
+        nuevaSolicitud.motivoGeneral = data.motivoGeneral;
+      }
+      if (data.fechaNecesaria) {
+        nuevaSolicitud.fechaNecesaria = Timestamp.fromDate(data.fechaNecesaria);
+      }
 
       await addDoc(
         collection(db, 'pacientes', PACIENTE_ID, 'solicitudesMateriales'),
