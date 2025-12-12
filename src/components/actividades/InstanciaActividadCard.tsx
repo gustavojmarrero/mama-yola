@@ -4,6 +4,7 @@ import {
   ESTADOS_INSTANCIA_CONFIG,
   getNombreInstancia,
   getDuracionInstancia,
+  getHoraFinalizacion,
 } from '../../types/actividades';
 
 interface InstanciaActividadCardProps {
@@ -122,9 +123,9 @@ export default function InstanciaActividadCard({
           <div>
             <h4 className="font-semibold text-gray-800">{nombre}</h4>
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span>{instancia.horaPreferida}</span>
-              <span>•</span>
-              <span>{duracion} min</span>
+              <span className="font-medium text-gray-600">
+                {instancia.horaPreferida} - {getHoraFinalizacion(instancia.horaPreferida, duracion)}
+              </span>
               {ubicacion && (
                 <>
                   <span>•</span>

@@ -321,6 +321,20 @@ export function getDuracionInstancia(instancia: InstanciaActividad): number {
   return 30; // Default
 }
 
+/**
+ * Calcula la hora de finalización dado un horario de inicio y duración
+ */
+export function getHoraFinalizacion(horaPreferida: string, duracionMinutos: number): string {
+  const [hora, minuto] = horaPreferida.split(':').map(Number);
+  const fecha = new Date();
+  fecha.setHours(hora, minuto, 0, 0);
+  fecha.setMinutes(fecha.getMinutes() + duracionMinutos);
+
+  const horas = String(fecha.getHours()).padStart(2, '0');
+  const mins = String(fecha.getMinutes()).padStart(2, '0');
+  return `${horas}:${mins}`;
+}
+
 // ===== DÍAS DE LA SEMANA =====
 
 export const DIAS_SEMANA = [
