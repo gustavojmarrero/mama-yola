@@ -13,6 +13,19 @@ interface RecursoCardProps {
 function getFaviconUrl(url: string): string {
   try {
     const domain = new URL(url).hostname;
+
+    // Dominios que no funcionan bien con el servicio de favicon
+    // Usamos iconos conocidos directamente
+    if (domain.includes('goo.gl') || domain.includes('photos.app.goo')) {
+      return 'https://www.google.com/s2/favicons?domain=photos.google.com&sz=64';
+    }
+    if (domain.includes('youtu.be')) {
+      return 'https://www.google.com/s2/favicons?domain=youtube.com&sz=64';
+    }
+    if (domain.includes('bit.ly') || domain.includes('tinyurl')) {
+      return ''; // URLs acortadas genéricas, no mostrar favicon
+    }
+
     return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
   } catch {
     return '';
