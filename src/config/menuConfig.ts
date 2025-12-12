@@ -37,6 +37,7 @@ export const MENU_ITEMS: MenuItem[] = [
   // Otros
   { id: '/eventos', name: 'Eventos', path: '/eventos', icon: '📅', roles: ['familiar', 'supervisor'] },
   { id: '/contactos', name: 'Contactos', path: '/contactos', icon: '📇', roles: ['familiar', 'supervisor'] },
+  { id: '/recursos', name: 'Recursos', path: '/recursos', icon: '🔗', roles: ['familiar', 'supervisor', 'cuidador'] },
   { id: '/usuarios', name: 'Usuarios', path: '/usuarios', icon: '👤', roles: ['familiar'] },
   { id: '/paciente', name: 'Paciente', path: '/paciente', icon: '🧓', roles: ['familiar', 'supervisor'] },
   { id: '/analytics', name: 'Analytics', path: '/analytics', icon: '📈', roles: ['familiar', 'supervisor'] },
@@ -74,6 +75,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     items: [
       MENU_ITEMS.find(i => i.id === '/eventos')!,
       MENU_ITEMS.find(i => i.id === '/contactos')!,
+      MENU_ITEMS.find(i => i.id === '/recursos')!,
       MENU_ITEMS.find(i => i.id === '/usuarios')!,
       MENU_ITEMS.find(i => i.id === '/paciente')!,
       MENU_ITEMS.find(i => i.id === '/analytics')!,

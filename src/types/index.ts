@@ -829,5 +829,39 @@ export interface SolicitudMaterial {
   actualizadoEn: Date;
 }
 
+// ===== TIPOS DE RECURSOS DIGITALES =====
+
+export interface CategoriaRecurso {
+  id: string;
+  pacienteId: string;
+  nombre: string;
+  icono: string;                  // Emoji: "📷"
+  color: string;                  // Hex color: "#3B82F6"
+  orden: number;                  // Para ordenar las categorías
+  predeterminada: boolean;        // true para categorías del sistema
+  activo: boolean;
+  creadoPor: string;              // userId
+  creadoEn: Date;
+  actualizadoEn: Date;
+}
+
+export interface RecursoDigital {
+  id: string;
+  pacienteId: string;
+  titulo: string;
+  descripcion: string;
+  url: string;
+  categoriaId: string;
+  categoriaNombre: string;        // Denormalizado para consultas
+  thumbnail?: string;             // URL de imagen preview (opcional)
+  notasPrivadas?: string;         // Solo visible para familiar/supervisor
+  favorito: boolean;
+  activo: boolean;
+  creadoPor: string;              // userId
+  creadoPorNombre: string;        // Denormalizado
+  creadoEn: Date;
+  actualizadoEn: Date;
+}
+
 // ===== RE-EXPORTAR TIPOS DE ACTIVIDADES V2 =====
 export * from './actividades';

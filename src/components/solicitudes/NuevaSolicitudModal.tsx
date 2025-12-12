@@ -6,17 +6,22 @@ import {
   UrgenciaMaterial,
   CategoriaInventario,
   ItemInventario,
+  SolicitudMaterial,
 } from '../../types';
+
+interface SolicitudFormData {
+  items: ItemSolicitudMaterial[];
+  urgencia: UrgenciaMaterial;
+  motivoGeneral?: string;
+  fechaNecesaria?: Date;
+}
 
 interface NuevaSolicitudModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCrear: (datos: {
-    items: ItemSolicitudMaterial[];
-    urgencia: UrgenciaMaterial;
-    motivoGeneral?: string;
-    fechaNecesaria?: Date;
-  }) => Promise<void>;
+  onCrear: (datos: SolicitudFormData) => Promise<void>;
+  solicitudEditar?: SolicitudMaterial | null;
+  onEditar?: (datos: SolicitudFormData) => Promise<void>;
 }
 
 const PACIENTE_ID = 'paciente-principal';
@@ -40,7 +45,10 @@ export default function NuevaSolicitudModal({
   isOpen,
   onClose,
   onCrear,
+  solicitudEditar,
+  onEditar,
 }: NuevaSolicitudModalProps) {
+  const modoEdicion = !!solicitudEditar;
   const [loading, setLoading] = useState(false);
   const [loadingInventario, setLoadingInventario] = useState(false);
   const [urgencia, setUrgencia] = useState<UrgenciaMaterial>('normal');
@@ -92,7 +100,7 @@ export default function NuevaSolicitudModal({
     cargarInventario();
   }, [isOpen]);
 
-  // Reset form cuando se cierra
+  // Reset form cuando se cierra o cargar datos en modo edición
   useEffect(() => {
     if (!isOpen) {
       setUrgencia('normal');
@@ -101,8 +109,18 @@ export default function NuevaSolicitudModal({
       setItems([]);
       setShowAddItem(false);
       resetAddItemForm();
+    } else if (solicitudEditar) {
+      // Modo edición: cargar datos existentes
+      setUrgencia(solicitudEditar.urgencia);
+      setMotivoGeneral(solicitudEditar.motivoGeneral || '');
+      setFechaNecesaria(
+        solicitudEditar.fechaNecesaria
+          ? new Date(solicitudEditar.fechaNecesaria).toISOString().split('T')[0]
+          : ''
+      );
+      setItems([...solicitudEditar.items]);
     }
-  }, [isOpen]);
+  }, [isOpen, solicitudEditar]);
 
   const resetAddItemForm = () => {
     setModoAgregar('inventario');
@@ -173,16 +191,22 @@ export default function NuevaSolicitudModal({
 
     setLoading(true);
     try {
-      await onCrear({
+      const datos = {
         items,
         urgencia,
         motivoGeneral: motivoGeneral || undefined,
         fechaNecesaria: fechaNecesaria ? new Date(fechaNecesaria) : undefined,
-      });
+      };
+
+      if (modoEdicion && onEditar) {
+        await onEditar(datos);
+      } else {
+        await onCrear(datos);
+      }
       onClose();
     } catch (error) {
-      console.error('Error al crear solicitud:', error);
-      alert('Error al crear la solicitud');
+      console.error(modoEdicion ? 'Error al editar solicitud:' : 'Error al crear solicitud:', error);
+      alert(modoEdicion ? 'Error al editar la solicitud' : 'Error al crear la solicitud');
     } finally {
       setLoading(false);
     }
@@ -197,9 +221,13 @@ export default function NuevaSolicitudModal({
         <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 z-10">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">🛒 Nueva Solicitud</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                {modoEdicion ? '✏️ Editar Solicitud' : '🛒 Nueva Solicitud'}
+              </h2>
               <p className="text-sm text-gray-500 mt-1">
-                Solicita la compra de materiales o consumibles
+                {modoEdicion
+                  ? 'Modifica los datos de la solicitud'
+                  : 'Solicita la compra de materiales o consumibles'}
               </p>
             </div>
             <button
@@ -492,7 +520,11 @@ export default function NuevaSolicitudModal({
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {loading ? 'Enviando...' : `Crear Solicitud (${items.length})`}
+              {loading
+                ? 'Guardando...'
+                : modoEdicion
+                ? `Guardar Cambios (${items.length})`
+                : `Crear Solicitud (${items.length})`}
             </button>
           </div>
         </div>

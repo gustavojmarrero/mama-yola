@@ -10,6 +10,7 @@ interface SolicitudMaterialCardProps {
   onMarcarComprada?: (solicitud: SolicitudMaterial) => void;
   onMarcarEntregada?: (solicitud: SolicitudMaterial) => void;
   onCancelar?: (solicitud: SolicitudMaterial) => void;
+  onEditar?: (solicitud: SolicitudMaterial) => void;
 }
 
 // Configuración de estados
@@ -39,6 +40,7 @@ export default function SolicitudMaterialCard({
   onMarcarComprada,
   onMarcarEntregada,
   onCancelar,
+  onEditar,
 }: SolicitudMaterialCardProps) {
   const estadoConfig = ESTADO_CONFIG[solicitud.estado];
   const urgenciaConfig = URGENCIA_CONFIG[solicitud.urgencia];
@@ -47,6 +49,11 @@ export default function SolicitudMaterialCard({
   const puedeMarcarComprada = (usuarioRol === 'familiar' || usuarioRol === 'supervisor') && solicitud.estado === 'aprobada';
   const puedeMarcarEntregada = (usuarioRol === 'familiar' || usuarioRol === 'supervisor') && solicitud.estado === 'comprada';
   const puedeCancelar = solicitud.estado === 'pendiente' && solicitud.solicitadoPor === usuarioId;
+  const puedeEditar = solicitud.estado === 'pendiente' && (
+    solicitud.solicitadoPor === usuarioId ||
+    usuarioRol === 'familiar' ||
+    usuarioRol === 'supervisor'
+  );
   const esUrgente = solicitud.urgencia === 'urgente' || solicitud.urgencia === 'alta';
 
   // Formatear fecha
@@ -153,6 +160,15 @@ export default function SolicitudMaterialCard({
           >
             Ver detalle
           </button>
+
+          {puedeEditar && onEditar && (
+            <button
+              onClick={() => onEditar(solicitud)}
+              className="px-3 py-2 bg-lavender-100 hover:bg-lavender-200 text-lavender-700 text-sm font-medium rounded-lg transition-colors"
+            >
+              ✏️ Editar
+            </button>
+          )}
 
           {puedeAprobar && onAprobar && (
             <button

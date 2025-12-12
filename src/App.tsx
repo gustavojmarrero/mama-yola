@@ -18,6 +18,7 @@ import PlantillasActividades from './pages/PlantillasActividades'
 import MenuComida from './pages/MenuComida'
 import Analytics from './pages/Analytics'
 import ConfiguracionHorarios from './pages/ConfiguracionHorarios'
+import RecursosDigitales from './pages/RecursosDigitales'
 import PrivateRoute from './components/common/PrivateRoute'
 
 function App() {
@@ -171,6 +172,14 @@ function App() {
         element={
           <PrivateRoute>
             <ConfiguracionHorarios />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/recursos"
+        element={
+          <PrivateRoute>
+            <RecursosDigitales />
           </PrivateRoute>
         }
       />

@@ -64,6 +64,7 @@ export default function SolicitudesMateriales() {
     marcarComoComprada,
     marcarComoEntregada,
     cancelarSolicitud,
+    editarSolicitud,
     recargarDatos,
   } = useSolicitudesMateriales();
 
@@ -80,6 +81,7 @@ export default function SolicitudesMateriales() {
   const [showNuevaModal, setShowNuevaModal] = useState(false);
   const [showDetalleModal, setShowDetalleModal] = useState(false);
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState<SolicitudMaterial | null>(null);
+  const [solicitudEditar, setSolicitudEditar] = useState<SolicitudMaterial | null>(null);
   const [modoDetalle, setModoDetalle] = useState<'ver' | 'aprobar' | 'rechazar' | 'comprar' | 'entregar'>('ver');
 
   // Control de permisos
@@ -191,6 +193,11 @@ export default function SolicitudesMateriales() {
     } catch (error) {
       showToast('Error al cancelar solicitud', 'error');
     }
+  };
+
+  const handleEditar = (solicitud: SolicitudMaterial) => {
+    setSolicitudEditar(solicitud);
+    setShowNuevaModal(true);
   };
 
   const handleConfirmarAccion = async (datos: {
@@ -396,6 +403,7 @@ export default function SolicitudesMateriales() {
                 onMarcarComprada={puedeAprobar ? handleMarcarComprada : undefined}
                 onMarcarEntregada={puedeAprobar ? handleMarcarEntregada : undefined}
                 onCancelar={handleCancelar}
+                onEditar={handleEditar}
               />
             ))}
           </div>
@@ -410,10 +418,14 @@ export default function SolicitudesMateriales() {
         )}
       </div>
 
-      {/* Modal Nueva Solicitud */}
+      {/* Modal Nueva/Editar Solicitud */}
       <NuevaSolicitudModal
         isOpen={showNuevaModal}
-        onClose={() => setShowNuevaModal(false)}
+        onClose={() => {
+          setShowNuevaModal(false);
+          setSolicitudEditar(null);
+        }}
+        solicitudEditar={solicitudEditar}
         onCrear={async (datos) => {
           if (!currentUser || !userProfile) return;
           try {
@@ -427,6 +439,17 @@ export default function SolicitudesMateriales() {
             setShowNuevaModal(false);
           } catch (error) {
             showToast('Error al crear solicitud', 'error');
+          }
+        }}
+        onEditar={async (datos) => {
+          if (!solicitudEditar) return;
+          try {
+            await editarSolicitud(solicitudEditar.id, datos);
+            showToast('Solicitud actualizada exitosamente', 'success');
+            setShowNuevaModal(false);
+            setSolicitudEditar(null);
+          } catch (error) {
+            showToast('Error al editar solicitud', 'error');
           }
         }}
       />

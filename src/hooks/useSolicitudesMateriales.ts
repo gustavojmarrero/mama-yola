@@ -39,6 +39,14 @@ export interface CrearSolicitudData {
   solicitadoPorRol: Rol;
 }
 
+// Datos para editar una solicitud existente
+export interface EditarSolicitudData {
+  items: ItemSolicitudMaterial[];
+  urgencia: UrgenciaMaterial;
+  motivoGeneral?: string;
+  fechaNecesaria?: Date;
+}
+
 interface UseSolicitudesMaterialesReturn {
   solicitudes: SolicitudMaterial[];
   solicitudesPendientes: SolicitudMaterial[];
@@ -76,6 +84,7 @@ interface UseSolicitudesMaterialesReturn {
     notasEntrega?: string
   ) => Promise<void>;
   cancelarSolicitud: (solicitudId: string) => Promise<void>;
+  editarSolicitud: (solicitudId: string, data: EditarSolicitudData) => Promise<void>;
   recargarDatos: () => Promise<void>;
 }
 
@@ -330,6 +339,48 @@ export function useSolicitudesMateriales(): UseSolicitudesMaterialesReturn {
     }
   }, [solicitudes, recargarDatos]);
 
+  // Editar solicitud (solo si está pendiente)
+  const editarSolicitud = useCallback(async (
+    solicitudId: string,
+    data: EditarSolicitudData
+  ): Promise<void> => {
+    try {
+      const solicitud = solicitudes.find(s => s.id === solicitudId);
+      if (!solicitud) throw new Error('Solicitud no encontrada');
+      if (solicitud.estado !== 'pendiente') {
+        throw new Error('Solo se pueden editar solicitudes pendientes');
+      }
+
+      const ahora = Timestamp.now();
+      const solicitudRef = doc(db, 'pacientes', PACIENTE_ID, 'solicitudesMateriales', solicitudId);
+
+      // Limpiar items de valores undefined
+      const itemsLimpios = data.items.map(item =>
+        removeUndefined(item as unknown as Record<string, unknown>)
+      );
+
+      const actualizacion: Record<string, unknown> = {
+        items: itemsLimpios,
+        urgencia: data.urgencia,
+        actualizadoEn: ahora,
+      };
+
+      // Solo agregar campos opcionales si tienen valor
+      if (data.motivoGeneral) {
+        actualizacion.motivoGeneral = data.motivoGeneral;
+      }
+      if (data.fechaNecesaria) {
+        actualizacion.fechaNecesaria = Timestamp.fromDate(data.fechaNecesaria);
+      }
+
+      await updateDoc(solicitudRef, actualizacion);
+      await recargarDatos();
+    } catch (err) {
+      console.error('Error al editar solicitud:', err);
+      throw err;
+    }
+  }, [solicitudes, recargarDatos]);
+
   // Cargar datos al montar
   useEffect(() => {
     recargarDatos();
@@ -356,6 +407,7 @@ export function useSolicitudesMateriales(): UseSolicitudesMaterialesReturn {
     marcarComoComprada,
     marcarComoEntregada,
     cancelarSolicitud,
+    editarSolicitud,
     recargarDatos,
   };
 }
