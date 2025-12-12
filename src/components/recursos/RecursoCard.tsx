@@ -42,7 +42,7 @@ function getAutoThumbnail(url: string): string | null {
     if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
       let videoId = '';
       if (domain.includes('youtu.be')) {
-        videoId = urlObj.pathname.slice(1);
+        videoId = urlObj.pathname.slice(1).split('?')[0];
       } else {
         videoId = urlObj.searchParams.get('v') || '';
       }
@@ -59,10 +59,8 @@ function getAutoThumbnail(url: string): string | null {
       }
     }
 
-    // Spotify - no hay thumbnails públicos fáciles
-    // Google Photos - no expone thumbnails públicamente
-
-    return null;
+    // Para cualquier otra URL, usar servicio de screenshot de WordPress (gratuito)
+    return `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=600`;
   } catch {
     return null;
   }
