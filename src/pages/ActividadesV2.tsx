@@ -249,8 +249,8 @@ export default function ActividadesV2() {
   const puedeProgramar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
   // Todos los roles pueden registrar actividades
   const puedeCompletar = userProfile?.rol === 'cuidador' || userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
-  // Solo familiares y supervisores pueden editar programaciones
-  const puedeEditar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor';
+  // Todos los roles pueden editar actividades completadas
+  const puedeEditar = userProfile?.rol === 'familiar' || userProfile?.rol === 'supervisor' || userProfile?.rol === 'cuidador';
 
   // Cargar configuración de horarios
   useEffect(() => {

@@ -12,6 +12,7 @@ import {
   orderBy,
   Timestamp,
   writeBatch,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type {
@@ -698,6 +699,20 @@ export async function actualizarInstanciaCompletada(
       ...ejecucionActual,
       ...ejecucion,
     },
+    actualizadoEn: Timestamp.now(),
+  });
+}
+
+/**
+ * Vacía una instancia completada, eliminando la actividad elegida y volviendo a estado pendiente
+ */
+export async function vaciarInstanciaCompletada(instanciaId: string): Promise<void> {
+  const docRef = doc(getInstanciasRef(), instanciaId);
+
+  await updateDoc(docRef, {
+    estado: 'pendiente' as EstadoInstancia,
+    actividadElegida: deleteField(),
+    ejecucion: deleteField(),
     actualizadoEn: Timestamp.now(),
   });
 }

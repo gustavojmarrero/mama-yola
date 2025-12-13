@@ -7,7 +7,7 @@ import {
   TIPOS_ACTIVIDAD_CONFIG,
   mapearTipoActividad,
 } from '../../types/actividades';
-import { actualizarInstanciaCompletada } from '../../services/instanciasActividades';
+import { actualizarInstanciaCompletada, vaciarInstanciaCompletada } from '../../services/instanciasActividades';
 import type { PlantillaActividad, ParticipacionActividad } from '../../types';
 
 const PACIENTE_ID = 'paciente-principal';
@@ -41,7 +41,7 @@ export default function EditarInstanciaCompletadaModal({
   onSuccess,
   instancia,
 }: EditarInstanciaCompletadaModalProps) {
-  const [paso, setPaso] = useState<'editar' | 'cambiar'>('editar');
+  const [paso, setPaso] = useState<'editar' | 'cambiar' | 'vaciar'>('editar');
   const [plantillas, setPlantillas] = useState<PlantillaActividad[]>([]);
   const [loading, setLoading] = useState(false);
   const [plantillaSeleccionada, setPlantillaSeleccionada] = useState<PlantillaActividad | null>(null);
@@ -163,6 +163,24 @@ export default function EditarInstanciaCompletadaModal({
     } catch (err) {
       console.error('Error actualizando instancia:', err);
       setError('Error al guardar. Intenta de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleVaciar = async () => {
+    if (!instancia) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await vaciarInstanciaCompletada(instancia.id);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      console.error('Error vaciando instancia:', err);
+      setError('Error al vaciar. Intenta de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -407,6 +425,51 @@ export default function EditarInstanciaCompletadaModal({
               </div>
             )}
 
+            {/* Paso: Confirmar eliminar */}
+            {paso === 'vaciar' && (
+              <div className="space-y-4 py-4">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    ¿Eliminar esta actividad?
+                  </h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    Podrás elegir otra actividad después.
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setPaso('editar')}
+                    disabled={saving}
+                    className="flex-1 py-3 px-4 border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    No, volver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleVaciar}
+                    disabled={saving}
+                    className="flex-1 py-3 px-4 rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 bg-red-500 text-white hover:bg-red-600"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Eliminando...
+                      </>
+                    ) : (
+                      'Sí, eliminar'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
@@ -417,30 +480,48 @@ export default function EditarInstanciaCompletadaModal({
 
           {/* Footer */}
           {paso === 'editar' && (
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={saving}
-                className="flex-1 py-3 px-4 border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleGuardar}
-                disabled={saving}
-                className="flex-1 py-3 px-4 rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 bg-lavender-600 text-white hover:bg-lavender-700"
-              >
-                {saving ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  'Guardar Cambios'
-                )}
-              </button>
+            <div className="px-6 py-4 border-t border-gray-100">
+              {/* Acción destructiva - sutil pero accesible */}
+              <div className="flex justify-center mb-4">
+                <button
+                  type="button"
+                  onClick={() => setPaso('vaciar')}
+                  disabled={saving}
+                  className="group flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-red-500 transition-all duration-200 disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span className="font-medium">Eliminar actividad</span>
+                </button>
+              </div>
+
+              {/* Acciones principales */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={saving}
+                  className="flex-1 py-3 px-4 border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGuardar}
+                  disabled={saving}
+                  className="flex-1 py-3 px-4 rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 bg-lavender-600 text-white hover:bg-lavender-700"
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    'Guardar Cambios'
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>
