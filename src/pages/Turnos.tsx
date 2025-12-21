@@ -650,7 +650,31 @@ export default function Turnos() {
                     <input
                       type="time"
                       value={formTurno.horaEntradaProgramada}
-                      onChange={(e) => setFormTurno({ ...formTurno, horaEntradaProgramada: e.target.value })}
+                      onChange={(e) => {
+                        const nuevaHoraEntrada = e.target.value;
+                        // Si es turno de 24 horas, recalcular hora de salida automáticamente
+                        if (formTurno.tipoTurno === '24hrs') {
+                          const [hora, minuto] = nuevaHoraEntrada.split(':').map(Number);
+                          // Calcular 23:59 después (1 minuto antes de la hora de entrada)
+                          let horaSalida = hora;
+                          let minutoSalida = minuto - 1;
+                          if (minutoSalida < 0) {
+                            minutoSalida = 59;
+                            horaSalida = horaSalida - 1;
+                            if (horaSalida < 0) {
+                              horaSalida = 23;
+                            }
+                          }
+                          const nuevaHoraSalida = `${horaSalida.toString().padStart(2, '0')}:${minutoSalida.toString().padStart(2, '0')}`;
+                          setFormTurno({
+                            ...formTurno,
+                            horaEntradaProgramada: nuevaHoraEntrada,
+                            horaSalidaProgramada: nuevaHoraSalida
+                          });
+                        } else {
+                          setFormTurno({ ...formTurno, horaEntradaProgramada: nuevaHoraEntrada });
+                        }
+                      }}
                       className="w-full border rounded-lg px-3 py-2"
                     />
                   </div>
