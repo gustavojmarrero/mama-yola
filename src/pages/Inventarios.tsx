@@ -7,6 +7,7 @@ import {
   getDocs,
   query,
   orderBy,
+  where,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -76,6 +77,7 @@ export default function Inventarios() {
   const { currentUser, userProfile } = useAuth();
   const [items, setItems] = useState<ItemInventario[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoInventario[]>([]);
+  const [medicamentosActivosIds, setMedicamentosActivosIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showMovimientoModal, setShowMovimientoModal] = useState(false);
@@ -195,11 +197,28 @@ export default function Inventarios() {
 
   async function cargarDatos() {
     try {
-      await Promise.all([cargarItems(), cargarMovimientos()]);
+      await Promise.all([cargarItems(), cargarMovimientos(), cargarMedicamentosActivos()]);
     } catch (error) {
       console.error('Error al cargar datos:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function cargarMedicamentosActivos() {
+    try {
+      const q = query(
+        collection(db, 'pacientes', PACIENTE_ID, 'medicamentos'),
+        where('activo', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      const idsActivos = new Set<string>();
+      snapshot.forEach((doc) => {
+        idsActivos.add(doc.id);
+      });
+      setMedicamentosActivosIds(idsActivos);
+    } catch (error) {
+      console.error('Error al cargar medicamentos activos:', error);
     }
   }
 
@@ -665,6 +684,19 @@ export default function Inventarios() {
   const itemsFiltrados = useMemo(() => {
     let resultado = [...items];
 
+    // Ocultar items de inventario vinculados a medicamentos inactivos para cuidadores y supervisores
+    // Solo familiares (admins) pueden ver todo
+    if (userProfile?.rol !== 'familiar') {
+      resultado = resultado.filter((item) => {
+        // Si el item tiene medicamentoId, verificar que esté activo
+        if (item.medicamentoId) {
+          return medicamentosActivosIds.has(item.medicamentoId);
+        }
+        // Items sin medicamentoId se muestran siempre
+        return true;
+      });
+    }
+
     // Búsqueda por nombre
     if (searchTerm) {
       const termLower = searchTerm.toLowerCase();
@@ -714,7 +746,7 @@ export default function Inventarios() {
     });
 
     return resultado;
-  }, [items, searchTerm, filtroCategoria, filtroEstado, filtroTipoConsumible, sortBy]);
+  }, [items, searchTerm, filtroCategoria, filtroEstado, filtroTipoConsumible, sortBy, userProfile?.rol, medicamentosActivosIds]);
 
   // Items visibles con paginación
   const itemsVisibles = itemsFiltrados.slice(0, visibleCount);
